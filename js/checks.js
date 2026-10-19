@@ -14,7 +14,11 @@
   var Data = global.RWData;
 
   function has(def, t) { return def.tags && def.tags.indexOf(t) >= 0; }
-  function encloses(def) { return has(def, 'room'); }
+  // 能不能封住房间。游戏里房间的边界不只是墙和门：
+  // 嵌在墙里的制冷机 / 通风孔 / 蒸发制冷器也是不可通行的，它们本身就是冷库密封的一环。
+  // 这里只额外认「贴墙件 + 不可通行」，不能把 solid 全算进来 ——
+  // 床、桌子、发电机、炮塔都带 solid，那样会把一个房间切成一堆碎块。
+  function encloses(def) { return has(def, 'room') || (has(def, 'onwall') && !has(def, 'pass')); }
   function isDoor(def) { return has(def, 'door'); }
   function isPower(def) { return def.tags && (has(def, 'conduit') || has(def, 'power')); }
   function isConsumer(def) { return has(def, 'power') && !has(def, 'gen') && !has(def, 'store') && (def.powerUse || 0) > 0; }

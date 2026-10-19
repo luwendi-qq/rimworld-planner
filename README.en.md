@@ -77,9 +77,17 @@ Full manual → [docs/usage.md](docs/usage.md) (Chinese)
 
 ![Power network](docs/images/power.png)
 
+Turn on the **电力网 (power grid)** layer to see the wiring: **thick yellow lines are conduit trunks, thin lines are devices joining the grid**.
+The 运行校验 (Run checks) button also reports each grid's generation / draw / storage balance, plus every room's area, space rating, door count and cooler coverage.
+
 ### Vanilla textures vs vector fallback
 
-![Texture comparison](docs/images/textures-compare.png)
+Same area: the top image uses the game's vanilla textures, the bottom one is the vector fallback you get without `img/`.
+**Shapes, footprints and rotations are identical** — only the game art is missing:
+
+![Vanilla textures](docs/images/textures-on.png)
+
+![Vector fallback](docs/images/textures-off.png)
 
 ## Getting the blueprint into the game
 
