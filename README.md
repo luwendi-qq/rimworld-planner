@@ -42,6 +42,8 @@
 
 到 [Releases](https://github.com/luwendi-qq/rimworld-planner/releases/latest) 下载 `rimworld-planner.single.html`，**双击就能用**。
 
+每次源码更新，GitHub Actions 会自动重新构建并更新 Releases 里的 `latest`（源码改动后无需手动发版）。
+
 CSS 和全部 JS 都内联在这一个文件里，没有任何外部依赖（约 630 KB），可以随便拷来拷去。
 
 ### ③ clone 源码（跟进更新 / 想改代码）

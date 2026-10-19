@@ -1,0 +1,51 @@
+name: 发布最新版
+
+# 每次源码更新后，自动构建单文件版并更新 GitHub Releases 里的 latest。
+# 说明：`build-single.yml` 只负责把单文件版提交回仓库；这个工作流负责真正发布 Release。
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'css/**'
+      - 'js/**'
+      - 'tools/build_single.py'
+      - '.github/workflows/release-latest.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-latest
+  cancel-in-progress: true
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    # 机器人为了让单文件版和源码同步而提交的 [skip ci] 不再重复发布
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: 构建单文件版
+        run: |
+          export SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)
+          python tools/build_single.py
+          python -c "import zipfile; z=zipfile.ZipFile('rimworld-planner.single.zip','w',zipfile.ZIP_DEFLATED); z.write('rimworld-planner.single.html','rimworld-planner.single.html'); z.close()"
+
+      - name: 更新 latest Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest \
+            rimworld-planner.single.html rimworld-planner.single.zip \
+            --title "最新构建 (${GITHUB_SHA:0:7})" \
+            --notes "由 GitHub Actions 自动构建，对应提交 ${GITHUB_SHA}。" \
+            --latest
