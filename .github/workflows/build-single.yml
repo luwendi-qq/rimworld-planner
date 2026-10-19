@@ -1,0 +1,51 @@
+name: 重新生成单文件版
+
+# 改了源码就自动重跑 tools/build_single.py，并把新的单文件版提交回仓库，
+# 保证 rimworld-planner.single.html 永远和源码一致（不会出现"用户下到的成品是旧版"）。
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'css/**'
+      - 'js/**'
+      - 'tools/build_single.py'
+      - '.github/workflows/build-single.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-single-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      # 用源码最后一次提交的时间当构建戳，保证「相同源码 → 相同产物」，
+      # 否则 build_single.py 里的时间戳会让每次运行都产生假 diff、机器人反复提交。
+      - name: 打包单文件版
+        run: |
+          export SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)
+          python tools/build_single.py
+
+      - name: 有变化才提交
+        run: |
+          if git diff --quiet -- rimworld-planner.single.html; then
+            echo "单文件版已经是最新的，无需提交。"
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add rimworld-planner.single.html
+          git commit -m "chore: 由 Actions 重新生成单文件版 [skip ci]"
+          git push

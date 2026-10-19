@@ -20,7 +20,7 @@ import argparse
 import os
 import re
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 
 # 内联顺序必须与 index.html 中的 <script src> 顺序一致
 SCRIPT_ORDER = [
@@ -72,19 +72,30 @@ def build(root, out_path):
 
     # ---- 内联 JS（按固定顺序，跳过不存在的可选文件）----
     inline = []
+    included = []
     for rel in SCRIPT_ORDER:
         path = os.path.join(root, rel)
         if not os.path.isfile(path):
             print('  跳过不存在的 %s' % rel)
             continue
         print('  内联 %s (%d 字节)' % (rel, os.path.getsize(path)))
+        included.append(rel)
         inline.append('<script>\n/* ==== %s ==== */\n%s\n</script>' % (rel, safe_inline_js(read(path))))
 
     # 把所有 <script src="js/..."> 标签整体替换掉
     html = re.sub(r'<script[^>]*src="js/[^"]+"[^>]*>\s*</script>\s*', '', html)
     block = '\n'.join(inline)
+    # 构建时间：默认用当前时间；设了 SOURCE_DATE_EPOCH 就用它（可复现构建）。
+    # CI 里会传 git 最后一次提交的时间，这样同样的源码总是产出同样的文件，
+    # 不会因为时间戳而每次推送都产生一个假 diff。
+    sde = os.environ.get('SOURCE_DATE_EPOCH', '').strip()
+    if sde.isdigit():
+        stamp_time = datetime.fromtimestamp(int(sde), timezone.utc)
+        stamp_label = stamp_time.strftime('%Y-%m-%d %H:%M UTC')
+    else:
+        stamp_label = datetime.now().strftime('%Y-%m-%d %H:%M')
     stamp = '<!-- 单文件构建：%s  内联模块：%s -->' % (
-        datetime.now().strftime('%Y-%m-%d %H:%M'), ', '.join(SCRIPT_ORDER))
+        stamp_label, ', '.join(included))
     if '</body>' in html:
         html = html.replace('</body>', block + '\n</body>', 1)
     else:
