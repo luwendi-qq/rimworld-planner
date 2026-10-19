@@ -45,7 +45,7 @@ rimworld-planner/
 本仓库只包含**代码和文档**，不含任何游戏美术资源（`img/` 已排除），所以体积很小，clone 很快。
 
 ```bash
-git clone https://github.com/Winstonlu233/rimworld-planner.git
+git clone https://github.com/luwendi-qq/rimworld-planner.git
 ```
 
 之后作者更新了，你在仓库目录里拉一下就同步了：
