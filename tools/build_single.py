@@ -102,7 +102,10 @@ def build(root, out_path):
         html += '\n' + block + '\n'
     html = html.replace('</head>', stamp + '\n</head>', 1)
 
-    with open(out_path, 'w', encoding='utf-8') as f:
+    # 必须显式 newline='\n'：Python 在 Windows 上默认会把 \n 翻译成 CRLF，
+    # 那样同样的源码在 Windows 上会构建出比 Linux（CI）大 6~7 KB 的文件，
+    # 本地重建和机器人重建来回打架。
+    with open(out_path, 'w', encoding='utf-8', newline='\n') as f:
         f.write(html)
     print('已生成：%s (%d 字节)' % (out_path, os.path.getsize(out_path)))
     return 0

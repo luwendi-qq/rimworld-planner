@@ -1,0 +1,19 @@
+# 统一换行符为 LF。
+#
+# 这不只是风格问题：tools/build_single.py 是把源码原样内联进单文件版的，
+# 所以工作区里是 CRLF 还是 LF，会直接决定生成出来的 rimworld-planner.single.html
+# 的字节数。而 GitHub Actions 跑在 Linux 上（LF），如果本机是 CRLF（Windows 默认），
+# 就会「同样的源码构建出不同的文件」，每次本地重建都比 CI 多 6～7 KB，
+# 然后被机器人再提交一次，来回打架。
+#
+# 固定成 LF 之后，本机重建和 CI 重建逐字节一致。
+* text=auto eol=lf
+
+# 二进制文件不要动
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.zip binary
+*.woff binary
+*.woff2 binary
