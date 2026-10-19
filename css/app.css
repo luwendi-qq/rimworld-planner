@@ -1,0 +1,449 @@
+/* 配色全部取自游戏本体：
+ *   按钮底色  UI/Widgets/ButtonBG / ButtonBGMouseover / ButtonBGClick
+ *   菜单按钮  UI/Widgets/DesButBG（建筑师菜单那种深蓝灰渐变）
+ *   面板/提示 UI/Widgets/TooltipBG  #0C0F11
+ *   灰底      TexUI.GrayBg          #333F33（暗绿灰）
+ *   悬停/选中 TexUI.HighlightTex 白 10% / HighlightSelectedTex #FFF080
+ *   强调青    TexUI.HighlightLineResearchColor #33CDD9
+ *   消息色    ColorLibrary.cs（红 #E50000 / 绿 #15B01A / 金 #DBB40C）
+ */
+:root {
+  --bg: #0e1113;        /* 最底层：近黑（TooltipBG #0C0F11 稍提亮） */
+  --bg2: #191d18;       /* 面板底：暗绿灰（GrayBg #333F33 压暗） */
+  --bg3: #232822;       /* 次级面板 / 输入框 */
+  --line: #3b4038;      /* 分隔线（Divider #676767 压暗） */
+  --fg: #e9e7e0;        /* 正文：暖白（游戏文字偏暖） */
+  --fg2: #a2a69b;       /* 次要文字 */
+  --btn: #6a512e;       /* 普通按钮：游戏那种暖棕 */
+  --btn-hi: #886432;    /* 悬停 */
+  --btn-dn: #624927;    /* 按下 */
+  --tab: #395365;       /* 建筑师菜单按钮的蓝灰 */
+  --tab-hi: #5d6775;
+  --accent: #33cdd9;    /* 强调青 */
+  --accent2: #fff080;   /* 选中暖黄 */
+  --warn: #dbb40c;      /* 金 */
+  --err: #e50000;       /* 红 */
+  --ok: #15b01a;        /* 绿 */
+  --on: #6a512e;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0; height: 100%;
+  background: var(--bg); color: var(--fg);
+  font: 13px/1.5 "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  overflow: hidden;
+  /* 游戏里所有 UI 文字都带一层深色描影，读起来更「实」 */
+  text-shadow: 0 1px 0 rgba(0,0,0,.55);
+}
+
+button, input, select, textarea { font: inherit; color: inherit; }
+
+/* ---------- 总体布局 ---------- */
+#app {
+  display: grid;
+  grid-template-columns: 268px 1fr 300px;
+  grid-template-rows: auto 1fr auto;
+  grid-template-areas: "head head head" "left main right" "foot foot foot";
+  height: 100vh;
+}
+
+header {
+  grid-area: head;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 7px 12px; background: var(--bg2);
+  border-bottom: 1px solid var(--line);
+}
+header .brand { font-weight: 700; letter-spacing: .3px; white-space: nowrap; }
+header .brand small { color: var(--fg2); font-weight: 400; margin-left: 6px; }
+header .spacer { flex: 1; }
+
+.group { display: flex; align-items: center; gap: 4px; }
+.group > label { color: var(--fg2); font-size: 12px; }
+
+.sep { width: 1px; height: 22px; background: var(--line); margin: 0 4px; }
+
+/* ---------- 通用控件 ---------- */
+/* 按钮照游戏：暖棕底 + 上缘高光 + 下缘阴影，悬停/按下换底色 */
+button {
+  background: linear-gradient(#7a5f37, var(--btn));
+  border: 1px solid #3f3020; border-top-color: #997a45;
+  color: #fdf7ea; padding: 4px 10px; border-radius: 3px; cursor: pointer;
+  text-shadow: 0 1px 0 rgba(0,0,0,.45);
+}
+button:hover { background: linear-gradient(#9a7440, var(--btn-hi)); }
+button:active { background: var(--btn-dn); transform: translateY(1px); }
+button.on, button.primary {
+  background: linear-gradient(#9a7440, var(--btn-hi));
+  border-color: var(--accent2); color: #fff;
+  box-shadow: 0 0 0 1px rgba(255,240,128,.4) inset, 0 0 6px rgba(255,240,128,.18);
+}
+button:disabled { opacity: .4; cursor: default; filter: saturate(.5); }
+/* 次级按钮：暗底细边（游戏里大量用这种） */
+button.ghost {
+  background: rgba(255,255,255,.05); border: 1px solid var(--line);
+  border-top-color: #4d5348; text-shadow: none; color: var(--fg2);
+}
+button.ghost:hover { background: rgba(255,255,255,.12); color: var(--fg); }
+/* 命令按钮：建筑师菜单那种深蓝灰 */
+button.cmd {
+  background: linear-gradient(#4a6a80, var(--tab)); border: 1px solid #23323d;
+  border-top-color: #6d8399; color: #eaf3f8;
+}
+button.cmd:hover { background: linear-gradient(#5f8299, var(--tab-hi)); }
+button.danger { border-color: #7a2b24; color: #f3c7c2; }
+button.danger:hover { background: linear-gradient(#8c3a30, #6d2a22); color: #fff; }
+
+input[type=text], input[type=number], select, textarea {
+  background: #0f1214; border: 1px solid var(--line); border-radius: 3px;
+  padding: 4px 7px; outline: none; color: var(--fg);
+}
+input[type=number] { width: 58px; }
+input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(51,205,217,.25); }
+input[type=range] { width: 96px; }
+input[type=checkbox] { accent-color: var(--btn-hi); }
+label.chk { display: inline-flex; align-items: center; gap: 4px; color: var(--fg2); cursor: pointer; }
+label.chk:hover { color: var(--fg); }
+
+/* ---------- 左侧 ---------- */
+#left {
+  grid-area: left; background: var(--bg2); border-right: 1px solid var(--line);
+  display: flex; flex-direction: column; min-height: 0;
+}
+#searchWrap { padding: 8px 8px 0; }
+#searchWrap input { width: 100%; }
+/* 分类页签：照游戏的标签条（连成一排、底边高亮） */
+#catTabs {
+  display: flex; flex-wrap: wrap; gap: 0; padding: 8px 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.tab {
+  padding: 5px 10px 4px; font-size: 12px; border: 1px solid var(--line);
+  border-bottom: none; border-radius: 3px 3px 0 0; margin-right: -1px; margin-bottom: -1px;
+  background: linear-gradient(#23282b, #171b1d); color: var(--fg2); position: relative;
+}
+.tab:hover { color: var(--fg); background: linear-gradient(#2e3538, #1d2225); }
+.tab.on {
+  background: linear-gradient(#4a6a80, var(--tab)); color: #fff; border-color: #23323d;
+  box-shadow: 0 2px 0 0 var(--accent2) inset, 0 0 8px rgba(255,240,128,.10) inset;
+}
+#palette {
+  overflow: auto; padding: 8px; flex: 1; display: grid;
+  grid-template-columns: 1fr 1fr; gap: 5px; align-content: start;
+}
+/* 物品栏格子：照建筑师菜单的按钮（深蓝灰渐变 + 上缘高光 + 选中暖黄） */
+.pitem {
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  padding: 6px 4px 5px; border-radius: 3px; cursor: pointer;
+  background: linear-gradient(#2b3a45, #1a2229);
+  border: 1px solid #141a1f; border-top-color: #4d6070;
+  box-shadow: 0 1px 0 rgba(0,0,0,.35);
+  transition: background .1s, border-color .1s;
+}
+.pitem:hover { background: linear-gradient(#3a5061, #232f39); border-top-color: #6d8399; }
+.pitem.on {
+  border-color: var(--accent2); border-top-color: var(--accent2);
+  background: linear-gradient(#3f5a6c, #243039);
+  box-shadow: 0 0 0 1px rgba(255,240,128,.35) inset, 0 0 8px rgba(255,240,128,.16);
+}
+.pitem canvas { display: block; image-rendering: auto; }
+.pitem span { display: flex; flex-direction: column; align-items: center; line-height: 1.15; }
+.pitem b { font-size: 11px; font-weight: 600; text-align: center; color: #eef4f8; }
+.pitem i { font-size: 9.5px; color: #93a3ae; font-style: normal; }
+.pitem em { color: var(--warn); font-style: normal; }
+.pitem i.stuff { font-size: 9.5px; color: var(--accent2); min-height: 11px; opacity: .9; }
+
+/* 拖入游戏目录的区域 */
+.dropzone {
+  border: 1px dashed #4d5348; border-radius: 4px;
+  padding: 10px 8px; text-align: center; font-size: 12px; line-height: 1.5;
+  color: var(--fg2); transition: border-color .15s, background .15s;
+  background: rgba(255,255,255,.03);
+}
+.dropzone.over { border-color: var(--accent2); background: rgba(255,240,128,.08); color: var(--fg); }
+.dropzone.busy { opacity: .6; }
+
+/* 长按/右键弹出的材质菜单（和游戏里的材质选择一致） */
+.stuffMenu {
+  position: fixed; z-index: 60; min-width: 136px; max-height: 340px; overflow: auto;
+  background: rgba(12,15,17,.97); border: 1px solid #5d6775;
+  border-radius: 3px; padding: 3px; box-shadow: 0 10px 30px rgba(0,0,0,.65);
+}
+.stuffMenu .smhead {
+  font-size: 11px; color: var(--fg2); padding: 4px 6px 6px; font-weight: 600;
+  border-bottom: 1px solid var(--line, #3a4048); margin-bottom: 4px;
+}
+.stuffMenu .smcat {
+  font-size: 10px; color: var(--fg2); padding: 5px 6px 2px; text-transform: none; opacity: .8;
+}
+.stuffMenu .smitem {
+  display: flex; align-items: center; gap: 7px; width: 100%;
+  background: none; border: 0; color: var(--fg, #dfe5ec); text-align: left;
+  font-size: 12px; padding: 4px 7px; border-radius: 5px; cursor: pointer;
+}
+.stuffMenu .smitem:hover { background: rgba(255,255,255,0.07); }
+.stuffMenu .smitem.on { background: rgba(255,240,128,0.16); }
+.stuffMenu .sw {
+  width: 13px; height: 13px; border-radius: 3px; flex: 0 0 auto;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.45);
+}
+#brushBar { border-top: 1px solid var(--line); padding: 7px 10px; font-size: 12px; }
+.muted { color: var(--fg2); }
+
+/* ---------- 中间画布 ---------- */
+#main { grid-area: main; position: relative; min-width: 0; min-height: 0; background: #0b0e10; }
+#canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
+#canvas.panning { cursor: grabbing; }
+#hint {
+  position: absolute; left: 10px; bottom: 10px; pointer-events: none;
+  background: rgba(12,15,17,.80); border: 1px solid var(--line); border-radius: 4px;
+  padding: 5px 9px; font-size: 11.5px; color: var(--fg2);
+  text-shadow: 0 1px 0 rgba(0,0,0,.6);
+}
+
+/* 拖动时的实时读数（画布正中上方）——照游戏里的「拖框读数」样式 */
+#drawHud {
+  position: absolute; left: 50%; top: 12px; transform: translateX(-50%);
+  pointer-events: none; opacity: 0; transition: opacity .1s;
+  background: rgba(12,15,17,.92); border: 1px solid var(--accent2);
+  border-radius: 4px; padding: 6px 16px;
+  font: 600 17px/1.2 ui-monospace, Menlo, Consolas, monospace;
+  color: var(--accent2); white-space: nowrap; letter-spacing: .5px;
+  box-shadow: 0 4px 18px rgba(0,0,0,.5);
+  text-shadow: 0 1px 0 rgba(0,0,0,.7);
+}
+#drawHud.show { opacity: 1; }
+
+/* 顶栏里的小读数 */
+.readout {
+  font: 600 13px/1 ui-monospace, Menlo, Consolas, monospace;
+  color: var(--accent2); min-width: 96px; white-space: nowrap;
+}
+
+/* ---------- 右侧 ---------- */
+#right {
+  grid-area: right; background: var(--bg2); border-left: 1px solid var(--line);
+  display: flex; flex-direction: column; min-height: 0;
+  overflow-y: auto;            /* 面板多，要能整列滚动 */
+  overflow-x: hidden;
+}
+#right .panel { flex: none; }
+.panel { border-bottom: 1px solid var(--line); padding: 8px 10px; }
+.panel h3 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .6px; color: var(--fg2); }
+#issuesList, #roomList, #statsList { max-height: 190px; overflow: auto; }
+.issue {
+  display: flex; gap: 6px; align-items: flex-start; padding: 5px 6px; border-radius: 5px;
+  cursor: pointer; font-size: 12px; margin-bottom: 3px; background: var(--bg3);
+}
+.issue:hover { background: rgba(255,255,255,.05); }
+.issue .dot { width: 7px; height: 7px; border-radius: 50%; margin-top: 5px; flex: none; }
+.issue.error .dot { background: var(--err); }
+.issue.warn .dot { background: var(--warn); }
+.issue.info .dot { background: var(--accent); }
+.ok { color: var(--accent2); padding: 6px; }
+.bad { color: var(--err); } .good { color: var(--accent2); }
+.prow, .rrow, .srow { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; padding: 3px 4px; border-radius: 4px; }
+.srow { cursor: pointer; }
+.srow:hover { background: var(--bg3); }
+#toolsGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+#layers, #planOpts { display: flex; flex-wrap: wrap; gap: 8px 12px; font-size: 12px; }
+.swatchRow { display: flex; flex-wrap: wrap; gap: 4px; }
+.sw { width: 18px; height: 18px; border-radius: 4px; border: 1px solid #000; cursor: pointer; }
+.sw.on { outline: 2px solid #fff; }
+
+/* ---------- 底部 ---------- */
+footer {
+  grid-area: foot; display: flex; align-items: center; gap: 12px;
+  padding: 4px 12px; background: var(--bg2); border-top: 1px solid var(--line);
+  font-size: 12px; color: var(--fg2);
+}
+footer b { color: var(--fg); }
+
+/* ---------- 弹窗 ---------- */
+.modal {
+  position: fixed; inset: 0; background: rgba(0,0,0,.55); display: none;
+  align-items: center; justify-content: center; z-index: 50;
+}
+.modal.show { display: flex; }
+.modal .box {
+  background: var(--bg2); border: 1px solid var(--line); border-radius: 10px;
+  width: min(720px, 92vw); padding: 14px 16px; box-shadow: 0 12px 40px rgba(0,0,0,.5);
+}
+.modal h2 { margin: 0 0 4px; font-size: 15px; }
+.modal p { margin: 0 0 10px; color: var(--fg2); font-size: 12px; }
+.modal textarea { width: 100%; height: 300px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; resize: vertical; }
+.modal .row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+
+/* 帮助弹窗 */
+#helpModal .box { max-height: 88vh; overflow: auto; }
+.helpBody h4 { margin: 14px 0 6px; font-size: 13px; color: var(--accent); }
+.helpBody h4:first-child { margin-top: 0; }
+.helpBody ul { margin: 0; padding-left: 18px; color: var(--fg); }
+.helpBody li { margin: 3px 0; }
+.helpBody p { color: var(--fg2); font-size: 12px; margin: 6px 0; }
+.helpBody code {
+  background: #12151a; border: 1px solid var(--line); border-radius: 4px;
+  padding: 0 4px; font-size: 11.5px; word-break: break-all;
+}
+/* 帮助里的外链（比如模组的创意工坊页面）：跟主题配色走，别用浏览器默认的蓝紫 */
+.helpBody a { color: var(--accent); text-decoration: none; border-bottom: 1px solid rgba(51, 205, 217, .45); }
+.helpBody a:hover { color: #7fe6ef; border-bottom-color: #7fe6ef; }
+.helpBody a code { color: inherit; border-color: rgba(51, 205, 217, .35); background: #10222a; }
+.pathTable { width: 100%; border-collapse: collapse; margin: 6px 0; }
+.pathTable th, .pathTable td { border: 1px solid var(--line); padding: 4px 6px; font-size: 11.5px; text-align: left; vertical-align: top; }
+.pathTable th { background: var(--bg3); color: var(--fg2); font-weight: 600; white-space: nowrap; }
+
+/* ---------- 提示 ---------- */
+.toast {
+  position: fixed; left: 50%; bottom: 46px; transform: translate(-50%, 20px);
+  background: #22303f; border: 1px solid var(--accent); color: #fff;
+  padding: 8px 14px; border-radius: 8px; opacity: 0; pointer-events: none;
+  transition: .18s; max-width: 70vw; z-index: 60; font-size: 12.5px;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.toast.err { border-color: var(--err); background: #3a2220; }
+
+details > summary { cursor: pointer; color: var(--fg2); font-size: 12px; }
+details { margin-top: 6px; }
+details p, details ul { color: var(--fg2); font-size: 11.5px; margin: 6px 0 0; padding-left: 16px; }
+kbd {
+  background: #12151a; border: 1px solid var(--line); border-bottom-width: 2px;
+  border-radius: 4px; padding: 0 4px; font-size: 11px;
+}
+
+/* 当前格 / 选中 信息面板 */
+#inspector { font-size: 12px; }
+#inspector .ihint { color: var(--fg2); font-size: 11.5px; }
+#inspector .icell {
+  color: var(--fg2); font-size: 11px; font-family: ui-monospace, Menlo, Consolas, monospace;
+  margin-bottom: 4px;
+}
+#inspector .iitem {
+  background: var(--bg3); border: 1px solid var(--line); border-radius: 6px;
+  padding: 5px 7px; margin-bottom: 4px; cursor: pointer;
+}
+#inspector .iitem:hover { border-color: var(--accent); }
+#inspector .iitem.sel { border-color: var(--accent2); box-shadow: 0 0 0 1px var(--accent2) inset; }
+#inspector .iitem .nm { font-weight: 600; }
+#inspector .iitem .sz { color: var(--fg2); font-size: 11px; }
+#inspector .iitem .meta { color: var(--fg2); font-size: 11px; margin-top: 2px; }
+#inspector .iitem .def {
+  color: #7f8b99; font-size: 10.5px; font-family: ui-monospace, Menlo, Consolas, monospace;
+  word-break: break-all;
+}
+#inspector .chip {
+  display: inline-block; background: #2b3542; border-radius: 3px;
+  padding: 0 4px; margin: 2px 3px 0 0; font-size: 10.5px; color: #cbd6e2;
+}
+#inspector .chip.warn { background: #4a3a1e; color: #f0cf8a; }
+#inspector .chip.blue { background: #1e3a4a; color: #8ad0f0; }
+
+.helpBody pre.tree {
+  background: #12151a; border: 1px solid var(--line); border-radius: 6px;
+  padding: 8px 10px; margin: 6px 0; font-size: 11.5px; line-height: 1.55;
+  color: #cbd6e2; overflow-x: auto; white-space: pre;
+}
+
+/* ================================================================
+ *  游戏化外观（第二层）：工具条 / 检视栏 / 面板标题 / 提示框 / 画布氛围
+ *  取值同样来自游戏 UI 贴图与 TexUI.cs
+ * ================================================================ */
+
+/* 面板：游戏里的窗口是一块近黑底 + 细边 + 标题条（TitleBGTex = 白 5%） */
+.panel { border-bottom: 1px solid #2b302a; padding: 0 10px 9px; }
+.panel h3 {
+  margin: 0 -10px 7px; padding: 4px 10px 3px;
+  font-size: 11.5px; text-transform: none; letter-spacing: .5px;
+  color: #cfd6cd; font-weight: 600;
+  background: rgba(255,255,255,.05); border-bottom: 1px solid #2b302a;
+}
+#right { background: var(--bg2); }
+#right .panel { background: linear-gradient(rgba(255,255,255,.012), transparent); }
+
+/* 检视栏条目：悬停白 10%，选中暖黄 18%（TexUI.HighlightTex / HighlightSelectedTex） */
+.iitem, .icell { border-radius: 3px; }
+.iitem { padding: 4px 6px; margin: 2px 0; background: rgba(255,255,255,.03); border: 1px solid transparent; cursor: pointer; }
+.iitem:hover { background: rgba(255,255,255,.10); }
+.iitem.sel { background: rgba(255,240,128,.18); border-color: rgba(255,240,128,.55); }
+.iitem .nm { font-size: 12.5px; }
+.iitem .sz { color: #93a3ae; font-size: 11px; }
+.iitem .def { color: #6f7a72; font-size: 10.5px; }
+.icell { padding: 3px 4px; background: rgba(255,255,255,.03); font-size: 12px; }
+.ihint { color: var(--fg2); font-size: 11.5px; line-height: 1.55; padding: 3px 4px; }
+.chip {
+  display: inline-block; padding: 1px 6px; margin: 2px 3px 0 0; border-radius: 2px;
+  background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.10);
+  font-size: 10.5px; color: #c3ccc4;
+}
+.chip.blue { background: rgba(51,205,217,.16); border-color: rgba(51,205,217,.4); color: #bdeef4; }
+.prow, .rrow, .srow { border-radius: 3px; }
+.srow:hover { background: rgba(255,255,255,.10); }
+.issue { border-radius: 3px; }
+.ok { color: var(--ok); font-size: 12px; padding: 4px; }
+.bad { color: var(--err); }
+.good { color: var(--ok); }
+
+/* 左下角工具条：照游戏的命令按钮（大方块 + 图标 + 文字） */
+#toolBar {
+  position: absolute; left: 10px; bottom: 34px; display: flex; gap: 4px;
+  padding: 4px; background: rgba(12,15,17,.72); border: 1px solid #2b302a;
+  border-radius: 4px; box-shadow: 0 6px 20px rgba(0,0,0,.45);
+}
+#toolBar button {
+  width: 58px; height: 54px; padding: 4px 2px 3px; display: flex;
+  flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  background: linear-gradient(#2b3a45, #1a2229); border: 1px solid #141a1f;
+  border-top-color: #4d6070; color: #c9d6dd; text-shadow: none;
+}
+#toolBar button svg {
+  width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+#toolBar button span { font-size: 11px; }
+#toolBar button:hover { background: linear-gradient(#3a5061, #232f39); color: #fff; }
+#toolBar button.on {
+  background: linear-gradient(#4a6a80, var(--tab)); color: #fff;
+  border-color: var(--accent2); box-shadow: 0 0 0 1px rgba(255,240,128,.4) inset, 0 0 10px rgba(255,240,128,.18);
+}
+
+/* 画布四周压暗一点，像游戏里的地图视野 */
+#vignette {
+  position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(120% 100% at 50% 45%, transparent 55%, rgba(0,0,0,.35) 100%);
+}
+
+/* 自定义提示框：照游戏的 TooltipBG（近黑 + 细亮边 + 阴影） */
+#tip {
+  position: fixed; z-index: 80; max-width: 320px; display: none;
+  background: rgba(12,15,17,.97); border: 1px solid #5d6775; border-radius: 3px;
+  padding: 6px 9px; font-size: 11.5px; line-height: 1.55; color: #dfe6df;
+  box-shadow: 0 8px 24px rgba(0,0,0,.6); pointer-events: none; white-space: pre-line;
+  text-shadow: 0 1px 0 rgba(0,0,0,.7);
+}
+#tip.show { display: block; }
+
+/* 顶栏 / 底栏 */
+header { background: linear-gradient(#232823, #1a1e19); border-bottom: 1px solid #2b302a; padding: 6px 12px; gap: 8px; }
+header .brand { color: #f0ede4; }
+footer { background: linear-gradient(#1a1e19, #14171300); border-top: 1px solid #2b302a; }
+.toast { border-radius: 3px; }
+.modal .box { border-radius: 4px; }
+kbd {
+  background: rgba(255,255,255,.10); border: 1px solid rgba(255,255,255,.16);
+  border-bottom-width: 2px; border-radius: 3px; padding: 0 4px; font-size: 11px;
+}
+
+/* ---------- 左侧底部：状态行 + 选中操作（紧凑，不再堆三行小字） ---------- */
+#brushBar {
+  border-top: 1px solid #2b302a; padding: 7px 8px 8px;
+  background: linear-gradient(rgba(255,255,255,.02), transparent);
+}
+#brushInfo { font-size: 12px; line-height: 1.6; }
+#brushInfo b { color: #f0ede4; }
+#brushInfo .muted { font-size: 11px; }
+#toolBar { bottom: 10px; }
+
+/* 物品栏格子里的 defName 太长时不撑破格子 */
+.pitem span { max-width: 100%; overflow: hidden; }
+.pitem b { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }

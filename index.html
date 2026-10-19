@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RimWorld 布局规划器 · 本地离线版</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+
+<body>
+  <div id="app">
+    <!-- ================= 顶栏 ================= -->
+    <header>
+      <div class="brand">RimWorld 布局规划器 <small>纯本地 · 不需要联网</small></div>
+      <div class="sep"></div>
+      <div class="group" title="工程名：导出蓝图 / 图片 / 工程文件时会用它当文件名">
+        <label>工程</label>
+        <input id="mapName" type="text" value="未命名布局" style="width:132px">
+      </div>
+      <div class="sep"></div>
+      <div class="group">
+        <label>地图</label>
+        <input id="gridCols" type="number" min="4" max="400" value="60" title="宽（格）">
+        <span class="muted">×</span>
+        <input id="gridRows" type="number" min="4" max="400" value="60" title="高（格）">
+        <button id="applyGrid" class="ghost">应用</button>
+      </div>
+      <div class="sep"></div>
+      <div class="group">
+        <button id="btnUndo" class="ghost" title="撤销 Ctrl+Z">↶ 撤销</button>
+        <button id="btnRedo" class="ghost" title="重做 Ctrl+Y">↷ 重做</button>
+        <button id="btnClear" class="ghost danger" title="清空整张图">清空</button>
+      </div>
+      <div class="sep"></div>
+      <div class="group">
+        <button id="btnZoomOut" class="ghost" title="缩小">−</button>
+        <button id="btnZoomIn" class="ghost" title="放大">＋</button>
+        <button id="btnFit" class="ghost" title="适配视图 F">适配</button>
+      </div>
+      <span id="rectInfo" class="readout"></span>
+      <div class="spacer"></div>
+      <div class="group">
+        <button id="btnExportJson" class="cmd" title="保存工程文件，可以再次打开继续改 (Ctrl+S)">保存工程</button>
+        <button id="btnExportBpDir" class="primary" title="真蓝图：会消耗材料、小人会去建。选一次游戏的 Blueprints 文件夹，以后一键写入（需要 Blueprints 模组）">存入 Blueprints</button>
+        <button id="btnExportBp" title="真蓝图 .xml（需要 Blueprints 模组）">导出蓝图</button>
+        <button id="btnHelp" class="ghost" title="使用说明 / 存档路径">? 帮助</button>
+      </div>
+    </header>
+
+    <!-- ================= 左侧：物品栏 ================= -->
+    <aside id="left">
+      <div id="searchWrap"><input id="search" type="text" placeholder="搜索建筑（中文 / 英文 / id）"></div>
+      <div id="catTabs"></div>
+      <div id="palette"></div>
+      <div id="brushBar">
+        <div id="brushInfo"></div>
+      </div>
+    </aside>
+
+    <!-- ================= 中间：画布 ================= -->
+    <main id="main">
+      <canvas id="canvas"></canvas>
+      <div id="vignette"></div>
+      <div id="drawHud"></div>
+      <!-- 左下角工具条：照游戏里的命令按钮（大方块 + 图标 + 文字） -->
+      <div id="toolBar">
+        <button data-tool="place" class="on" title="放置 (1)：点一下放一个，拖动按建筑类型自动变成方框或直线">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h9v9H4z"/><path d="M15.5 15.5h5M18 13v5"/></svg>
+          <span>放置</span>
+        </button>
+        <button data-tool="select" title="框选 (2)：拖一个框选中建筑和地板；拖已选中的东西就是移动">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h5M15 4h5M4 20h5M15 20h5M4 4v5M4 15v5M20 4v5M20 15v5"/><path d="M10 10h4v4h-4z"/></svg>
+          <span>框选</span>
+        </button>
+        <button data-tool="erase" title="橡皮 (3)：拖一个框整片删掉（连地板）">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 15l7-7 6 6-4 4H7z"/><path d="M11 8l4-4 6 6-4 4"/><path d="M4 20h16"/></svg>
+          <span>橡皮</span>
+        </button>
+      </div>
+    </main>
+
+    <!-- ================= 右侧：工具 / 校验 ================= -->
+    <aside id="right">
+      <div class="panel">
+        <h3>导入</h3>
+        <div style="display:flex;flex-wrap:wrap;gap:4px">
+          <button id="btnOpenJson" title="打开本工具保存的工程文件（.rwplan.json）">打开工程</button>
+          <button id="btnImportSave" title="读取 RimWorld 存档 .rws，把已建好的基地当底图">读取存档 .rws</button>
+          <button id="btnHelpImport" class="ghost" title="查看 Blueprints / 存档文件夹在哪里">路径在哪？</button>
+        </div>
+        <input type="file" id="fileJson" accept=".json" hidden>
+        <input type="file" id="fileSave" accept=".rws,.xml" hidden>
+        <div class="muted" style="font-size:11.5px;margin-top:6px">
+          存档一般在：<code id="savePathHint">…</code>
+          <button id="btnHelpImport2" class="ghost" style="padding:0 4px;font-size:11px">详情</button>
+        </div>
+        <div style="margin-top:8px" class="group">
+          <label class="chk" title="游戏里 +z 是北（屏幕上方），本编辑器 z 向下。开启后导入的存档朝向和游戏内一致。">
+            <input type="checkbox" id="flipZ" checked> 与游戏视角一致
+          </label>
+          <label class="chk" title="一般不用开，除非你确实左右镜像了">
+            <input type="checkbox" id="flipX"> 翻转 X 轴
+          </label>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>导入游戏资源</h3>
+        <div id="gameDrop" class="dropzone">
+          把 <b>RimWorld 安装目录</b> 拖到这里<br>
+          <span class="muted">自动读取建筑数据 + 原版贴图，不用装任何东西</span>
+        </div>
+        <div style="display:flex;gap:4px;margin-top:6px">
+          <button id="btnPickGame" class="ghost" style="flex:1">选择游戏目录</button>
+          <button id="btnGameClear" class="ghost" title="清掉浏览器里缓存的游戏数据与贴图">清除</button>
+        </div>
+        <input type="file" id="fileGameDir" webkitdirectory directory multiple hidden>
+        <div id="gameStatus" class="muted" style="font-size:11.5px;margin-top:6px"></div>
+      </div>
+
+      <div class="panel">
+        <h3>本地存档</h3>
+        <div style="display:flex;gap:4px">
+          <button id="btnSaveLocal">保存到浏览器</button>
+          <button id="btnLoadLocal">载入</button>
+          <button id="btnDelLocal" class="danger">删除</button>
+        </div>
+        <select id="savedSel" style="width:100%;margin-top:6px"></select>
+      </div>
+
+      <div class="panel">
+        <h3>图层</h3>
+        <div id="layers">
+          <label class="chk"><input type="checkbox" id="lyGrid"> 网格</label>
+          <label class="chk"><input type="checkbox" id="lyFloors"> 地板</label>
+          <label class="chk"><input type="checkbox" id="lyBuildings"> 建筑</label>
+          <label class="chk"><input type="checkbox" id="lyPower"> 电力网</label>
+          <label class="chk"><input type="checkbox" id="lyRooms"> 房间</label>
+          <label class="chk" title="显示作用范围：太阳灯照射圈、制冷机冷热端、通风口两侧、风机风区、马蹄钉使用位…"><input type="checkbox" id="lyZones"> 作用范围</label>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>当前格 / 选中</h3>
+        <div id="inspector"></div>
+        <div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">
+          <button id="btnSelRotate" title="旋转选中 R">旋转</button>
+          <button id="btnSelCopy" title="复制选中 Ctrl+C">复制</button>
+          <button id="btnSelPaste" title="粘贴 Ctrl+V：在鼠标位置放下复制的内容">粘贴</button>
+          <button id="btnSelDelete" class="danger" title="删除选中 Delete">删除选中</button>
+          <button id="btnSelClear" class="ghost" title="取消选择 Esc">取消</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>校验结果</h3>
+        <button id="btnCheck2" class="cmd" style="width:100%;margin-bottom:6px">运行校验</button>
+        <div id="issuesList"></div>
+      </div>
+
+      <div class="panel">
+        <h3>电力</h3>
+        <div id="powerSummary"></div>
+      </div>
+
+      <div class="panel">
+        <h3>房间</h3>
+        <div id="roomList"></div>
+      </div>
+
+      <div class="panel">
+        <h3>建筑清单</h3>
+        <div id="statsList"></div>
+      </div>
+
+      <div class="panel">
+        <h3>计划设置</h3>
+        <div id="planOpts">
+          <div class="muted" style="font-size:11.5px">
+            材质逐物品：<b>长按左键</b>（或右键）左边任意建筑即可选材质。
+          </div>
+        </div>
+        <div class="group" style="margin-top:6px">
+          <label class="chk" title="用游戏原版贴图显示（由「导入游戏资源」生成，或用 tools/extract_textures.py）；没有就自动用矢量图。">
+            <input type="checkbox" id="useSprites" checked> 原版贴图
+          </label>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>备注</h3>
+        <details>
+          <summary>快捷键</summary>
+          <p>
+            <kbd>1</kbd>/<kbd>2</kbd>/<kbd>3</kbd> 放置 / 框选 / 橡皮<br>
+            <kbd>R</kbd> 旋转 · <kbd>Delete</kbd> 删除 · <kbd>Esc</kbd> 取消<br>
+            <kbd>G</kbd>/<kbd>P</kbd>/<kbd>O</kbd> 网格 / 电力 / 房间 · <kbd>F</kbd> 适配视图<br>
+            <kbd>Ctrl</kbd>+<kbd>Z</kbd>/<kbd>Y</kbd> 撤销 / 重做 · <kbd>Ctrl</kbd>+<kbd>A</kbd> 全选<br>
+            <kbd>Ctrl</kbd>+<kbd>C</kbd>/<kbd>V</kbd> 复制 / 粘贴 · <kbd>Ctrl</kbd>+<kbd>S</kbd> 保存工程<br>
+            滚轮缩放 · 中键拖动平移 · 右键删除
+          </p>
+        </details>
+        <details>
+          <summary>导出蓝图回游戏</summary>
+          <p>
+            点顶栏「导出蓝图」得到一个 <code>.xml</code>，放进游戏的 <code>Blueprints</code> 文件夹，
+            游戏里载入蓝图后，小人就会消耗材料开建（需要 <b>Blueprints</b> 模组）。
+            点「存入 Blueprints」可以选一次文件夹后一键写入。
+          </p>
+        </details>
+        <details>
+          <summary>碎碎念</summary>
+          <p class="muted">
+            这是个玩家自制的非官方小工具。工具本身不含任何游戏素材。内置的尺寸/耗电是人工整理的参考值。
+            蓝图格式参考 Fluffy 的 Blueprints 模组。人人都是故事的记录者，祝你玩的开心。
+          </p>
+        </details>
+      </div>
+    </aside>
+
+    <!-- ================= 底部 ================= -->
+    <footer>
+      <span>坐标 <b id="coords">-</b></span>
+      <span id="undoState"></span>
+    </footer>
+  </div>
+
+  <!-- 文本弹窗 -->
+  <div class="modal" id="ioModal">
+    <div class="box">
+      <h2 id="ioTitle">标题</h2>
+      <p id="ioHint"></p>
+      <textarea id="ioText" spellcheck="false"></textarea>
+      <div class="row">
+        <button onclick="document.getElementById('ioModal').classList.remove('show')">关闭</button>
+        <button id="ioApply" class="primary">应用</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <div id="tip"></div>
+
+  <!-- 帮助 -->
+  <div class="modal" id="helpModal">
+    <div class="box">
+      <h2>使用说明</h2>
+      <div class="helpBody">
+        <h4>怎么用</h4>
+        <ol>
+          <li>左边点一个建筑或地板，然后在网格上点一下（或拖一个框）画出来。</li>
+          <li>点「运行校验」，右侧会列出问题，点问题可以直接跳到对应位置。</li>
+        </ol>
+        <ul>
+          <li><b>墙 / 栅栏 / 沙袋</b>：拖框只画最外一圈，圈房间最快。</li>
+          <li><b>门 / 家具 / 电器</b>：点一下放一个，拖动只能拉横线或竖线。</li>
+          <li><b>地板</b>：拖框整片铺满。<b>橡皮</b>：拖框整片删除（含地板）。</li>
+          <li><b>框选</b>：拖框选中建筑和地板，按 <kbd>Delete</kbd> 删除；拖动已选中的东西可以整体移动。</li>
+          <li><b>材质</b>：在左边<b>长按左键</b>（或右键）建筑即可选材质（木材 / 石材 / 金属 / 纤维 / 皮革…）；
+            已经放好的可以选中后在右下角改。</li>
+        </ul>
+        <p>拖动时画布正中会显示宽 × 高和格子数。放在已有东西上会替换它。
+          风机风区、制冷机冷热端、太阳灯照射圈这类<b>作用范围</b>，摆放时就能看到。
+          想下次接着改，点「<b>保存工程</b>」存成 <code>.rwplan.json</code> 即可。</p>
+
+        <h4>导回游戏：蓝图</h4>
+        <p>点顶栏「<b>导出蓝图</b>」得到一个 <code>.xml</code>，放进游戏的 <code>Blueprints</code> 文件夹，
+          游戏里载入蓝图后，小人就会消耗材料开建。需要 <b>Blueprints</b> 模组（1.7 用这个，另需 1.7 版 Harmony）：</p>
+        <table class="pathTable">
+          <tr><th>模组</th><th>工坊 ID</th></tr>
+          <tr>
+            <td><a href="https://steamcommunity.com/sharedfiles/filedetails/?id=3819556044" target="_blank" rel="noreferrer">Blueprints - 1.7 Waylith (Unofficial)</a></td>
+            <td><a href="https://steamcommunity.com/sharedfiles/filedetails/?id=3819556044" target="_blank" rel="noreferrer"><code>3819556044</code></a></td>
+          </tr>
+        </table>
+
+        <h4>Blueprints 文件夹在哪</h4>
+        <p>和存档在同一层，游戏里 <b>选项 → 常规 → 打开存档数据文件夹</b> 就能看到：</p>
+        <pre class="tree">&lt;存档数据目录&gt;/
+├── Saves/        ← 存档 .rws 在这里
+├── Config/
+└── Blueprints/   ← 导出的 .xml 放这里</pre>
+        <p>顶栏点「<b>存入 Blueprints</b>」选一次文件夹，之后一键写入，不用管路径。</p>
+
+        <h4>读取存档当底图</h4>
+        <p>「读取存档 .rws」会把已经建好的基地读进来（含每件物品用的材质），在它上面继续规划。
+          只读取位置、朝向和材质，不会改动存档；地图尺寸会自动跟随存档。</p>
+
+        <h4>数据与贴图</h4>
+        <p>右侧「<b>导入游戏资源</b>」把 RimWorld 安装目录拖进去（或点「选择游戏目录」），
+          工具会读取建筑数据与原版贴图并缓存在本机，下次打开直接可用。
+          不导入也能用，会自动使用内置的矢量图。</p>
+        <p class="muted">贴图是游戏的美术资源，本工具不附带，只在你本机从你购买的游戏里读取。</p>
+      </div>
+      <div class="row">
+        <button onclick="document.getElementById('helpModal').classList.remove('show')">知道了</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 数据 -->
+  <script src="js/data.js"></script>
+  <!-- 内置中文名对照表（若已提取官方简中语言包，则语言包优先） -->
+  <script src="js/zh-names.js"></script>
+  <!-- 若存在 tools/extract_defs.py 生成的完整数据库，自动合并进内置库 -->
+  <script src="js/buildings.generated.js" onerror="void 0"></script>
+  <!-- 若存在 tools/extract_textures.py 生成的原版贴图清单（本地提取），自动启用 -->
+  <script src="js/sprites.js" onerror="void 0"></script>
+  <!-- 浏览器内直接读游戏目录（zip + zstd + DDS 解码）；不导入游戏时完全不启用 -->
+  <script src="js/vendor/fzstd.js" onerror="void 0"></script>
+  <script src="js/gamezip.js" onerror="void 0"></script>
+  <script src="js/gamedefs.js" onerror="void 0"></script>
+  <script src="js/gameimport.js" onerror="void 0"></script>
+  <script src="js/icons.js"></script>
+  <script src="js/engine.js"></script>
+  <script src="js/checks.js"></script>
+  <script src="js/exporters.js"></script>
+  <script src="js/io.js"></script>
+  <script src="js/main.js"></script>
+</body>
+
+</html>
