@@ -40,6 +40,9 @@
       </div>
       <span id="rectInfo" class="readout"></span>
       <div class="spacer"></div>
+      <label class="chk" title="勾选后，蓝图只包含你新画的；存档原有的锁定建筑/地板不会被打包进蓝图">
+        <input type="checkbox" id="excludeLocked" checked> 只导出新增
+      </label>
       <div class="group">
         <button id="btnExportJson" class="cmd" title="保存工程文件，可以再次打开继续改 (Ctrl+S)">保存工程</button>
         <button id="btnExportBpDir" class="primary" title="真蓝图：会消耗材料、小人会去建。选一次游戏的 Blueprints 文件夹，以后一键写入（需要 Blueprints 模组）">存入 Blueprints</button>
@@ -103,6 +106,42 @@
             <input type="checkbox" id="flipX"> 翻转 X 轴
           </label>
         </div>
+        <div style="margin-top:6px" class="group">
+          <label class="chk" title="存档原有建筑会标记为「已锁定·底图」：不能误删/误移，导出蓝图时自动排除。">
+            <input type="checkbox" id="lockImported" checked> 锁定存档原有建筑（导出时排除）
+          </label>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>存档情报</h3>
+        <div id="saveInfo" class="saveInfo"><div class="muted">读取 .rws 后显示地形 / 小人 / 科技 / 库存</div></div>
+        <div style="margin-top:6px" class="group">
+          <label class="chk"><input type="checkbox" id="respectTerrain" checked title="放置时按存档地形校验：沼泽、水面、山体都会拦下来"> 按地形校验可建造性</label>
+        </div>
+        <div class="group">
+          <label class="chk"><input type="checkbox" id="strictTerrain" title="开：地形/山体不支持时直接拒绝放置；关（默认）：允许先规划，红框提示并由估算面板统计"> 严格模式（禁止画在不支持的地形上）</label>
+        </div>
+        <div class="group">
+          <label class="chk"><input type="checkbox" id="lyTerrain" checked> 显示地形</label>
+          <label class="chk"><input type="checkbox" id="lyHome" checked title="存档里的玩家活动区域（Area_Home）：淡绿底 + 边界"> 玩家区域</label>
+          <label class="chk"><input type="checkbox" id="lyBlocked" title="把当前笔刷放不下的格子标红/蓝"> 标出不可建造</label>
+        </div>
+        <label class="chk" style="margin-top:4px" title="默认只统计玩家活动区域内的物资；关掉则统计全地图（含荒野里散落的物品）">
+          <input type="checkbox" id="stockHome" checked> 库存只算玩家区域
+        </label>
+      </div>
+
+      <div class="panel">
+        <h3>工作量估算</h3>
+        <div class="estOpts">
+          <label>建造人数 <input type="number" id="estBuilders" min="1" max="30" value="1"></label>
+          <label>采矿人数 <input type="number" id="estMiners" min="1" max="30" value="1"></label>
+          <label>每日工时 <input type="number" id="estHours" min="1" max="24" value="16"></label>
+          <label title="搬运/走路/吃饭等额外开销，按建造工时的百分比估">搬运开销% <input type="number" id="estHaul" min="0" max="300" step="5" value="25"></label>
+        </div>
+        <button id="btnEstimate" class="cmd" style="width:100%;margin:6px 0 6px">估算蓝图（可行性 + 工期）</button>
+        <div id="estimateOut" class="estimate"><div class="muted">先读存档，再点上面的按钮。</div></div>
       </div>
 
       <div class="panel">
@@ -151,6 +190,11 @@
           <button id="btnSelDelete" class="danger" title="删除选中 Delete">删除选中</button>
           <button id="btnSelClear" class="ghost" title="取消选择 Esc">取消</button>
         </div>
+        <div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap">
+          <button id="btnLockSel" class="ghost" title="把选中的标记为「底图」，导出时排除">锁定选中</button>
+          <button id="btnUnlockSel" class="ghost" title="解除选中建筑的锁定，之后可以编辑/导出">解锁选中</button>
+          <button id="btnUnlockAll" class="ghost" title="把所有存档原有建筑解锁并允许导出">全部解锁</button>
+        </div>
       </div>
 
       <div class="panel">
@@ -195,7 +239,8 @@
           <p>
             <kbd>1</kbd>/<kbd>2</kbd>/<kbd>3</kbd> 放置 / 框选 / 橡皮<br>
             <kbd>R</kbd> 旋转 · <kbd>Delete</kbd> 删除 · <kbd>Esc</kbd> 取消<br>
-            <kbd>G</kbd>/<kbd>P</kbd>/<kbd>O</kbd> 网格 / 电力 / 房间 · <kbd>F</kbd> 适配视图<br>
+            <kbd>G</kbd>/<kbd>T</kbd>/<kbd>B</kbd> 网格 / 地形 / 不可建造标记<br>
+            <kbd>P</kbd>/<kbd>O</kbd> 电力 / 房间 · <kbd>F</kbd> 适配视图<br>
             <kbd>Ctrl</kbd>+<kbd>Z</kbd>/<kbd>Y</kbd> 撤销 / 重做 · <kbd>Ctrl</kbd>+<kbd>A</kbd> 全选<br>
             <kbd>Ctrl</kbd>+<kbd>C</kbd>/<kbd>V</kbd> 复制 / 粘贴 · <kbd>Ctrl</kbd>+<kbd>S</kbd> 保存工程<br>
             滚轮缩放 · 中键拖动平移 · 右键删除
@@ -299,6 +344,25 @@
     </div>
   </div>
 
+  <!-- 首次打开：提示导入游戏资源 -->
+  <div class="modal" id="gameImportModal">
+    <div class="box" style="width:min(560px,92vw)">
+      <h2>导入一次游戏资源？</h2>
+      <p>把 RimWorld 安装目录导入后，工具会读取：</p>
+      <ul class="promptList">
+        <li>精确的建筑尺寸 / 耗电 / 造价 / 工时 / 科技前置</li>
+        <li>地形与可建造性、地图自带山体识别</li>
+        <li>原版建筑贴图（只从你本机的游戏读取，不上传）</li>
+      </ul>
+      <p class="muted" style="font-size:11.5px">不导入也能用：会自动使用内置数据和矢量图，只是部分数值是参考值。右侧「导入游戏资源」面板一直保留，可以随时再导。</p>
+      <label class="chk" style="margin-top:2px"><input type="checkbox" id="gameImportNoAsk"> 不再提醒</label>
+      <div class="row">
+        <button id="btnPromptLater" class="ghost">以后再说</button>
+        <button id="btnPromptPickGame" class="primary">选择游戏目录</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 数据 -->
   <script src="js/data.js"></script>
   <!-- 内置中文名对照表（若已提取官方简中语言包，则语言包优先） -->
@@ -314,7 +378,10 @@
   <script src="js/gameimport.js" onerror="void 0"></script>
   <script src="js/icons.js"></script>
   <script src="js/engine.js"></script>
+  <!-- 存档地形 / 山体 / 可建造性 -->
+  <script src="js/site.js"></script>
   <script src="js/checks.js"></script>
+  <script src="js/workload.js"></script>
   <script src="js/exporters.js"></script>
   <script src="js/io.js"></script>
   <script src="js/main.js"></script>

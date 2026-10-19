@@ -43,26 +43,102 @@
   ];
 
   // 常用「地板层」贴图（只影响观感，不参与校验）
+  //   def   = 游戏里的 TerrainDef（导入游戏资源 / 存档地形都用它对齐）
+  //   aff   = 建造这块地板需要的地形 affordance（游戏里地板默认 Heavy，桥是 Bridgeable）
+  //   cost / work = 没有导入游戏数据时的参考造价与工时
   var FLOORS = [
-    { id: 'none', name: '无（泥土）', color: '#4a4034', art: 'dirt' },
-    { id: 'wood', name: '木地板', color: '#8a6a45', art: 'planks' },
-    { id: 'stone', name: '石砖', color: '#8d8d88', art: 'tile' },
-    { id: 'tileSandstone', name: '砂岩砖', color: '#b9a882', art: 'tile' },
-    { id: 'tileGranite', name: '花岗岩砖', color: '#8f8b8b', art: 'tile' },
-    { id: 'tileLimestone', name: '石灰岩砖', color: '#c0bda8', art: 'tile' },
-    { id: 'tileSlate', name: '板岩砖', color: '#6f7378', art: 'tile' },
-    { id: 'tileMarble', name: '大理石砖', color: '#d8d6cf', art: 'tile' },
-    { id: 'tileAncient', name: '远古砖', color: '#9a8f7a', art: 'tile' },
-    { id: 'metalTile', name: '金属砖', color: '#8fa0ad', art: 'tile' },
-    { id: 'goldTile', name: '金砖', color: '#c9a63c', art: 'tile' },
-    { id: 'silverTile', name: '银砖', color: '#b9c2c9', art: 'tile' },
-    { id: 'concrete', name: '混凝土', color: '#9a9a97', art: 'concrete' },
-    { id: 'steel', name: '钢制地板', color: '#6f7883', art: 'tile' },
-    { id: 'sterile', name: '无菌地板', color: '#c9d4dc', art: 'tile' },
-    { id: 'carpet', name: '地毯', color: '#7a4a52', art: 'carpet' },
-    { id: 'paved', name: '铺装砖', color: '#7d7367', art: 'tile' },
-    { id: 'bridge', name: '桥', color: '#6c4e37', art: 'bridge' },
-    { id: 'water', name: '水面', color: '#2f5a7a', art: 'water' }
+    { id: 'none', name: '无（泥土）', color: '#4a4034', art: 'dirt', def: 'Soil', aff: null },
+    { id: 'wood', name: '木地板', color: '#8a6a45', art: 'planks', def: 'WoodPlankFloor', aff: 'Heavy', cost: { WoodLog: 3 }, work: 85 },
+    { id: 'stone', name: '石砖', color: '#8d8d88', art: 'tile', def: 'FlagstoneGranite', aff: 'Heavy', cost: { BlocksGranite: 1 }, work: 100 },
+    { id: 'tileSandstone', name: '砂岩砖', color: '#b9a882', art: 'tile', def: 'TileSandstone', aff: 'Heavy', cost: { BlocksSandstone: 1 }, work: 200 },
+    { id: 'tileGranite', name: '花岗岩砖', color: '#8f8b8b', art: 'tile', def: 'TileGranite', aff: 'Heavy', cost: { BlocksGranite: 1 }, work: 200 },
+    { id: 'tileLimestone', name: '石灰岩砖', color: '#c0bda8', art: 'tile', def: 'TileLimestone', aff: 'Heavy', cost: { BlocksLimestone: 1 }, work: 200 },
+    { id: 'tileSlate', name: '板岩砖', color: '#6f7378', art: 'tile', def: 'TileSlate', aff: 'Heavy', cost: { BlocksSlate: 1 }, work: 200 },
+    { id: 'tileMarble', name: '大理石砖', color: '#d8d6cf', art: 'tile', def: 'TileMarble', aff: 'Heavy', cost: { BlocksMarble: 1 }, work: 200 },
+    { id: 'tileAncient', name: '远古砖', color: '#9a8f7a', art: 'tile', def: 'AncientTile', aff: null },
+    { id: 'metalTile', name: '金属砖', color: '#8fa0ad', art: 'tile', def: 'MetalTile', aff: 'Heavy', cost: { Steel: 1 }, work: 200 },
+    { id: 'goldTile', name: '金砖', color: '#c9a63c', art: 'tile', def: 'GoldTile', aff: 'Heavy', cost: { Gold: 1 }, work: 200 },
+    { id: 'silverTile', name: '银砖', color: '#b9c2c9', art: 'tile', def: 'SilverTile', aff: 'Heavy', cost: { Silver: 1 }, work: 200 },
+    { id: 'concrete', name: '混凝土', color: '#9a9a97', art: 'concrete', def: 'Concrete', aff: 'Heavy', cost: { Steel: 1 }, work: 100 },
+    { id: 'steel', name: '钢制地板', color: '#6f7883', art: 'tile', def: 'MetalTile', aff: 'Heavy', cost: { Steel: 1 }, work: 200 },
+    { id: 'sterile', name: '无菌地板', color: '#c9d4dc', art: 'tile', def: 'SterileTile', aff: 'Heavy', cost: { Steel: 1, ComponentIndustrial: 1 }, work: 400 },
+    { id: 'carpet', name: '地毯', color: '#7a4a52', art: 'carpet', def: 'Carpet_Mindbend', aff: 'Heavy', cost: { Cloth: 7 }, work: 100 },
+    { id: 'paved', name: '铺装砖', color: '#7d7367', art: 'tile', def: 'PavedTile', aff: 'Heavy', cost: { Steel: 2 }, work: 300 },
+    { id: 'bridge', name: '桥', color: '#6c4e37', art: 'bridge', def: 'Bridge', aff: 'Bridgeable', cost: { WoodLog: 10 }, work: 300 },
+    { id: 'water', name: '水面', color: '#2f5a7a', art: 'water', def: 'WaterShallow', aff: null }
+  ];
+
+  // ------------------------------------------------------------------
+  // 地形（TerrainDef）与山体（自然岩石 ThingDef）
+  // 存档里的地形是「defName 的短哈希」：hash = hash*31 + charCode，再 % 65535。
+  // 这里内置一份常见地形兜底；导入游戏资源后会被完整表覆盖。
+  // ------------------------------------------------------------------
+  var L = ['Light'], LM = ['Light', 'Medium'], LMH = ['Light', 'Medium', 'Heavy'];
+  var TERRAIN_FALLBACK = [
+    { def: 'Soil', name: '土壤', color: '#4a4034', aff: LMH.concat(['GrowSoil', 'Diggable']) },
+    { def: 'SoilRich', name: '肥沃土壤', color: '#3f3a2c', aff: LMH.concat(['GrowSoil', 'Diggable']) },
+    { def: 'Gravel', name: '碎石地', color: '#5d5a52', aff: LMH.concat(['GrowSoil', 'Diggable']) },
+    { def: 'MossyTerrain', name: '苔藓地', color: '#46503c', aff: LMH.concat(['GrowSoil', 'Diggable']) },
+    { def: 'Riverbank', name: '河岸', color: '#6b5c44', aff: LMH.concat(['GrowSoil', 'Diggable']) },
+    { def: 'Sand', name: '沙地', color: '#b6a077', aff: LMH.concat(['Diggable']) },
+    { def: 'SoftSand', name: '软沙', color: '#c2ad84', aff: L.concat(['Diggable']) },
+    { def: 'MarshyTerrain', name: '沼泽', color: '#3d4a32', aff: L.concat(['GrowSoil', 'Diggable', 'Bridgeable']) },
+    { def: 'Mud', name: '泥地', color: '#4a3d2f', aff: ['Bridgeable', 'WaterproofConduitable'] },
+    { def: 'Marsh', name: '浅滩', color: '#2f4a4f', aff: ['Bridgeable', 'WaterproofConduitable'] },
+    { def: 'Ice', name: '冰面', color: '#b9d4dd', aff: LMH },
+    { def: 'IceDeep', name: '厚冰', color: '#a9c8d4', aff: [] },
+    { def: 'IceSheet', name: '冰原', color: '#c4dde5', aff: LMH },
+    { def: 'WaterShallow', name: '浅水', color: '#2f5a7a', aff: ['ShallowWater', 'WaterproofConduitable', 'Bridgeable', 'Walkable'] },
+    { def: 'WaterDeep', name: '深水', color: '#1e3c55', aff: [] },
+    { def: 'WaterOceanShallow', name: '浅海', color: '#2a5a78', aff: ['ShallowWater', 'WaterproofConduitable', 'Bridgeable', 'Walkable'] },
+    { def: 'WaterOceanDeep', name: '深海', color: '#17344d', aff: [] },
+    { def: 'WaterMovingShallow', name: '浅流动水', color: '#2b617f', aff: ['ShallowWater', 'WaterproofConduitable', 'Bridgeable', 'Walkable', 'MovingFluid'] },
+    { def: 'WaterMovingChestDeep', name: '齐胸流动水', color: '#224f6b', aff: ['Bridgeable', 'Walkable', 'MovingFluid'] },
+    { def: 'LavaShallow', name: '浅岩浆', color: '#8a3a14', aff: [] },
+    { def: 'LavaDeep', name: '深岩浆', color: '#6d2a0d', aff: [] },
+    { def: 'Bridge', name: '木桥', color: '#6c4e37', aff: L },
+    { def: 'HeavyBridge', name: '重型桥', color: '#6a4c35', aff: L },
+    { def: 'AncientHeavyBridge', name: '远古重型桥', color: '#5f5244', aff: L },
+    { def: 'Concrete', name: '混凝土', color: '#8c8c8c', aff: LMH },
+    { def: 'PavedTile', name: '铺装砖', color: '#8c8c8c', aff: LMH },
+    { def: 'WoodPlankFloor', name: '木地板', color: '#6c4e37', aff: LMH },
+    { def: 'SterileTile', name: '无菌地板', color: '#b9c4cc', aff: LMH },
+    { def: 'MetalTile', name: '金属砖', color: '#8fa0ad', aff: LMH },
+    { def: 'GoldTile', name: '金砖', color: '#c9a63c', aff: LMH },
+    { def: 'SilverTile', name: '银砖', color: '#b9c2c9', aff: LMH },
+    { def: 'AncientTile', name: '远古砖', color: '#9a8f7a', aff: LMH },
+    { def: 'AncientConcrete', name: '远古混凝土', color: '#8a857a', aff: LMH },
+    { def: 'BrokenAsphalt', name: '破损沥青', color: '#4a4a4a', aff: LMH.concat(['Walkable']) },
+    { def: 'PackedDirt', name: '压实土', color: '#5a4b3a', aff: LMH.concat(['Walkable']) },
+    { def: 'RockFloor', name: '岩地', color: '#5b5854', aff: LMH },
+    { def: 'VolcanicRock', name: '火山岩', color: '#3f3a38', aff: LMH.concat(['SmoothableStone']) },
+    { def: 'FungalGravel', name: '真菌碎石', color: '#4d4a3a', aff: LMH.concat(['GrowSoil', 'Diggable']) },
+    { def: 'ToxicMarsh', name: '毒沼泽', color: '#3f4a28', aff: L.concat(['Bridgeable']) },
+    { def: 'Underwall', name: '墙下', color: '#2a2a2a', aff: [] },
+    { def: 'Space', name: '太空', color: '#0a0a12', aff: [] },
+    { def: 'Substructure', name: '支撑结构', color: '#555b60', aff: LMH }
+  ];
+  // 地板砖的 defName（导入游戏数据后会补全所有石材）
+  ['Sandstone', 'Granite', 'Limestone', 'Slate', 'Marble'].forEach(function (s) {
+    TERRAIN_FALLBACK.push({ def: 'Tile' + s, name: s + '砖', color: '#8d8d88', aff: LMH });
+    TERRAIN_FALLBACK.push({ def: 'Flagstone' + s, name: s + '石板', color: '#8d8d88', aff: LMH });
+    TERRAIN_FALLBACK.push({ def: 'FineTile' + s, name: '精致' + s + '砖', color: '#8d8d88', aff: LMH });
+  });
+
+  // 自然岩石：山体。hp 用来估开采时间；mineableThing 是挖出来的东西。
+  var ROCK_FALLBACK = [
+    { def: 'Sandstone', name: '砂岩', hp: 400, mineableThing: 'ChunkSandstone', color: '#7e685e' },
+    { def: 'Granite', name: '花岗岩', hp: 900, mineableThing: 'ChunkGranite', color: '#695f61' },
+    { def: 'Limestone', name: '石灰岩', hp: 700, mineableThing: 'ChunkLimestone', color: '#a49e8c' },
+    { def: 'Slate', name: '板岩', hp: 500, mineableThing: 'ChunkSlate', color: '#464646' },
+    { def: 'Marble', name: '大理石', hp: 600, mineableThing: 'ChunkMarble', color: '#b8b4a8' },
+    { def: 'MineableSteel', name: '压缩钢', hp: 1500, mineableThing: 'Steel', yield: 40, resource: true },
+    { def: 'MineableSilver', name: '银矿', hp: 1500, mineableThing: 'Silver', yield: 40, resource: true },
+    { def: 'MineableGold', name: '金矿', hp: 1500, mineableThing: 'Gold', yield: 40, resource: true },
+    { def: 'MineableUranium', name: '铀矿', hp: 1500, mineableThing: 'Uranium', yield: 40, resource: true },
+    { def: 'MineablePlasteel', name: '玻璃钢矿', hp: 1500, mineableThing: 'Plasteel', yield: 40, resource: true },
+    { def: 'MineableJade', name: '玉矿', hp: 1500, mineableThing: 'Jade', yield: 40, resource: true },
+    { def: 'MineableComponentsIndustrial', name: '压缩零部件', hp: 1500, mineableThing: 'ComponentIndustrial', yield: 1, resource: true }
   ];
 
   // 建筑数据。size:[宽, 深]（未旋转时）。power* 单位为 W。
@@ -344,6 +420,108 @@
     return { replaced: replaced, added: added, keptArt: keptArt, total: BUILDINGS.length };
   }
 
+  // ------------------------------------------------------------------
+  // 地形 / 山体 / 科技树 索引
+  // ------------------------------------------------------------------
+
+  /** 存档里的地形哈希：hash*31 + char，最后 % 65535（和游戏 TerrainGrid 的写法一致） */
+  function terrainHash(defName) {
+    var h = 23, s = String(defName || '');
+    for (var i = 0; i < s.length; i++) h = ((h * 31 + s.charCodeAt(i)) >>> 0);
+    return h % 65535;
+  }
+
+  var terrains = {};       // defName -> { def, name, color, aff[], smoothTo, isWater, isRock }
+  var terrainByHash = {};  // 哈希 -> defName
+  var rocks = {};          // 自然岩石 defName -> { def, name, hp, mineableThing, yield }
+  var rockByTerrain = {};  // 地形 defName（X_Rough）-> 岩石 defName（X）
+  var researches = {};     // defName -> { def, name, cost, prereq[], techLevel }
+
+  function terrainName(def) {
+    var t = terrains[def];
+    return t ? t.name : def;
+  }
+  function terrainAff(def) {
+    var t = terrains[def];
+    return (t && t.aff) || null;
+  }
+
+  /** 重建地形索引（内置兜底 + 从游戏 defs 导入的数据） */
+  function indexTerrains() {
+    terrains = {};
+    terrainByHash = {};
+    TERRAIN_FALLBACK.forEach(function (t) {
+      terrains[t.def] = {
+        def: t.def, name: t.name, color: t.color, aff: (t.aff || []).slice(),
+        isWater: /^(Water|Marsh|Mud|Lava|HotSpring)/.test(t.def),
+        isRock: /_(Rough|RoughHewn|Smooth)$/.test(t.def)
+      };
+    });
+    Object.keys(terrains).forEach(function (d) { terrainByHash[terrainHash(d)] = d; });
+    return terrains;
+  }
+
+  /** 从游戏 defs 合并地形表（gamedefs.js 解析出来的 terrain 对象） */
+  function mergeTerrains(list) {
+    if (!list) return 0;
+    var n = 0;
+    list.forEach(function (t) {
+      if (!t || !t.def) return;
+      var old = terrains[t.def] || {};
+      terrains[t.def] = {
+        def: t.def,
+        name: t.name || old.name || t.def,
+        color: t.color || old.color || '#777',
+        aff: t.aff || old.aff || [],
+        need: t.need || old.need || null,
+        work: t.work != null ? t.work : old.work,
+        cost: t.cost || old.cost || null,
+        research: t.research || old.research || null,
+        smoothTo: t.smoothTo || old.smoothTo || null,
+        isWater: t.isWater != null ? t.isWater : (old.isWater != null ? old.isWater : /^(Water|Marsh|Mud|Lava|HotSpring)/.test(t.def)),
+        isRock: /_(Rough|RoughHewn|Smooth)$/.test(t.def)
+      };
+      terrainByHash[terrainHash(t.def)] = t.def;
+      n++;
+    });
+    return n;
+  }
+
+  function indexRocks() {
+    rocks = {};
+    rockByTerrain = {};
+    ROCK_FALLBACK.forEach(function (r) { rocks[r.def] = r; });
+    Object.keys(rocks).forEach(function (d) {
+      rockByTerrain[d + '_Rough'] = d;
+      rockByTerrain[d + '_RoughHewn'] = d;
+    });
+    return rocks;
+  }
+
+  /** 从游戏 defs 合并自然岩石表 */
+  function mergeRocks(list) {
+    if (!list) return 0;
+    var n = 0;
+    list.forEach(function (r) {
+      if (!r || !r.def) return;
+      rocks[r.def] = {
+        def: r.def, name: r.name || (rocks[r.def] && rocks[r.def].name) || r.def,
+        hp: r.hp || (rocks[r.def] && rocks[r.def].hp) || 400,
+        mineableThing: r.mineableThing || (rocks[r.def] && rocks[r.def].mineableThing) || null,
+        yield: r.yield || (rocks[r.def] && rocks[r.def].yield) || 1,
+        resource: !!(r.resource || (rocks[r.def] && rocks[r.def].resource)),
+        color: r.color || (rocks[r.def] && rocks[r.def].color) || null
+      };
+      rockByTerrain[r.def + '_Rough'] = r.def;
+      rockByTerrain[r.def + '_RoughHewn'] = r.def;
+      n++;
+    });
+    return n;
+  }
+
+  indexTerrains();
+  indexRocks();
+
   global.RWData = {
     CATEGORIES: CATEGORIES,
     BUILDINGS: BUILDINGS,
@@ -353,6 +531,29 @@
     normDef: normDef,
     matchDefName: matchDefName,
     mergeBuildings: mergeBuildings,
+    // ---- 地形 / 山体 / 科技树 ----
+    terrainHash: terrainHash,
+    terrains: function () { return terrains; },
+    terrain: function (def) { return terrains[def] || null; },
+    terrainName: terrainName,
+    terrainAff: terrainAff,
+    terrainByHash: function (h) { return terrainByHash[h] || null; },
+    mergeTerrains: mergeTerrains,
+    rocks: function () { return rocks; },
+    rock: function (def) { return rocks[def] || null; },
+    rockByTerrain: function (terrainDef) { return rockByTerrain[terrainDef] || null; },
+    mergeRocks: mergeRocks,
+    researches: function () { return researches; },
+    research: function (def) { return researches[def] || null; },
+    mergeResearches: function (list) {
+      if (!list) return 0;
+      var n = 0;
+      list.forEach(function (r) {
+        if (!r || !r.def) return;
+        researches[r.def] = r; n++;
+      });
+      return n;
+    },
     // ---- 材质（逐物品；由 tools/extract_defs.py 生成，缺失时为空数组）----
     STUFFS: [],
     STUFF_CATS: [],

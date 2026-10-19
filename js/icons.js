@@ -1106,6 +1106,7 @@
       imgSource = source || null;
       imgCache = {}; tintCache = {}; boxCache = {};
       if (SP) {
+        spriteOn = true;   // 有贴图清单就默认走原版贴图（用户随后仍可在右侧关掉）
         var defs = global.RWData && global.RWData.BUILDINGS;
         if (defs) defs.forEach(function (d) { d._sp = undefined; d.__plan = null; });
         warmUp();     // 重新预载（走自定义取图方式）

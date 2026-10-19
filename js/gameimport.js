@@ -295,6 +295,11 @@
     global.RWData.STUFF_CATS = parsed.stuffCats;
     global.RWData.STUFFS = parsed.stuffs;
     var merged = global.RWData.mergeBuildings(parsed.buildings);
+    // 地形 / 山体 / 科技树 / 物品名（存档导入、可建造性校验、工时估算都要用）
+    global.RWData.mergeTerrains(parsed.terrain ? Object.keys(parsed.terrain).map(function (k) { return parsed.terrain[k]; }) : null);
+    global.RWData.mergeRocks(parsed.rocks);
+    global.RWData.mergeResearches(parsed.researches);
+    if (parsed.items) global.RWData.ITEM_NAMES = parsed.items;
 
     // ---- 贴图 ----
     var db = await idbOpen();
@@ -488,6 +493,10 @@
     await idbPut(db, META, 'buildings', parsed.buildings);
     await idbPut(db, META, 'stuffs', parsed.stuffs);
     await idbPut(db, META, 'stuffCats', parsed.stuffCats);
+    await idbPut(db, META, 'terrains', parsed.terrain ? Object.keys(parsed.terrain).map(function (k) { return parsed.terrain[k]; }) : []);
+    await idbPut(db, META, 'rocks', parsed.rocks || []);
+    await idbPut(db, META, 'researches', parsed.researches || []);
+    await idbPut(db, META, 'items', parsed.items || {});
     meta.sprites = done;
     meta.skipped = skipped;
     meta.bytes = bytes;
@@ -590,14 +599,22 @@
       var buildings = await idbGet(db, META, 'buildings');
       var stuffs = await idbGet(db, META, 'stuffs');
       var stuffCats = await idbGet(db, META, 'stuffCats');
+      var terrains = await idbGet(db, META, 'terrains');
+      var rocks = await idbGet(db, META, 'rocks');
+      var researches = await idbGet(db, META, 'researches');
+      var items = await idbGet(db, META, 'items');
       if (!manifest || !buildings) { db.close(); return null; }
       var repaired = repairNames(buildings, stuffs, stuffCats);
       if (stuffCats) global.RWData.STUFF_CATS = stuffCats;
       if (stuffs) global.RWData.STUFFS = stuffs;
-      global.RWData.mergeBuildings(buildings);
+      var merged = global.RWData.mergeBuildings(buildings);
+      if (terrains) global.RWData.mergeTerrains(terrains);
+      if (rocks) global.RWData.mergeRocks(rocks);
+      if (researches) global.RWData.mergeResearches(researches);
+      if (items) global.RWData.ITEM_NAMES = items;
       if (repaired) info.repaired = repaired;
       db.close();
-      return { info: info, manifest: manifest };
+      return { info: info, manifest: manifest, merged: merged };
     } catch (e) { return null; }
   }
 

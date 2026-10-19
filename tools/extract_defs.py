@@ -90,7 +90,7 @@ def find_data_root(root):
     return None
 
 
-RE_WITH_TYPE = re.compile(r'^(?:ThingDef|StuffCategoryDef)\.([^.]+)\.(label|labelNoun)$')
+RE_WITH_TYPE = re.compile(r'^(?:ThingDef|StuffCategoryDef|TerrainDef|ResearchProjectDef)\.([^.]+)\.(label|labelNoun)$')
 # DefInjected/ThingDef/ 目录下的文件省略了类型前缀，标签形如 <Beer.label>
 RE_BARE = re.compile(r'^([A-Za-z0-9_]+)\.(label|labelNoun)$')
 
@@ -137,9 +137,10 @@ def parse_lang_labels(data_root):
                 if not f.lower().endswith('.xml'):
                     continue
                 full = os.path.join(base, f).lower().replace('\\', '/')
-                bare = 'definjected/thingdef' in full or 'definjected/stuffcategorydef' in full
+                bare = ('definjected/thingdef' in full or 'definjected/stuffcategorydef' in full
+                        or 'definjected/terraindef' in full or 'definjected/researchprojectdef' in full)
                 if not bare:
-                    continue        # 只要 ThingDef / StuffCategoryDef 的，别的 def 类型没用
+                    continue        # 只要 ThingDef / StuffCategoryDef / TerrainDef / ResearchProjectDef 的
                 try:
                     tree = ET.parse(os.path.join(base, f))
                 except (ET.ParseError, OSError):
@@ -162,7 +163,8 @@ def parse_lang_labels(data_root):
                             nm = m.name.lower().replace('\\', '/')
                             if not nm.endswith('.xml'):
                                 continue
-                            if 'definjected/thingdef' not in nm and 'definjected/stuffcategorydef' not in nm:
+                            if ('definjected/thingdef' not in nm and 'definjected/stuffcategorydef' not in nm
+                                    and 'definjected/terraindef' not in nm and 'definjected/researchprojectdef' not in nm):
                                 continue
                             fh = tf.extractfile(m)
                             if fh is None:
@@ -183,10 +185,12 @@ def parse_lang_labels(data_root):
 
 
 def parse_defs(data_root):
-    """返回 (named, thing_defs, color_defs)"""
+    """返回 (named, thing_defs, color_defs, terrain_defs, research_defs)"""
     named = {}       # Name 属性 -> element
     thing_defs = []  # 所有 ThingDef
     color_defs = []
+    terrain_defs = []
+    research_defs = []
 
     search_roots = []
     dlc_abs = set()
@@ -224,7 +228,11 @@ def parse_defs(data_root):
                     thing_defs.append((dlc, el))
                 elif tag == 'ColorDef':
                     color_defs.append(el)
-    return named, thing_defs, color_defs
+                elif tag == 'TerrainDef':
+                    terrain_defs.append(el)
+                elif tag == 'ResearchProjectDef':
+                    research_defs.append(el)
+    return named, thing_defs, color_defs, terrain_defs, research_defs
 
 
 def child(el, tag):
@@ -237,6 +245,13 @@ def child(el, tag):
 def text_of(el, tag, default=None):
     c = child(el, tag)
     return c.text.strip() if (c is not None and c.text) else default
+
+
+def list_text(el, tag):
+    box = child(el, tag)
+    if box is None:
+        return []
+    return [(x.text or '').strip() for x in box if (x.text or '').strip()]
 
 
 def collect_parents(el, named, acc=None, depth=0):
@@ -260,11 +275,14 @@ def collect_parents(el, named, acc=None, depth=0):
 def resolve(el, named):
     """把继承链摊平成一个 dict：标量字段子覆盖父，list 字段（comps/stuffCategories）父在前"""
     chain = collect_parents(el, named) + [el]
-    merged = {'comps': [], 'stuffCategories': [], 'statBases': {}, 'building': {}}
+    merged = {'comps': [], 'stuffCategories': [], 'statBases': {}, 'building': {},
+              'graphicData': {}, 'costList': [], 'research': []}
     scalars = ['defName', 'label', 'category', 'designationCategory', 'passability',
                'holdsRoof', 'fillPercent', 'size', 'thingClass', 'terrainAffordanceNeeded',
                'blockPlants', 'blockLight', 'altitudeLayer', 'hasInteractionCell',
-               'rotatable', 'specialDisplayRadius', 'buildingSize', 'uiOrder']
+               'rotatable', 'specialDisplayRadius', 'buildingSize', 'uiOrder',
+               'useStuffTerrainAffordance', 'mineable', 'constructionSkillPrerequisite',
+               'costStuffCount']
     # 先全部置 None，避免调用方 .get() 之外的下标取值踩空
     for s in scalars:
         merged[s] = None
@@ -283,6 +301,21 @@ def resolve(el, named):
             for c in bd:
                 if c.text:
                     merged['building'][strip_ns(c.tag)] = c.text.strip()
+        gd = child(node, 'graphicData')
+        if gd is not None:
+            for c in gd:
+                if c.text:
+                    merged['graphicData'][strip_ns(c.tag)] = c.text.strip()
+        for tag_name, key in (('costList', 'costList'), ('researchPrerequisites', 'research')):
+            box = child(node, tag_name)
+            if box is None:
+                continue
+            if box.get('Inherit') == 'false':
+                merged[key] = []
+            for li in box:
+                v = (li.text or '').strip()
+                if v:
+                    merged[key].append((strip_ns(li.tag), v))
         comps = child(node, 'comps')
         if comps is not None:
             # 子节点的 comps 若显式 Inherit=false 则整体替换
@@ -297,7 +330,29 @@ def resolve(el, named):
             for li in sc:
                 if li.text:
                     merged['stuffCategories'].append(li.text.strip())
+    # costList 汇总
+    cost = {}
+    for k, v in merged['costList']:
+        cost[k] = cost.get(k, 0) + safe_float(v, 0)
+    merged['cost'] = cost
+    merged['research'] = [v if k == 'li' else k for k, v in merged['research']]
     return merged
+
+
+def affordances_of(el, named):
+    chain = collect_parents(el, named) + [el]
+    out = []
+    for node in chain:
+        box = child(node, 'affordances')
+        if box is None:
+            continue
+        if box.get('Inherit') == 'false':
+            out = []
+        for li in box:
+            v = (li.text or '').strip()
+            if v and v not in out:
+                out.append(v)
+    return out
 
 
 def safe_float(v, default=0.0):
@@ -458,8 +513,13 @@ def collect_stuffs(named, thing_defs, lang_labels, data_root):
             elif tag == 'ThingDef':
                 chain = collect_parents(el, named) + [el]
                 cc, app, color, common = [], None, None, None
+                work_factor = work_offset = cs_factor = None
+                st_aff = None
                 for node in chain:
                     sp = child(node, 'stuffProps')
+                    v_aff = text_of(node, 'terrainAffordanceNeeded')
+                    if v_aff:
+                        st_aff = v_aff
                     if sp is None:
                         continue
                     box = child(sp, 'categories')
@@ -474,20 +534,143 @@ def collect_stuffs(named, thing_defs, lang_labels, data_root):
                     v = text_of(sp, 'commonality')
                     if v:
                         common = v
+                    fbox = child(sp, 'statFactors')
+                    if fbox is not None:
+                        v = text_of(fbox, 'WorkToBuild')
+                        if v is not None:
+                            work_factor = safe_float(v, 1.0)
+                        v = text_of(fbox, 'ConstructionSpeedFactor')
+                        if v is not None:
+                            cs_factor = safe_float(v, 1.0)
+                    obox = child(sp, 'statOffsets')
+                    if obox is not None:
+                        v = text_of(obox, 'WorkToBuild')
+                        if v is not None:
+                            work_offset = safe_float(v, 0.0)
                 if not cc or not (set(cc) & used):
                     continue
                 dn = text_of(el, 'defName')
                 if not dn:
                     continue
-                stuffs.append({
+                st = {
                     'id': dn, 'def': dn,
                     'name': lang_labels.get(dn) or text_of(el, 'label') or dn,
                     'color': parse_hex(color),
                     'cats': cc,
                     'app': app or '',
                     'common': safe_float(common, 0.0),
-                })
+                }
+                if work_factor is not None:
+                    st['workFactor'] = work_factor
+                if work_offset is not None:
+                    st['workOffset'] = work_offset
+                if cs_factor is not None:
+                    st['csFactor'] = cs_factor
+                if st_aff:
+                    st['aff'] = st_aff
+                stuffs.append(st)
     return cats, stuffs
+
+
+def collect_world(named, thing_defs, terrain_defs, research_defs, lang_labels):
+    """收集地形 / 自然岩石 / 科技 / 物品名（工时估算与存档地形解析用）"""
+    terrains, rocks, researches, items = [], [], [], {}
+
+    # 物品名
+    for dlc, el in thing_defs:
+        dn = text_of(el, 'defName')
+        if not dn or dn in items:
+            continue
+        nm = lang_labels.get(dn) or text_of(el, 'label')
+        if nm:
+            items[dn] = nm
+
+    # 自然岩石
+    for dlc, el in thing_defs:
+        try:
+            m = resolve(el, named)
+        except Exception:
+            continue
+        dn = m.get('defName')
+        if not dn:
+            continue
+        natural = (m['building'].get('isNaturalRock') or '').lower() == 'true'
+        if not natural and (m.get('mineable') or '').lower() != 'true':
+            continue
+        if (m.get('category') or '') != 'Building':
+            continue
+        rocks.append({
+            'def': dn,
+            'name': lang_labels.get(dn) or m.get('label') or dn,
+            'hp': int(safe_float(m['statBases'].get('MaxHitPoints'), 400)),
+            'mineableThing': m['building'].get('mineableThing'),
+            'yield': int(safe_float(m['building'].get('mineableYield'), 1)),
+            'resource': (m['building'].get('isResourceRock') or '').lower() == 'true',
+            'color': parse_hex(m['graphicData'].get('color')),
+        })
+
+    # 地形
+    by_def = {}
+    for el in terrain_defs:
+        dn = text_of(el, 'defName')
+        if not dn:
+            continue
+        aff = affordances_of(el, named)
+        cost = {}
+        cl = child(el, 'costList')
+        if cl is not None:
+            for c in cl:
+                if c.text:
+                    cost[strip_ns(c.tag)] = safe_float(c.text, 0)
+        work = None
+        stb = child(el, 'statBases')
+        if stb is not None:
+            w = text_of(stb, 'WorkToBuild')
+            if w is not None:
+                work = safe_float(w, 0)
+        by_def[dn] = {
+            'def': dn,
+            'name': lang_labels.get(dn) or text_of(el, 'label') or dn,
+            'color': parse_hex(text_of(el, 'color')),
+            'aff': aff,
+            'need': text_of(el, 'terrainAffordanceNeeded'),
+            'work': work,
+            'cost': {k: int(round(v)) for k, v in cost.items() if v} or None,
+            'research': list_text(el, 'researchPrerequisites') or None,
+            'smoothTo': text_of(el, 'smoothedTerrain'),
+            'isWater': bool(re.match(r'^(Water|Marsh|Mud|Lava|HotSpring)', dn)),
+        }
+    # 自然岩石对应的三种运行期地形
+    for rk in rocks:
+        base = rk['name'] or rk['def']
+        aff = ['Light', 'Medium', 'Heavy']
+        for suffix, label in (('_Rough', '粗' + base), ('_RoughHewn', '开采' + base), ('_Smooth', '光滑' + base)):
+            dn = rk['def'] + suffix
+            if dn in by_def:
+                continue
+            by_def[dn] = {
+                'def': dn, 'name': label, 'color': rk['color'],
+                'aff': (aff + ['SmoothableStone']) if suffix != '_Smooth' else aff,
+                'need': None, 'work': None, 'cost': None, 'research': None,
+                'smoothTo': None if suffix == '_Smooth' else rk['def'] + '_Smooth',
+                'isWater': False,
+            }
+    terrains = list(by_def.values())
+
+    # 科技
+    for el in research_defs:
+        dn = text_of(el, 'defName')
+        if not dn:
+            continue
+        researches.append({
+            'def': dn,
+            'name': lang_labels.get(dn) or text_of(el, 'label') or dn,
+            'cost': safe_float(text_of(el, 'baseCost'), 0),
+            'prereq': list_text(el, 'prerequisites'),
+            'techLevel': text_of(el, 'techLevel') or '',
+        })
+
+    return terrains, rocks, researches, items
 
 
 def builtin_names():
@@ -545,7 +728,7 @@ def main():
         return 1
 
     print('数据目录：', data_root)
-    named, thing_defs, color_defs = parse_defs(data_root)
+    named, thing_defs, color_defs, terrain_defs, research_defs = parse_defs(data_root)
     lang_labels = parse_lang_labels(data_root)
     if lang_labels:
         print('  读取到官方简中语言包：%d 条建筑名' % len(lang_labels))
@@ -704,6 +887,25 @@ def main():
         r = safe_float(merged.get('specialDisplayRadius'), 0)
         if r > 0:
             entry['radius'] = r      # 游戏里会画一个圆形作用范围（如太阳灯）
+        # 建造所需：工时 / 固定材料 / 材质数量 / 科技前置 / 技能前置 / 地形要求
+        work = safe_float(merged['statBases'].get('WorkToBuild'), 0)
+        if work > 0:
+            entry['work'] = int(round(work))
+        if merged['cost']:
+            entry['cost'] = {k: int(round(v)) for k, v in merged['cost'].items() if v}
+        csc = safe_float(merged.get('costStuffCount'), 0)
+        if csc > 0:
+            entry['costStuff'] = int(round(csc))
+        if merged['research']:
+            entry['research'] = merged['research']
+        skill = safe_float(merged.get('constructionSkillPrerequisite'), 0)
+        if skill > 0:
+            entry['skillReq'] = int(skill)
+        aff = merged.get('terrainAffordanceNeeded')
+        if aff and aff != 'true':
+            entry['aff'] = aff
+        if (merged.get('useStuffTerrainAffordance') or '').lower() == 'true':
+            entry['useStuffAff'] = 1
         if dlc:
             entry['dlc'] = dlc
         entries.append(entry)
@@ -713,6 +915,9 @@ def main():
 
     # 材质表（供界面按分类列出，和游戏一样逐物品选材质）
     stuff_cats, stuffs = collect_stuffs(named, thing_defs, lang_labels, data_root)
+
+    # 地形 / 山体 / 科技 / 物品名
+    terrains, rocks, researches, items = collect_world(named, thing_defs, terrain_defs, research_defs, lang_labels)
 
     # 计划颜色（ColorDef colorType=Structure）
     colors = []
@@ -742,6 +947,14 @@ def main():
     if stuffs:
         js.append('  g.RWData.STUFF_CATS = %s;' % to_js(stuff_cats))
         js.append('  g.RWData.STUFFS = %s;' % to_js(stuffs))
+    if terrains:
+        js.append('  g.RWData.mergeTerrains(%s);' % to_js(terrains))
+    if rocks:
+        js.append('  g.RWData.mergeRocks(%s);' % to_js(rocks))
+    if researches:
+        js.append('  g.RWData.mergeResearches(%s);' % to_js(researches))
+    if items:
+        js.append('  g.RWData.ITEM_NAMES = %s;' % to_js(items))
     js.append('  if (g.console) g.console.log("[extract_defs] 精确更新 " + r.replaced + " 条，新增 " + r.added + " 条，共 " + r.total + " 条建筑");')
     js.append('})(typeof window!=="undefined"?window:globalThis);')
 

@@ -54,6 +54,14 @@
     bridge: 'Bridge'
   };
 
+  /** 本库地板 id → 游戏 TerrainDef（优先用数据里的 def 字段，更准） */
+  function floorTerrainOf(id) {
+    if (id === 'none' || id === 'water' || id === 'tileAncient') return null;  // 非玩家可建造/仅观感
+    var f = Data.floorsById && Data.floorsById[id];
+    if (f && f.def) return f.def;
+    return FLOOR_TERRAIN[id] || null;
+  }
+
   /** 本库条目 → 游戏 defName */
   function gameDefName(def) {
     if (!def) return null;
@@ -73,11 +81,13 @@
   function toBlueprintsXML(state, opts) {
     opts = opts || {};
     var stuff = STUFF_DEF[opts.stuff || 'stone'] || null;
-    var entries = [], skipped = {};
+    var entries = [], skipped = {}, lockedSkipped = 0;
+    var excludeLocked = opts.excludeLocked !== false;
 
     if (opts.floors !== false) {
       Object.keys(state.floors).forEach(function (k) {
-        var t = FLOOR_TERRAIN[state.floors[k]];
+        if (excludeLocked && state.lockedFloors && state.lockedFloors[k]) { lockedSkipped++; return; }
+        var t = floorTerrainOf(state.floors[k]);
         if (!t) return;
         var p = k.split(',');
         entries.push({ terrain: t, x: +p[0], z: mapZ(+p[1]) });
@@ -86,6 +96,7 @@
 
     var flipX = state.flipX, flipZ = state.flipZ !== false;
     state.buildings.forEach(function (b) {
+      if (excludeLocked && b.locked) { lockedSkipped++; return; }
       var def = Data.byId[b.defId];
       var dn = gameDefName(def);
       if (!dn) { skipped[def ? def.name : b.defId] = (skipped[def ? def.name : b.defId] || 0) + 1; return; }
@@ -110,7 +121,7 @@
       });
     });
 
-    if (!entries.length) return { xml: '', count: 0, skipped: skipped };
+    if (!entries.length) return { xml: '', count: 0, skipped: skipped, lockedSkipped: lockedSkipped };
 
     var minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity;
     entries.forEach(function (e) {
@@ -165,7 +176,7 @@
     // 与真实文件一致：带 BOM + CRLF
     return {
       xml: '\uFEFF' + L.join('\r\n') + '\r\n',
-      count: entries.length, skipped: skipped,
+      count: entries.length, skipped: skipped, lockedSkipped: lockedSkipped,
       w: maxX - minX + 1, h: maxZ - minZ + 1
     };
   }

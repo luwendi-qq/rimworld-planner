@@ -15,6 +15,7 @@
     buildings: [],
     floors: {},          // "x,z" -> floorId
     plannedFloors: {},   // "x,z" -> 1=规划中(蓝图) 2=规划中但被禁用
+    lockedFloors: {},    // "x,z" -> true（存档原有地板，导出时排除）
     areas: {},           // "x,z" -> areaId（区域规划层，仅本工具）
     nextUid: 1,
     selection: {},       // uid -> true（建筑）
@@ -25,7 +26,7 @@
     lastStuff: {},       // defId -> 上次选的材质（和游戏一样记住）
     rotation: 0,
     flip: false,
-    layers: { grid: true, floors: true, buildings: true, power: false, rooms: false, zones: true },
+    layers: { grid: true, floors: true, buildings: true, power: false, rooms: false, zones: true, terrain: true, blocked: false, home: true },
     hover: null,
     marquee: null,
     drag: null,
@@ -38,7 +39,18 @@
     // 与游戏视角一致：游戏里 +z 是北（屏幕上方），本编辑器 z 向下，导入/导出时翻转 Z
     flipZ: true,
     planColor: 'Structure_White',
-    mapName: '未命名布局'
+    mapName: '未命名布局',
+    // ---- 存档带出来的地图信息 ----
+    terrain: null,       // { w,h,cells:Uint16Array, defs:{} }
+    rocks: null,         // { w,h,cells, defs }
+    roofs: null,         // { w,h,cells, kind }
+    home: null,          // { w,h,cells:Uint16Array(0/1), count } 玩家活动区域
+    terrainReady: false,
+    importStamp: 0,
+    saveInfo: null,      // { version, difficulty, pawns, research, resources }
+    respectTerrain: true, // 放置时按地形校验
+    strictTerrain: false, // true=地形不满足直接拒绝；false=允许先规划、只警告
+    useHomeStock: true    // 库存只统计玩家活动区域（Area_Home）
   };
 
   var listeners = {};
@@ -169,19 +181,40 @@
     return out;
   }
 
+  /** 地形/山体检查（没导入存档地形时永远通过） */
+  function terrainIssue(defId, x, z, rot, stuff) {
+    if (!state.respectTerrain || !global.RWSite) return null;
+    if (!state.terrain && !state.rocks) return null;
+    return global.RWSite.checkBuilding(defId, x, z, rot, stuff);
+  }
+  function siteBlock(defId, x, z, rot, stuff, ignoreTerrain) {
+    if (ignoreTerrain) return null;
+    var s = terrainIssue(defId, x, z, rot, stuff);
+    // 默认只警告（允许先把蓝图画在山体/沼泽上，再按估算决定挖不挖）；
+    // 勾了「严格模式」才会直接拒绝放置。
+    if (s && !s.ok && state.strictTerrain) return s;
+    return null;
+  }
+
   /**
    * 判定能否放置（不再有「原地替换」：冲突就拒绝，避免误删东西）
    */
-  function canPlace(defId, x, z, rot, ignoreUid) {
+  function canPlace(defId, x, z, rot, ignoreUid, stuff, ignoreTerrain) {
     var def = Data.byId[defId]; if (!def) return { ok: false, why: '未知建筑' };
     var fp = footprint(def, rot);
     if (x < 0 || z < 0 || x + fp[0] > state.cols || z + fp[1] > state.rows)
       return { ok: false, why: '超出地图边界' };
+    var site = siteBlock(defId, x, z, rot, stuff, ignoreTerrain);
+    if (site && !site.ok) return site;
     var victims = victimsAt(def, x, z, rot, ignoreUid);
     if (victims.length) {
+      var locked = victims.filter(function (b) { return b.locked; });
+      if (locked.length) {
+        return { ok: false, why: '这一格是存档原有建筑（已锁定），先解锁或删掉', victims: victims, locked: locked };
+      }
       return { ok: false, why: '与「' + (defOf(victims[0]) || { name: '?' }).name + '」重合，先删掉那一格', victims: victims };
     }
-    return { ok: true };
+    return { ok: true, terrain: terrainIssue(defId, x, z, rot, stuff) };
   }
 
   /** 放一个建筑。冲突直接失败，不会删除任何已有建筑。 */
@@ -192,12 +225,19 @@
     var fp = footprint(def, rot);
     if (x < 0 || z < 0 || x + fp[0] > state.cols || z + fp[1] > state.rows)
       return { ok: false, why: '超出地图边界' };
+    var site = siteBlock(defId, x, z, rot, opts.stuff, opts.ignoreTerrain);
+    if (site && !site.ok) return site;
     var victims = victimsAt(def, x, z, rot, opts.ignoreUid);
     if (victims.length) {
+      var locked = victims.filter(function (b) { return b.locked; });
+      if (locked.length) {
+        return { ok: false, why: '这一格是存档原有建筑（已锁定），先解锁或删掉', victims: victims, locked: locked };
+      }
       return { ok: false, why: '与「' + (defOf(victims[0]) || { name: '?' }).name + '」重合，先删掉那一格', victims: victims };
     }
     var b = { uid: state.nextUid++, defId: defId, x: x, z: z, rot: rot || 0, color: opts.color || null,
               stuff: (opts.stuff !== undefined) ? opts.stuff : defaultStuff(def) };
+    if (opts.locked) b.locked = true;
     state.buildings.push(b);
     indexAdd(b);
     return { ok: true, b: b, replaced: 0 };
@@ -224,6 +264,7 @@
       cols: state.cols, rows: state.rows,
       buildings: state.buildings,
       floors: state.floors, plannedFloors: state.plannedFloors,
+      lockedFloors: state.lockedFloors,
       nextUid: state.nextUid
     });
   }
@@ -239,6 +280,7 @@
     state.buildings = s.buildings;
     state.floors = s.floors || {};
     state.plannedFloors = s.plannedFloors || {};
+    state.lockedFloors = s.lockedFloors || {};
     state.nextUid = s.nextUid;
     state.selection = {};
     reindex(); render(); emit('change');
@@ -267,9 +309,10 @@
     return res;
   }
 
-  function removeBuilding(uid) {
+  function removeBuilding(uid, force) {
     for (var i = 0; i < state.buildings.length; i++) {
       if (state.buildings[i].uid === uid) {
+        if (state.buildings[i].locked && !force) return false;
         indexRemove(state.buildings[i]);
         state.buildings.splice(i, 1);
         return true;
@@ -278,17 +321,34 @@
     return false;
   }
 
-  function removeAt(x, z) {
+  function removeAt(x, z, force) {
     var list = buildingsAt(x, z).slice();
     var removed = false;
-    list.forEach(function (b) { if (removeBuilding(b.uid)) removed = true; });
-    if (state.floors[key(x, z)]) { delete state.floors[key(x, z)]; removed = true; reindex(); }
+    list.forEach(function (b) { if (removeBuilding(b.uid, force)) removed = true; });
+    var k = key(x, z);
+    if (state.floors[k] && (force || !(state.lockedFloors && state.lockedFloors[k]))) {
+      delete state.floors[k];
+      if (state.lockedFloors) delete state.lockedFloors[k];
+      removed = true; reindex();
+    }
     return removed;
   }
 
-  function clearAll() {
+  /** 清空：默认保留存档原有的锁定建筑（底图），force=true 才全部清掉 */
+  function clearAll(force) {
     pushHistory();
-    state.buildings = []; state.floors = {}; state.plannedFloors = {};
+    if (force) {
+      state.buildings = []; state.floors = {}; state.plannedFloors = {}; state.lockedFloors = {};
+    } else {
+      state.buildings = state.buildings.filter(function (b) { return b.locked; });
+      var keep = {};
+      Object.keys(state.lockedFloors || {}).forEach(function (k) { if (state.floors[k]) keep[k] = state.floors[k]; });
+      state.floors = keep;
+      state.plannedFloors = {};
+      var lf = {};
+      Object.keys(keep).forEach(function (k) { lf[k] = true; });
+      state.lockedFloors = lf;
+    }
     state.selection = {}; state.floorSelection = {};
     reindex(); render(); emit('change');
   }
@@ -316,16 +376,26 @@
   }
 
   function deleteSelection() {
-    var sel = Object.keys(state.selection);
+    var sel = Object.keys(state.selection).map(Number);
     var fl = selectedFloors();
     if (!sel.length && !fl.length) return;
     pushHistory();
+    var removed = 0, blocked = 0;
     if (sel.length) {
-      state.buildings = state.buildings.filter(function (b) { return !state.selection[b.uid]; });
+      state.buildings = state.buildings.filter(function (b) {
+        if (!state.selection[b.uid]) return true;
+        if (b.locked) { blocked++; return true; }   // 存档原有建筑不删
+        removed++; return false;
+      });
     }
-    fl.forEach(function (f) { delete state.floors[f.key]; });
+    fl.forEach(function (f) {
+      if (state.lockedFloors && state.lockedFloors[f.key]) { blocked++; return; }
+      delete state.floors[f.key]; removed++;
+    });
     state.selection = {}; state.floorSelection = {};
+    if (!removed) state.history.pop();
     reindex(); render(); emit('change');
+    return { removed: removed, blocked: blocked };
   }
 
   function rotateSelection() {
@@ -336,8 +406,9 @@
     sel.forEach(function (b) {
       var def = defOf(b);
       if (def && def.rotatable === false) return;    // 游戏里不可旋转
+      if (b.locked) return;                          // 存档原有建筑不动
       var nr = (b.rot + 90) % 360;
-      var chk = canPlace(b.defId, b.x, b.z, nr, b.uid);
+      var chk = canPlace(b.defId, b.x, b.z, nr, b.uid, b.stuff);
       if (chk.ok) { b.rot = nr; moved++; }
     });
     reindex(); render(); emit('change');
@@ -535,7 +606,10 @@
         var fl = Data.floorsById[f];
         if (!fl) continue;
         ctx.save();
+        var lockedFloor = state.lockedFloors && state.lockedFloors[key(x, z)];
+        if (lockedFloor) { ctx.globalAlpha = 0.6; }
         if (!Art.drawFloorSprite(ctx, fl, x, z, 1)) Art.drawFloor(ctx, fl, x, z, 1);
+        ctx.globalAlpha = 1;
         // 被选中的地板格描个边，好看出框选到了哪些
         if (state.floorSelection[key(x, z)]) {
           ctx.strokeStyle = COLORS.select;
@@ -734,7 +808,9 @@
     var w = def.size[0], h = def.size[1];
     var isConduit = def.tags.indexOf('conduit') >= 0;
     var info = null;
-    if (drawArtFor(def, b.rot, b.x, b.z, fp, b.planned ? 0.5 : null, b.stuff)) {
+    var alpha = b.planned ? 0.5 : null;
+    if (b.locked) alpha = (alpha == null ? 0.72 : alpha * 0.72);
+    if (drawArtFor(def, b.rot, b.x, b.z, fp, alpha, b.stuff)) {
       // 贴图已画
     } else {
       if (isConduit) info = { conn: conduitConnMask(b.x, b.z) };
@@ -744,7 +820,7 @@
       if (!isConduit) ctx.rotate(b.rot * Math.PI / 180);
       ctx.translate(-w / 2, -h / 2);
       ctx.lineJoin = 'round';
-      if (b.planned) ctx.globalAlpha = 0.5;
+      if (alpha != null) ctx.globalAlpha = alpha;
       withStuffColor(def, b.stuff, function () { Art.drawBuilding(ctx, def, w, h, info); });
       ctx.restore();
     }
@@ -754,6 +830,18 @@
       ctx.setLineDash([0.22, 0.16]);
       ctx.strokeRect(b.x + 0.06, b.z + 0.06, fp[0] - 0.12, fp[1] - 0.12);
       ctx.setLineDash([]);
+    }
+    // 存档原有建筑：淡一点 + 左上角一个很小的 🔒（屏幕尺寸固定，避免挡住贴图）
+    if (b.locked && state.cam.cell > 8) {
+      var lockPx = Math.max(5, Math.min(9, state.cam.cell * 0.24));
+      ctx.save();
+      ctx.font = (lockPx / state.cam.cell) + 'px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.globalAlpha = 0.85;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText('🔒', b.x + 0.04, b.z + 0.02);
+      ctx.restore();
     }
     if (state.selection[b.uid]) {
       ctx.strokeStyle = COLORS.select; ctx.lineWidth = 2 / state.cam.cell;
@@ -864,7 +952,8 @@
         var def = Data.byId[it.defId]; if (!def) return;
         var fp = footprint(def, it.rot);
         var tx = state.paste.at.x + it.dx, tz = state.paste.at.z + it.dz;
-        var ok = canPlace(it.defId, tx, tz, it.rot, null);
+        var ok = canPlace(it.defId, tx, tz, it.rot, null, it.stuff);
+        var bad = !ok.ok || (ok.terrain && !ok.terrain.ok);
         if (state.layers.zones) drawZonesOf(def, it.rot, tx, tz, 0.8);
         if (!drawArtFor(def, it.rot, tx, tz, fp, 0.75, it.stuff)) {
           ctx.globalAlpha = 0.75;
@@ -876,9 +965,9 @@
           ctx.restore();
           ctx.globalAlpha = 1;
         }
-        ctx.fillStyle = !ok.ok ? 'rgba(224,87,74,0.25)' : 'rgba(74,208,122,0.16)';
+        ctx.fillStyle = bad ? 'rgba(224,87,74,0.25)' : 'rgba(74,208,122,0.16)';
         ctx.fillRect(tx, tz, fp[0], fp[1]);
-        ctx.strokeStyle = ok.ok ? COLORS.ok : COLORS.bad;
+        ctx.strokeStyle = bad ? COLORS.bad : COLORS.ok;
         ctx.lineWidth = 2 / state.cam.cell;
         ctx.strokeRect(tx, tz, fp[0], fp[1]);
       });
@@ -926,8 +1015,9 @@
         var fill;
         if (erasing) fill = 'rgba(224,87,74,0.25)';
         else if (defR) {
-          var chk = canPlace(defR.id, c[0], c[1], state.rotation, null);
-          fill = !chk.ok ? 'rgba(224,87,74,0.22)' : 'rgba(74,208,122,0.16)';
+          var chk = canPlace(defR.id, c[0], c[1], state.rotation, null, bstuff);
+          var bad = !chk.ok || (chk.terrain && !chk.terrain.ok);
+          fill = bad ? 'rgba(224,87,74,0.22)' : 'rgba(74,208,122,0.16)';
         } else fill = 'rgba(120,200,255,0.18)';
         ctx.fillStyle = fill;
         ctx.fillRect(c[0], c[1], fpR[0], fpR[1]);
@@ -960,7 +1050,8 @@
     }
     var def = Data.byId[state.brush.id]; if (!def) return;
     var fp = footprint(def, state.rotation);
-    var chk = canPlace(def.id, hx, hz, state.rotation, null);
+    var chk = canPlace(def.id, hx, hz, state.rotation, null, state.brush.stuff);
+    var bad = !chk.ok || (chk.terrain && !chk.terrain.ok);
     // 摆放预览就显示作用范围：风机风区、制冷机冷热端、太阳灯照射圈…（和游戏一致）
     if (state.layers.zones) drawZonesOf(def, state.rotation, hx, hz, 0.95);
     if (!drawArtFor(def, state.rotation, hx, hz, fp, 0.6, state.brush.stuff)) {
@@ -973,9 +1064,9 @@
       ctx.restore();
       ctx.globalAlpha = 1;
     }
-    ctx.fillStyle = !chk.ok ? 'rgba(224,87,74,0.25)' : 'rgba(74,208,122,0.16)';
+    ctx.fillStyle = bad ? 'rgba(224,87,74,0.25)' : 'rgba(74,208,122,0.16)';
     ctx.fillRect(hx, hz, fp[0], fp[1]);
-    ctx.strokeStyle = !chk.ok ? COLORS.bad : COLORS.ok;
+    ctx.strokeStyle = bad ? COLORS.bad : COLORS.ok;
     ctx.lineWidth = 2 / state.cam.cell;
     ctx.strokeRect(hx, hz, fp[0], fp[1]);
   }
@@ -991,6 +1082,56 @@
     ctx.strokeRect(x, z, w, h);
   }
 
+  /** 存档地形 / 山体（离屏 1px/格画布，按格缩放贴上去） */
+  function drawTerrainLayer() {
+    if (!state.terrainReady || !global.RWSite) return;
+    var cv = global.RWSite.canvases();
+    if (!cv || !cv.terrain) return;
+    var prev = ctx.imageSmoothingEnabled;
+    ctx.imageSmoothingEnabled = false;
+    ctx.globalAlpha = 0.9;
+    ctx.drawImage(cv.terrain, 0, 0, state.cols, state.rows);
+    if (cv.rock) { ctx.globalAlpha = 0.85; ctx.drawImage(cv.rock, 0, 0, state.cols, state.rows); }
+    ctx.globalAlpha = 1;
+    ctx.imageSmoothingEnabled = prev;
+  }
+
+  /** 玩家活动区域：淡绿底 + 边界 */
+  function drawHomeLayer() {
+    if (!state.home || !global.RWSite) return;
+    var cv = global.RWSite.canvases();
+    if (!cv || !cv.home) return;
+    var prev = ctx.imageSmoothingEnabled;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(cv.home, 0, 0, state.cols, state.rows);
+    ctx.imageSmoothingEnabled = prev;
+  }
+
+  /**
+   * 「不可建造」覆盖层：把当前笔刷放不下的格子标红。
+   * 选中地板笔刷就按地板检查，没笔刷时按「墙」的标准（Heavy）粗略标一下。
+   */
+  function drawBlockedOverlay(v) {
+    if (!state.respectTerrain || !global.RWSite) return;
+    if (!state.terrain && !state.rocks) return;
+    var Site = global.RWSite;
+    var isFloor = state.brush && state.brush.kind === 'floor';
+    var def = (!isFloor && state.brush && state.brush.kind === 'building') ? Data.byId[state.brush.id] : null;
+    var stuff = state.brush ? state.brush.stuff : null;
+    ctx.save();
+    for (var x = v.x0; x < v.x1; x++) {
+      for (var z = v.z0; z < v.z1; z++) {
+        var c = isFloor ? Site.checkFloor(state.brush.id, x, z)
+              : (def ? Site.cellCheck(def, stuff, x, z)
+                     : { ok: !!(Site.terrainAt(x, z) && (Site.terrainAt(x, z).aff || []).indexOf('Heavy') >= 0) });
+        if (c.ok) continue;
+        ctx.fillStyle = c.kind === 'rock' ? 'rgba(90,110,140,0.35)' : 'rgba(224,87,74,0.28)';
+        ctx.fillRect(x, z, 1, 1);
+      }
+    }
+    ctx.restore();
+  }
+
   function render() {
     if (!ctx) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -1004,10 +1145,13 @@
     ctx.fillStyle = COLORS.inside;
     ctx.fillRect(0, 0, state.cols, state.rows);
     var v = visibleRange();
+    if (state.layers.terrain && state.terrainReady) drawTerrainLayer();
+    if (state.layers.home && state.home) drawHomeLayer();
     if (state.layers.floors) drawFloors(v);
     if (state.layers.grid) drawGrid(v);
     if (state.layers.buildings) drawBuildings(v);
     drawOverlays(v);
+    if (state.layers.blocked) drawBlockedOverlay(v);
     drawMarquee();
     drawBrushPreview(v);
     ctx.restore();
@@ -1039,11 +1183,15 @@
         pushHistory();
         var removed = 0;
         if (hitSel.length && Object.keys(state.selection).length > 1) {
-          // 右键点在已选中的东西上 → 删掉整批选中
+          // 右键点在已选中的东西上 → 删掉整批选中（锁定的存档建筑不动）
           var sel = Object.keys(state.selection);
-          state.buildings = state.buildings.filter(function (b) { return !state.selection[b.uid]; });
+          state.buildings = state.buildings.filter(function (b) {
+            if (!state.selection[b.uid]) return true;
+            if (b.locked) return true;
+            removed++; return false;
+          });
           state.selection = {};
-          reindex(); removed = sel.length;
+          reindex();
         } else {
           if (removeAt(c0.x, c0.z)) removed = 1;
         }
@@ -1261,27 +1409,32 @@
   /** 把一批格子按当前笔刷落下去 */
   function commitCells(cells) {
     pushHistory();
-    var changed = 0, replaced = 0;
+    var changed = 0, replaced = 0, blocked = 0, reasons = {};
     if (state.tool === 'erase') {
       cells.forEach(function (c) { if (removeAt(c[0], c[1])) changed++; });
     } else if (state.brush && state.brush.kind === 'floor') {
       cells.forEach(function (c) {
-        if (state.brush.id === 'none') delete state.floors[key(c[0], c[1])];
-        else state.floors[key(c[0], c[1])] = state.brush.id;
+        var k = key(c[0], c[1]);
+        var chk = (state.respectTerrain && global.RWSite)
+          ? global.RWSite.checkFloor(state.brush.id, c[0], c[1]) : { ok: true };
+        if (!chk.ok && state.strictTerrain) { blocked++; reasons[chk.why] = (reasons[chk.why] || 0) + 1; return; }
+        if (state.brush.id === 'none') delete state.floors[k];
+        else state.floors[k] = state.brush.id;
+        if (state.lockedFloors) delete state.lockedFloors[k];   // 手动铺过就不再算存档原有
         changed++;
       });
     } else if (state.brush && state.brush.kind === 'building') {
       var def = brushDef();
       if (def) {
         var out = placeBatch(cells, def.id, state.rotation, { color: def._color, stuff: state.brush.stuff });
-        changed = out.placed; replaced = out.replaced;
+        changed = out.placed; replaced = out.replaced; blocked = out.blocked;
       }
     }
     if (!changed && !replaced) state.history.pop();
     else emit('change');
     reindex();
     render();
-    return { changed: changed, replaced: replaced };
+    return { changed: changed, replaced: replaced, blocked: blocked, reasons: reasons };
   }
 
   /** 兼容旧调用：提交一个矩形区域 */
@@ -1344,6 +1497,7 @@
     sel.forEach(function (b) {
       var def = defOf(b);
       if (!def || !def.stuffCats || !def.stuffCats.length) return;
+      if (b.locked) return;    // 存档原有建筑不改材质
       b.stuff = stuff; n++;
     });
     if (state.brush && state.brush.kind === 'building') setStuffOf(state.brush.id, stuff);
@@ -1360,7 +1514,7 @@
   }
 
   function startMoveSelection() {
-    var sel = selectedBuildings();
+    var sel = selectedBuildings().filter(function (b) { return !b.locked; });
     if (!sel.length) return;
     var orig = {};
     sel.forEach(function (b) { orig[b.uid] = { x: b.x, z: b.z }; });
@@ -1371,17 +1525,64 @@
   }
 
   // ---------------------------------------------------------------- 载入 / 导出数据
+  /** 网格 RLE：把几万格压成 [值, 连续数, ...]，存进工程 JSON 不会太大 */
+  function rleEncode(arr) {
+    var out = [], i = 0, n = arr.length;
+    while (i < n) {
+      var v = arr[i], j = i + 1;
+      while (j < n && arr[j] === v) j++;
+      out.push(v, j - i);
+      i = j;
+    }
+    return out;
+  }
+  function rleDecode(flat, total) {
+    var out = new Uint16Array(total), p = 0;
+    for (var i = 0; i + 1 < flat.length; i += 2) {
+      var v = flat[i], c = flat[i + 1];
+      for (var k = 0; k < c && p < total; k++) out[p++] = v;
+    }
+    return out;
+  }
+  function packLayer(L) {
+    if (!L || !L.cells) return null;
+    return { w: L.w, h: L.h, defs: L.defs || {}, rle: rleEncode(L.cells) };
+  }
+  function unpackLayer(P) {
+    if (!P || !P.rle) return null;
+    return { w: P.w, h: P.h, defs: P.defs || {}, cells: rleDecode(P.rle, P.w * P.h) };
+  }
+
   function loadProject(data) {
     state.cols = data.cols || 250;
     state.rows = data.rows || 250;
     state.buildings = (data.buildings || []).map(function (b) {
-      return { uid: state.nextUid++, defId: b.defId, x: b.x, z: b.z, rot: b.rot || 0,
-               color: b.color || null, stuff: b.stuff || null };
+      var o = { uid: state.nextUid++, defId: b.defId, x: b.x, z: b.z, rot: b.rot || 0,
+                color: b.color || null, stuff: b.stuff || null };
+      if (b.locked) o.locked = true;
+      if (b.src) o.src = b.src;
+      if (b.planned) o.planned = true;
+      return o;
     });
     state.floors = data.floors || {};
     state.plannedFloors = data.plannedFloors || {};
+    state.lockedFloors = data.lockedFloors || {};
     state.lastStuff = data.lastStuff || {};
     state.mapName = data.name || '未命名布局';
+    state.terrain = unpackLayer(data.terrain);
+    state.rocks = unpackLayer(data.rocks);
+    state.home = unpackLayer(data.home);
+    state.terrainReady = !!state.terrain;
+    state.importStamp = (state.importStamp || 0) + 1;
+    if (data.useHomeStock != null) state.useHomeStock = !!data.useHomeStock;
+    state.saveInfo = data.saveInfo || null;
+    if (state.saveInfo && state.saveInfo.hasHome) {
+      state.saveInfo.resources = state.useHomeStock !== false
+        ? (state.saveInfo.resourcesHome || {}) : (state.saveInfo.resourcesAll || {});
+    }
+    if (data.respectTerrain != null) state.respectTerrain = !!data.respectTerrain;
+    if (data.strictTerrain != null) state.strictTerrain = !!data.strictTerrain;
+    if (global.RWSite) global.RWSite.terrainDirty();
     state.selection = {};
     state.history = []; state.future = [];
     reindex(); render(); emit('change');
@@ -1392,10 +1593,18 @@
       format: 'rw-planner', version: 1, name: state.mapName,
       cols: state.cols, rows: state.rows,
       buildings: state.buildings.map(function (b) {
-        return { defId: b.defId, x: b.x, z: b.z, rot: b.rot, color: b.color, stuff: b.stuff };
+        var o = { defId: b.defId, x: b.x, z: b.z, rot: b.rot, color: b.color, stuff: b.stuff };
+        if (b.locked) o.locked = true;
+        if (b.src) o.src = b.src;
+        if (b.planned) o.planned = true;
+        return o;
       }),
       floors: state.floors, plannedFloors: state.plannedFloors,
-      lastStuff: state.lastStuff
+      lockedFloors: state.lockedFloors,
+      lastStuff: state.lastStuff,
+      terrain: packLayer(state.terrain), rocks: packLayer(state.rocks), home: packLayer(state.home),
+      saveInfo: state.saveInfo, respectTerrain: state.respectTerrain, strictTerrain: state.strictTerrain,
+      useHomeStock: state.useHomeStock
     };
   }
 
@@ -1410,9 +1619,44 @@
     });
     Object.keys(state.floors).forEach(function (k) {
       var p = k.split(',');
-      if (+p[0] >= state.cols || +p[1] >= state.rows) delete state.floors[k];
+      if (+p[0] >= state.cols || +p[1] >= state.rows) {
+        delete state.floors[k];
+        if (state.lockedFloors) delete state.lockedFloors[k];
+      }
     });
     reindex(); fitView(); emit('change');
+  }
+
+  // ---------------------------------------------------------------- 锁定（存档原有建筑）
+  /** 设选中建筑的锁定状态 */
+  function setSelectionLocked(on) {
+    var sel = selectedBuildings();
+    if (!sel.length) return 0;
+    pushHistory();
+    sel.forEach(function (b) { if (on) b.locked = true; else delete b.locked; });
+    if (!on) {
+      // 解锁后同时也解除地板锁定（同一批底图一起解锁更顺手）
+      var fl = Object.keys(state.floorSelection || {});
+      fl.forEach(function (k) { if (state.lockedFloors) delete state.lockedFloors[k]; });
+    }
+    render(); emit('change');
+    return sel.length;
+  }
+  function setAllLocked(on) {
+    pushHistory();
+    state.buildings.forEach(function (b) {
+      if (b.src === 'save' || b.locked || on) { if (on) b.locked = true; else delete b.locked; }
+    });
+    if (!on) state.lockedFloors = {};
+    else {
+      Object.keys(state.floors).forEach(function (k) { state.lockedFloors[k] = true; });
+    }
+    render(); emit('change');
+  }
+  function lockedCount() {
+    var n = 0;
+    state.buildings.forEach(function (b) { if (b.locked) n++; });
+    return n;
   }
 
   // ---------------------------------------------------------------- 对外 API
@@ -1424,10 +1668,26 @@
     zoomAt: zoomAt, anchorOffset: anchorOffset,
     cellInfo: function (x, z) {
       if (!inBounds(x, z)) return null;
+      var Site = global.RWSite;
+      var terrain = Site ? Site.terrainAt(x, z) : null;
+      var rock = Site ? Site.rockAt(x, z) : null;
+      var roof = Site ? Site.roofAt(x, z) : 0;
+      var inHome = !!(state.home && state.home.cells && state.home.cells[z * state.home.w + x]);
+      var build = null;
+      if (Site) {
+        if (state.brush && state.brush.kind === 'building') build = Site.cellCheck(Data.byId[state.brush.id], state.brush.stuff, x, z);
+        else if (state.brush && state.brush.kind === 'floor') build = Site.checkFloor(state.brush.id, x, z);
+      }
       return {
         x: x, z: z,
         floor: state.floors[key(x, z)] || null,
+        lockedFloor: !!(state.lockedFloors && state.lockedFloors[key(x, z)]),
         planned: state.plannedFloors ? (state.plannedFloors[key(x, z)] || 0) : 0,
+        terrain: terrain ? { def: terrain.def, name: terrain.name, aff: terrain.aff || [], unknown: !!terrain.unknown } : null,
+        rock: rock ? { def: rock.def, name: rock.name, hp: rock.hp, thing: rock.mineableThing, yield: rock.yield } : null,
+        roof: roof,
+        home: inHome,
+        build: build,
         buildings: buildingsAt(x, z).map(function (b) {
           var d = defOf(b);
           return {
@@ -1442,10 +1702,16 @@
             powerGen: d ? (d.powerGen || 0) : 0,
             powerStore: d ? (d.powerStore || 0) : 0,
             beauty: d ? d.beauty : null, dlc: d ? d.dlc : null,
+            work: d ? (d.work || 0) : 0,
+            cost: d ? (d.cost || null) : null,
+            research: d ? (d.research || null) : null,
+            skillReq: d ? (d.skillReq || 0) : 0,
+            aff: d ? (d.aff || null) : null,
             zones: d ? zonesOf(d, b.rot) : [],
             radius: d ? d.radius : 0,
             rotatable: d ? d.rotatable !== false : true,
-            planned: !!b.planned, selected: !!state.selection[b.uid]
+            planned: !!b.planned, locked: !!b.locked, src: b.src || null,
+            selected: !!state.selection[b.uid]
           };
         })
       };
@@ -1454,6 +1720,7 @@
     screenToCell: screenToCell, cellAt: cellAt, visibleRange: visibleRange,
     key: key, footprint: footprint, defOf: defOf, cellsOf: cellsOf, inBounds: inBounds, zonesOf: zonesOf,
     reindex: reindex, buildingsAt: buildingsAt, canPlace: canPlace,
+    siteBlock: siteBlock,
     coexist: coexist, victimsAt: victimsAt, placeBuilding: placeBuilding, placeBatch: placeBatch,
     rectCells: rectCells, lineCells: lineCells, shapeCells: shapeCells, commitRect: commitRect,
     commitShape: commitShape, commitCells: commitCells, defaultDrawMode: defaultDrawMode,
@@ -1463,6 +1730,8 @@
     addBuilding: addBuilding, removeBuilding: removeBuilding, removeAt: removeAt, clearAll: clearAll,
     setSelection: setSelection, selectedBuildings: selectedBuildings, deleteSelection: deleteSelection,
     selectedFloors: selectedFloors, selectionCount: selectionCount,
+    setSelectionLocked: setSelectionLocked, setAllLocked: setAllLocked, lockedCount: lockedCount,
+    rleEncode: rleEncode, rleDecode: rleDecode,
     stuffsFor: stuffsFor, stuffById: stuffById, defaultStuff: defaultStuff,
     setBrushStuff: setBrushStuff, setSelectionStuff: setSelectionStuff,
     doorRotAt: doorRotAt,
@@ -1470,6 +1739,7 @@
     copySelection: copySelection, pasteAt: pasteAt, setBrush: setBrush, setTool: setTool,
     pushHistory: pushHistory, undo: undo, redo: redo,
     loadProject: loadProject, exportProject: exportProject, setGrid: setGrid,
+    terrainDirty: function () { if (global.RWSite) global.RWSite.terrainDirty(); else state.importStamp++; },
     COLORS: COLORS
   };
 })(typeof window !== 'undefined' ? window : globalThis);

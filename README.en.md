@@ -19,7 +19,13 @@ A browser-based **layout planner for RimWorld bases**. Place buildings on the re
 - **Correct footprints** — 250×250 grid (configurable), `R` to rotate; multi-cell buildings (beds, tables, fabrication benches) change footprint with rotation
 - **Layout checks** — overlap · power network · room detection & space rating · reachability · temperature estimate
 - **Export to game** — real Blueprints-mod `.xml`, **including each building's material and rotation**; workers will build it for real
-- **Import your save** — load an existing `.rws` colony as a backdrop and keep planning
+- **Import your save** — load an existing `.rws` colony as a backdrop and keep planning; it also reads the map **terrain/mountain**, **colonist skills**, **research progress** and **stored materials**
+- **Terrain-aware checks** — marsh only has the Light affordance (walls need Heavy), water needs a bridge first, mountain rock must be mined
+- **Workload estimate** — combines colonist skills, research prerequisites and stockpile to tell you whether a blueprint is feasible, how much material it needs and roughly how many in-game days it takes
+- **Lock the backdrop** — save-imported buildings are locked by default (no accidental edits) and excluded from the blueprint export, so you only ship your new plan
+- **Player home area** — reads `Area_Home` and draws it in green; stockpile counts default to the player area (switchable to whole-map)
+- **Click room to locate** — clicking a room in the room list jumps the view to it
+- **First-run import prompt** — on first launch the app asks once to import your RimWorld folder (with a "don't remind me" option); the import panel stays available
 - **Chinese UI** — building and material names match the game (built-in table, or the official Simplified Chinese language pack if present)
 - **Optional vanilla textures** — drop your RimWorld install folder into the page and the canvas shows the real game art; skip it and you get clean vector fallbacks
 
@@ -39,7 +45,7 @@ Fully functional. The only catch: you must drag in your RimWorld folder once if 
 
 Grab `rimworld-planner.single.html` from [Releases](https://github.com/luwendi-qq/rimworld-planner/releases/latest) and **just double-click it**.
 
-CSS and all JS are inlined into this one file — no external dependencies, roughly 390 KB, copy it anywhere.
+CSS and all JS are inlined into this one file — no external dependencies, roughly 630 KB, copy it anywhere.
 
 ### 3. Clone the source (follow updates / hack on it)
 

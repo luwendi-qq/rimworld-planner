@@ -154,12 +154,15 @@
 
   var SCALARS = ['defName', 'label', 'category', 'designationCategory', 'passability',
     'holdsRoof', 'fillPercent', 'size', 'thingClass', 'rotatable',
-    'specialDisplayRadius', 'designationHotKey'];
+    'specialDisplayRadius', 'designationHotKey', 'terrainAffordanceNeeded',
+    'mineable', 'useStuffTerrainAffordance', 'constructionSkillPrerequisite', 'techLevel',
+    'costStuffCount'];
 
   /** 把一条 def 的继承链摊平 */
   function resolve(el, named) {
     var chain = parentsOf(el, named).concat([el]);
-    var m = { comps: [], stuffCategories: [], statBases: {}, building: {}, graphicData: {} };
+    var m = { comps: [], stuffCategories: [], statBases: {}, building: {}, graphicData: {},
+              costList: [], research: [] };
     SCALARS.forEach(function (k) { m[k] = null; });
     chain.forEach(function (node) {
       SCALARS.forEach(function (k) { var v = textOf(node, k); if (v != null) m[k] = v; });
@@ -173,6 +176,18 @@
         var b = bd.childNodes[j];
         if (b.nodeType === 1 && b.textContent) m.building[tag(b)] = b.textContent.trim();
       }
+      // costList / researchPrerequisites：和游戏一样，子节点默认追加；写了 Inherit=false 则清空
+      [['costList', 'costList'], ['researchPrerequisites', 'research']].forEach(function (pair) {
+        var box = kid(node, pair[0]);
+        if (!box) return;
+        if (box.getAttribute('Inherit') === 'false') m[pair[1]] = [];
+        for (var k3 = 0; k3 < box.childNodes.length; k3++) {
+          var li = box.childNodes[k3];
+          if (li.nodeType !== 1) continue;
+          var v = (li.textContent || '').trim();
+          if (v) m[pair[1]].push({ key: tag(li), val: v });
+        }
+      });
       var gd = kid(node, 'graphicData');
       if (gd) {
         ['texPath', 'graphicClass', 'drawSize', 'drawOffset', 'linkType', 'shaderType',
@@ -196,7 +211,30 @@
         m.stuffCategories = m.stuffCategories.concat(listText(node, 'stuffCategories'));
       }
     });
+    // costList 汇总成 { 物品: 数量 }；researchPrerequisites 里是 <li>名字</li>
+    var cost = {};
+    m.costList.forEach(function (c) { cost[c.key] = (cost[c.key] || 0) + num(c.val); });
+    m.cost = cost;
+    m.research = m.research.map(function (r) { return r.key === 'li' ? r.val : r.key; });
     return m;
+  }
+
+  /** 读取 <affordances> 列表（地形用） */
+  function affordancesOf(el, named) {
+    var chain = parentsOf(el, named).concat([el]);
+    var out = [];
+    chain.forEach(function (node) {
+      var box = kid(node, 'affordances');
+      if (!box) return;
+      if (box.getAttribute('Inherit') === 'false') out = [];
+      for (var i = 0; i < box.childNodes.length; i++) {
+        var li = box.childNodes[i];
+        if (li.nodeType !== 1) continue;
+        var v = (li.textContent || '').trim();
+        if (v && out.indexOf(v) < 0) out.push(v);
+      }
+    });
+    return out;
   }
 
   // ---------------------------------------------------------------- 主入口
@@ -208,6 +246,7 @@
   function parse(docs, lang) {
     lang = lang || {};
     var named = {}, thingDefs = [], cats = [], terrainDefs = [], stuffDefs = [], seenDef = {};
+    var researchDefs = [];
     var parser = new DOMParser();
     docs.forEach(function (doc) {
       var xml;
@@ -226,6 +265,7 @@
         if (t === 'ThingDef') thingDefs.push({ el: el, dlc: dlc });
         else if (t === 'TerrainDef') terrainDefs.push(el);
         else if (t === 'StuffCategoryDef') cats.push(el);
+        else if (t === 'ResearchProjectDef') researchDefs.push(el);
       }
     });
 
@@ -326,6 +366,17 @@
       if ((m.rotatable || '').toLowerCase() === 'false') entry.rotatable = false;
       var r = num(m.specialDisplayRadius);
       if (r > 0) entry.radius = r;
+      // 建造所需：工时、固定材料、科技前置、技能前置、地形要求
+      var workToBuild = num(m.statBases.WorkToBuild);
+      if (workToBuild > 0) entry.work = Math.round(workToBuild);
+      if (Object.keys(m.cost).length) entry.cost = m.cost;
+      var csc = num(m.costStuffCount);
+      if (csc > 0) entry.costStuff = csc;
+      if (m.research.length) entry.research = m.research;
+      var skill = num(m.constructionSkillPrerequisite);
+      if (skill > 0) entry.skillReq = skill;
+      if (m.terrainAffordanceNeeded && m.terrainAffordanceNeeded !== 'true') entry.aff = m.terrainAffordanceNeeded;
+      if ((m.useStuffTerrainAffordance || '').toLowerCase() === 'true') entry.useStuffAff = 1;
       if (rec.dlc) entry.dlc = rec.dlc;
       entries.push(entry);
     });
@@ -337,28 +388,76 @@
     thingDefs.forEach(function (rec) {
       var el = rec.el;
       var cc = null, app = null, color = null, common = null;
+      var workFactor = null, workOffset = null, csFactor = null, stAff = null;
       parentsOf(el, named).concat([el]).forEach(function (node) {
         var sp = kid(node, 'stuffProps');
+        var affv = textOf(node, 'terrainAffordanceNeeded');
+        if (affv) stAff = affv;
         if (!sp) return;
         var cbox = kid(sp, 'categories');
         if (cbox) { var l = listText(sp, 'categories'); if (l.length) cc = l; }
         var v = textOf(sp, 'appearance'); if (v) app = v;
         v = textOf(sp, 'color'); if (v) color = v;
         v = textOf(sp, 'commonality'); if (v) common = v;
+        var fbox = kid(sp, 'statFactors');
+        if (fbox) {
+          var wf = textOf(fbox, 'WorkToBuild'); if (wf != null) workFactor = num(wf, 1);
+          var cf = textOf(fbox, 'ConstructionSpeedFactor'); if (cf != null) csFactor = num(cf, 1);
+        }
+        var obox = kid(sp, 'statOffsets');
+        if (obox) {
+          var wo = textOf(obox, 'WorkToBuild'); if (wo != null) workOffset = num(wo, 0);
+          var co = textOf(obox, 'ConstructionSpeedFactor'); if (co != null) csFactor = (csFactor == null ? 1 : csFactor) + num(co, 0);
+        }
       });
       if (!cc) return;
       if (!cc.some(function (c) { return used[c]; })) return;
       var dn = textOf(el, 'defName');
       if (!dn || seenStuff[dn]) return;
       seenStuff[dn] = 1;
-      stuffs.push({
+      var st = {
         id: dn, def: dn,
         name: lang[dn] || zhNameOf(dn, textOf(el, 'label')),
         color: hexColor(color), cats: cc, app: app || '', common: num(common)
+      };
+      if (workFactor != null) st.workFactor = workFactor;
+      if (workOffset != null) st.workOffset = workOffset;
+      if (csFactor != null) st.csFactor = csFactor;
+      if (stAff) st.aff = stAff;
+      stuffs.push(st);
+    });
+
+    // ---- 材料/物品名（造价清单会引用 Steel / ComponentIndustrial 这类 defName）----
+    var items = {};
+    thingDefs.forEach(function (rec) {
+      var dn = textOf(rec.el, 'defName');
+      if (!dn || items[dn]) return;
+      var nm = lang[dn] || zhNameOf(dn, textOf(rec.el, 'label'));
+      if (nm) items[dn] = nm;
+    });
+
+    // ---- 自然岩石（山体）----
+    var rocks = [], seenRock = {};
+    thingDefs.forEach(function (rec) {
+      var el = rec.el, m = resolve(el, named);
+      if (!m.defName || seenRock[m.defName]) return;
+      var natural = (m.building.isNaturalRock || '').toLowerCase() === 'true';
+      if (!natural && (m.mineable || '').toLowerCase() !== 'true') return;
+      if ((m.category || '') !== 'Building') return;
+      seenRock[m.defName] = 1;
+      var hp = num(m.statBases.MaxHitPoints, 400);
+      var mt = m.building.mineableThing || null;
+      var y = num(m.building.mineableYield, 1);
+      var isRes = (m.building.isResourceRock || '').toLowerCase() === 'true';
+      rocks.push({
+        def: m.defName,
+        name: lang[m.defName] || zhNameOf(m.defName, m.label),
+        hp: hp, mineableThing: mt, yield: y, resource: isRes,
+        color: hexColor(m.graphicData.color)
       });
     });
 
-    // ---- 地板（TerrainDef）----
+    // ---- 地形（TerrainDef）----
     var terrain = {};
     terrainDefs.forEach(function (el) {
       var dn = textOf(el, 'defName');
@@ -368,11 +467,65 @@
       if (!tp && parent && terrain[parent]) tp = terrain[parent].texPath;
       var col = hexColor(textOf(el, 'color'));
       if (!col && parent && terrain[parent]) col = terrain[parent].color;
-      terrain[dn] = { texPath: tp, color: col };
+      var aff = affordancesOf(el, named);
+      var cost = {};
+      var cl = kid(el, 'costList');
+      if (cl) for (var ci = 0; ci < cl.childNodes.length; ci++) {
+        var c = cl.childNodes[ci];
+        if (c.nodeType === 1) cost[tag(c)] = num(c.textContent);
+      }
+      var work = null;
+      var stb = kid(el, 'statBases');
+      if (stb) { var w = textOf(stb, 'WorkToBuild'); if (w != null) work = num(w); }
+      var research = listText(el, 'researchPrerequisites');
+      var smooth = textOf(el, 'smoothedTerrain') || (parent && terrain[parent] ? terrain[parent].smoothTo : null);
+      terrain[dn] = {
+        def: dn,
+        name: lang[dn] || zhNameOf(dn, textOf(el, 'label')),
+        texPath: tp, color: col, aff: aff,
+        need: textOf(el, 'terrainAffordanceNeeded') || null,
+        work: work, cost: Object.keys(cost).length ? cost : null,
+        research: research.length ? research : null,
+        smoothTo: smooth || null,
+        isWater: /^(Water|Marsh|Mud|Lava|HotSpring)/.test(dn)
+      };
+    });
+    // 从自然岩石生成游戏运行时才会有的三种地形：X_Rough / X_RoughHewn / X_Smooth
+    rocks.forEach(function (rk) {
+      var baseName = rk.name || rk.def;
+      var col = rk.color || '#6a6a6a';
+      [['_Rough', '粗' + baseName], ['_RoughHewn', '开采' + baseName], ['_Smooth', '光滑' + baseName]].forEach(function (pair) {
+        var dn = rk.def + pair[0];
+        if (terrain[dn]) return;
+        terrain[dn] = {
+          def: dn, name: pair[1], texPath: null, color: col,
+          aff: pair[0] === '_Smooth' ? ['Light', 'Medium', 'Heavy'] : ['Light', 'Medium', 'Heavy', 'SmoothableStone'],
+          work: null, cost: null, research: null,
+          smoothTo: pair[0] === '_Smooth' ? null : rk.def + '_Smooth',
+          isWater: false, isRock: true
+        };
+      });
+    });
+
+    // ---- 科技树（ResearchProjectDef）----
+    var researches = [], seenRes = {};
+    researchDefs.forEach(function (el) {
+      var dn = textOf(el, 'defName');
+      if (!dn || seenRes[dn]) return;
+      seenRes[dn] = 1;
+      researches.push({
+        def: dn,
+        name: lang[dn] || zhNameOf(dn, textOf(el, 'label')),
+        cost: num(textOf(el, 'baseCost'), 0),
+        prereq: listText(el, 'prerequisites'),
+        techLevel: textOf(el, 'techLevel') || '',
+        anomaly: /anomaly/i.test(dn) || /Knowledge/.test(textOf(el, 'tab') || '')
+      });
     });
 
     return {
       buildings: entries, stuffs: stuffs, stuffCats: stuffCats, terrain: terrain,
+      rocks: rocks, researches: researches, items: items,
       __raw: thingDefs, __named: named
     };
   }
@@ -406,7 +559,7 @@
       var dataStart = p + 512;
       if (type === 0 || type === 48) {          // 普通文件
         var lower = name.toLowerCase();
-        if (/definjected\/thingdef\/.*\.xml$/.test(lower) || /definjected\/stuffcategorydef\/.*\.xml$/.test(lower)) {
+        if (/definjected\/(thingdef|stuffcategorydef|terraindef|researchprojectdef)\/.*\.xml$/.test(lower)) {
           var xml = dec.decode(u8.subarray(dataStart, dataStart + size));
           var m = xml.match(/<([A-Za-z0-9_]+)\.(label|labelNoun)>([^<]+)</g);
           if (m) {

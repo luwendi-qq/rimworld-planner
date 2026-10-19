@@ -227,8 +227,10 @@ label.chk:hover { color: var(--fg); }
   display: flex; flex-direction: column; min-height: 0;
   overflow-y: auto;            /* 面板多，要能整列滚动 */
   overflow-x: hidden;
+  scrollbar-gutter: stable;    /* 给滚动条预留空间，内容不会被挡住 */
+  padding-right: 2px;
 }
-#right .panel { flex: none; }
+#right .panel { flex: none; min-width: 0; overflow-wrap: anywhere; }
 .panel { border-bottom: 1px solid var(--line); padding: 8px 10px; }
 .panel h3 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .6px; color: var(--fg2); }
 #issuesList, #roomList, #statsList { max-height: 190px; overflow: auto; }
@@ -246,6 +248,8 @@ label.chk:hover { color: var(--fg); }
 .prow, .rrow, .srow { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; padding: 3px 4px; border-radius: 4px; }
 .srow { cursor: pointer; }
 .srow:hover { background: var(--bg3); }
+.rrow.roomJump { cursor: pointer; }
+.rrow.roomJump:hover { background: rgba(255,255,255,.08); }
 #toolsGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
 #layers, #planOpts { display: flex; flex-wrap: wrap; gap: 8px 12px; font-size: 12px; }
 .swatchRow { display: flex; flex-wrap: wrap; gap: 4px; }
@@ -274,6 +278,7 @@ footer b { color: var(--fg); }
 .modal p { margin: 0 0 10px; color: var(--fg2); font-size: 12px; }
 .modal textarea { width: 100%; height: 300px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; resize: vertical; }
 .modal .row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+.promptList { margin: 0 0 10px; padding-left: 18px; color: var(--fg); font-size: 12px; line-height: 1.7; }
 
 /* 帮助弹窗 */
 #helpModal .box { max-height: 88vh; overflow: auto; }
@@ -377,6 +382,42 @@ kbd {
   font-size: 10.5px; color: #c3ccc4;
 }
 .chip.blue { background: rgba(51,205,217,.16); border-color: rgba(51,205,217,.4); color: #bdeef4; }
+.chip.red { background: rgba(224,87,74,.18); border-color: rgba(224,87,74,.5); color: #f2b6ae; }
+
+/* ---------- 存档情报 / 工作量估算 ---------- */
+.saveInfo { font-size: 11.5px; line-height: 1.6; max-height: 260px; overflow: auto; scrollbar-gutter: stable; padding-right: 2px; }
+.si-block { margin: 4px 0; overflow-wrap: anywhere; }
+.si-pawn { display: flex; justify-content: space-between; gap: 6px; padding: 1px 0; }
+.si-sk { color: var(--accent); font-size: 10.5px; }
+.si-mat { display: flex; flex-wrap: wrap; gap: 3px; }
+.si-mat .mat {
+  background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.10);
+  border-radius: 2px; padding: 0 5px; font-size: 10.5px;
+}
+.si-mat .mat b { color: var(--accent2); }
+
+.estOpts { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 11px; color: var(--fg2); }
+.estOpts label { display: flex; align-items: center; gap: 3px; }
+.estOpts input { width: 46px; }
+.estimate { font-size: 11.5px; line-height: 1.55; max-height: 460px; overflow: auto; }
+.estHead { padding: 5px 7px; border-radius: 3px; margin-bottom: 6px; font-weight: 600; }
+.estHead.ok { background: rgba(21,176,26,.16); color: #a8e6ab; }
+.estHead.warn { background: rgba(219,180,12,.16); color: #f0cf8a; }
+.estHead.bad { background: rgba(224,87,74,.16); color: #f2b6ae; }
+.estSec { margin: 7px 0 3px; color: var(--fg); font-weight: 600; }
+.estSec.good { color: #a8e6ab; }
+.estSec.warn { color: #f0cf8a; }
+.estSec.bad { color: #f2b6ae; }
+.estSec.muted { color: var(--fg2); font-weight: 400; }
+.estRow { display: flex; justify-content: space-between; gap: 8px; padding: 1px 0; }
+.estRow.total { border-top: 1px solid var(--line); margin-top: 3px; padding-top: 4px; font-weight: 600; color: var(--accent2); }
+.estTable { width: 100%; border-collapse: collapse; margin: 3px 0; font-size: 10.5px; }
+.estTable th, .estTable td { border-bottom: 1px solid rgba(255,255,255,.08); padding: 2px 3px; text-align: right; }
+.estTable th:first-child, .estTable td:first-child { text-align: left; }
+.estTable th { color: var(--fg2); font-weight: 400; }
+.estTable tr.bad td { color: #f2b6ae; }
+.fire { color: #ff9d4d; }
+button.mini { padding: 0 6px; font-size: 10.5px; }
 .prow, .rrow, .srow { border-radius: 3px; }
 .srow:hover { background: rgba(255,255,255,.10); }
 .issue { border-radius: 3px; }

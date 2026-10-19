@@ -312,12 +312,16 @@
 
   function itemHTML(it) {
     var chips = '';
-    if (it.planned) chips += chip('蓝图/未建成', 'blue');
+    if (it.locked) chips += chip('存档原有·已锁定', 'blue');
+    else if (it.planned) chips += chip('蓝图/未建成', 'blue');
     if (it.stuffName) chips += chip(it.stuffName);
     if (it.powerGen) chips += chip('发电 ' + it.powerGen + 'W');
     if (it.powerUse) chips += chip('耗电 ' + it.powerUse + 'W');
     if (it.powerStore) chips += chip('储电 ' + it.powerStore + 'Wd');
     if (it.beauty) chips += chip('美观 ' + (it.beauty > 0 ? '+' : '') + it.beauty);
+    if (it.work) chips += chip('工时 ' + it.work);
+    if (it.aff) chips += chip('需要 ' + it.aff + ' 地形');
+    if (it.skillReq) chips += chip('建造 ≥' + it.skillReq);
     if (it.dlc) chips += chip(it.dlc);
     (it.tags || []).forEach(function (t) {
       if (t === 'power' || t === 'conduit' || t === 'gen' || t === 'store') return;
@@ -341,13 +345,29 @@
       var fl = info.floor ? Data.floorsById[info.floor] : null;
       var pf = info.planned === 2 ? '（规划中·已禁用）' : info.planned === 1 ? '（规划中）' : '';
       html += '<div class="icell">格 (' + info.x + ', ' + info.z + ')' +
-        (fl ? ' · 地板：' + esc(fl.name) + pf : '') +
+        (fl ? ' · 地板：' + esc(fl.name) + (info.lockedFloor ? '（存档原有）' : '') + pf : '') +
         '</div>';
+      // 地形 / 山体
+      var tparts = [];
+      if (info.rock) tparts.push('<span class="chip red">山体 · ' + esc(info.rock.name) + '（先开采）</span>');
+      else if (info.terrain) {
+        var needHeavy = (info.terrain.aff || []).indexOf('Heavy') >= 0;
+        tparts.push(chip('地形 ' + info.terrain.name + (needHeavy ? ' · 可承重' : '')));
+        if (info.terrain.unknown) tparts.push(chip('未识别地形'));
+      }
+      if (info.roof === 2 || info.roof === 3) tparts.push(chip('头顶岩层'));
+      if (info.home) tparts.push(chip('玩家区域', 'blue'));
+      if (tparts.length) html += '<div style="margin-top:2px">' + tparts.join(' ') + '</div>';
+      if (info.build && !info.build.ok) {
+        html += '<div class="ihint" style="color:var(--err)">当前笔刷放不下：' + esc(info.build.why) + '</div>';
+      }
       if (info.buildings.length) {
         html += info.buildings.map(itemHTML).join('');
       } else if (!fl) {
         html += '<div class="ihint">这一格是空的。点一下可以选中；用笔刷点就能放东西。</div>';
       }
+      var rIdx = (state.rocks && state.rocks.cells) ? (state.rocks.cells[info.z * state.rocks.w + info.x] || 0) : 0;
+      if (rIdx && !info.rock) html += '<div class="ihint">这一格有东西占着（碎石/植物等），游戏里要清掉再建。</div>';
     } else {
       html += '<div class="icell">把鼠标移到画布上看格信息</div>';
     }
@@ -456,10 +476,16 @@
     // 房间
     var rb = $('roomList');
     rb.innerHTML = lastReport.rooms.length ? lastReport.rooms.map(function (r, i) {
-      return '<div class="rrow"><b>房间 #' + (i + 1) + '</b> ' + r.area + ' 格 · 空间 ' + r.space +
+      return '<div class="rrow roomJump" data-idx="' + i + '" title="点击定位到这个房间"><b>房间 #' + (i + 1) + '</b> ' + r.area + ' 格 · 空间 ' + r.space +
         '（' + r.spaceText + '）· 门 ' + r.doors + ' · 制冷器 ' + r.coolers + '/' + r.cooling +
         ' ' + (r.reachable ? '' : '<span class="bad">不通</span>') + '</div>';
     }).join('') : '<div class="muted">没有封闭的房间</div>';
+    Array.prototype.forEach.call(rb.querySelectorAll('.roomJump'), function (el) {
+      el.onclick = function () {
+        var r = lastReport.rooms[+el.dataset.idx];
+        if (r) focusCells(r.cells);
+      };
+    });
 
     // 统计
     var st = lastReport.stats;
@@ -507,16 +533,20 @@
     return X.toBlueprintsXML(state, {
       name: currentName(), stuff: currentStuff,
       rotFix: state.rotFix !== false,
+      excludeLocked: $('excludeLocked') ? $('excludeLocked').checked : true,
       gameVersion: (state.saveMeta && state.saveMeta.gameVersion) || state.saveVersion || '',
       meta: state.saveMeta || null
     });
   }
 
   function doExportBlueprint() {
+    // 已经设过 Blueprints 文件夹：直接写进去，不再下载一份
+    if (state.bpDir) { exportBlueprintToFolder(); return; }
     var r = bpResult();
-    if (!r.count) { toast('画布上还没有可导出的建筑/地板'); return; }
+    if (!r.count) { toast('画布上还没有可导出的建筑/地板' + (r.lockedSkipped ? '（存档原有建筑已按设置排除）' : '')); return; }
     X.download(safeName(currentName()) + '.xml', r.xml, 'application/xml');
     var msg = '已导出蓝图「' + safeName(currentName()) + '.xml」（' + r.count + ' 件，' + r.w + '×' + r.h + ' 格）';
+    if (r.lockedSkipped) msg += '；已排除 ' + r.lockedSkipped + ' 个存档原有';
     msg += ' —— 放进 Blueprints 文件夹，游戏里点蓝图按钮载入';
     toast(msg);
     if (Object.keys(r.skipped).length) {
@@ -539,7 +569,7 @@
         }
       }
       var r = bpResult();
-      if (!r.count) { toast('画布上还没有可导出的建筑/地板'); return; }
+      if (!r.count) { toast('画布上还没有可导出的建筑/地板' + (r.lockedSkipped ? '（存档原有建筑已按设置排除）' : '')); return; }
       var name = safeName(currentName()) + '.xml';
       var fh = await dir.getFileHandle(name, { create: true });
       var w = await fh.createWritable();
@@ -569,9 +599,9 @@
     };
   }
 
-  function importSaveText(txt) {
+  async function importSaveText(txt) {
     var res;
-    try { res = Io.parseSave(txt); }
+    try { res = await Io.parseSave(txt, { flipX: $('flipX').checked, flipZ: $('flipZ').checked }); }
     catch (e) { toast('读取存档失败：' + e.message, true); return; }
 
     var unk = Object.keys(res.unknown);
@@ -583,17 +613,36 @@
     state.saveMeta = res.meta || null;
     var r = Io.importFromSave(res, {
       flipZ: $('flipZ').checked,
-      flipX: $('flipX').checked
+      flipX: $('flipX').checked,
+      lockImported: $('lockImported') ? $('lockImported').checked : true
     });
     $('gridCols').value = state.cols;
     $('gridRows').value = state.rows;
     RW.fitContent();   // 适配到基地本身，否则 250x250 缩到每格 2 像素，什么都看不见
 
+    // 同步「显示地形 / 玩家区域 / 标出不可建造 / 库存范围」勾选框
+    if ($('lyTerrain')) $('lyTerrain').checked = !!state.layers.terrain;
+    if ($('lyHome')) $('lyHome').checked = !!state.layers.home;
+    if ($('lyBlocked')) $('lyBlocked').checked = !!state.layers.blocked;
+    if ($('stockHome')) $('stockHome').checked = state.useHomeStock !== false;
+    // 工程名默认用存档里的殖民地名（Blueprint 文件名也跟着变）
+    if (r.colonyName) {
+      state.mapName = r.colonyName;
+      $('mapName').value = r.colonyName;
+      document.title = r.colonyName + ' · RimWorld 布局规划器';
+    }
+    applyStockChoice();
+    updateSaveInfo();
+
     var msg = '已导入 ' + (res.version ? 'v' + res.version.split(' ')[0] + ' 存档：' : '存档：') +
-      r.placed + ' 个建筑';
+      (r.colonyName ? '「' + r.colonyName + '」 ' : '') + r.placed + ' 个建筑';
     if (r.planned) msg += '（其中 ' + r.planned + ' 个是蓝图/施工中，画成半透明虚线）';
-    if (r.mapSize) msg += '，地图按存档设为 ' + r.mapSize.w + '×' + r.mapSize.h;
-    if (r.failed) msg += '，' + r.failed + ' 个因越界/重合跳过';
+    if (r.locked) msg += '；其中 ' + r.locked + ' 个标记为存档原有（导出蓝图时排除）';
+    if (r.mapSize) msg += '；地图按存档设为 ' + r.mapSize.w + '×' + r.mapSize.h;
+    if (r.failed) msg += '；' + r.failed + ' 个因越界/重合跳过';
+    if (r.terrain) msg += '；读到地形（山体 ' + rockCount() + ' 格' + (r.home ? '，玩家区域 ' + r.home.count + ' 格' : '') + '）';
+    if (r.pawns) msg += '；小人 ' + r.pawns + ' 名';
+    if (r.resources) msg += '；玩家区域库存物资 ' + r.resources + ' 种（全地图 ' + r.resourcesAll + ' 种）';
     toast(msg);
 
     if (unk.length) {
@@ -602,6 +651,210 @@
         null,
         '这些 def 不在当前数据库里，已跳过。如果是你装的 mod，用 tools/extract_defs.py 提取本地游戏后就能识别；纯 mod 内容忽略即可。');
     }
+  }
+
+  function rockCount() {
+    var n = 0;
+    if (state.rocks && state.rocks.cells) {
+      for (var i = 0; i < state.rocks.cells.length; i++) if (state.rocks.cells[i]) n++;
+    }
+    return n;
+  }
+
+  // ------------------------------------------------------------------ 存档情报面板
+  function updateSaveInfo() {
+    var box = $('saveInfo');
+    if (!box) return;
+    var si = state.saveInfo;
+    if (!si) { box.innerHTML = '<div class="muted">读取 .rws 后显示地形 / 小人 / 科技 / 库存</div>'; return; }
+    var html = '';
+    // 地形
+    if (state.terrain && global.RWSite) {
+      var sum = global.RWSite.summarize();
+      html += '<div class="si-block"><b>地形</b>：可承重(Heavy) ' + sum.heavy + ' 格 · 水 ' + sum.water +
+        ' 格 · 沼泽/泥 ' + sum.marsh + ' 格 · <span class="bad">山体/矿石 ' + rockCount() + ' 格</span>' +
+        (state.home ? ' · 玩家区域 <b>' + (state.home.count || 0) + '</b> 格' : '') + '</div>';
+    } else {
+      html += '<div class="si-block muted">没有读到地形网格（旧版存档可能在别的图里）</div>';
+    }
+    // 小人
+    var pa = (si.pawns || []).filter(function (p) { return !p.dead; });
+    if (pa.length) {
+      html += '<div class="si-block"><b>小人</b> ' + pa.length + ' 名：</div>';
+      html += pa.map(function (p) {
+        var s = p.skills || {};
+        function lv(k) { return (s[k] && s[k].level) || 0; }
+        return '<div class="si-pawn">' + esc(p.name) +
+          ' <span class="muted">' + esc(p.kindDef || '') + '</span>' +
+          ' <span class="si-sk">建 ' + lv('Construction') + ' · 矿 ' + lv('Mining') +
+          ' · 智 ' + lv('Intellectual') + '</span></div>';
+      }).join('');
+    }
+    // 科技
+    if (si.research && global.RWWork) {
+      var res = si.research;
+      var defs = Data.researches ? Data.researches() : {};
+      var done = 0, prog = 0;
+      Object.keys(res.progress || {}).forEach(function (k) {
+        var info = defs[k];
+        var v = res.progress[k];
+        if (info && info.cost > 0 ? v >= info.cost - 0.001 : (v > 0 && k !== res.current)) done++;
+        else if (v > 0) prog++;
+      });
+      html += '<div class="si-block"><b>科技</b>：已完成 ' + done + ' 项' +
+        (res.current ? ' · 研究中 <b>' + esc(res.current) + '</b>' +
+          (defs[res.current] ? ' (' + Math.round((res.progress[res.current] || 0)) + '/' + defs[res.current].cost + ')' : '') : '') +
+        (Object.keys(defs).length ? '' : ' <span class="muted">（导入游戏资源可显示中文名与前置）</span>') + '</div>';
+    }
+    // 库存
+    var useHome = state.useHomeStock !== false && si.hasHome;
+    var res2 = (useHome ? (si.resourcesHome || {}) : (si.resourcesAll || si.resources || {}));
+    var keys = Object.keys(res2);
+    var allN = Object.keys(si.resourcesAll || si.resources || {}).length;
+    var homeN = Object.keys(si.resourcesHome || {}).length;
+    if (keys.length) {
+      keys.sort(function (a, b) { return res2[b] - res2[a]; });
+      var top = keys.slice(0, 16);
+      html += '<div class="si-block"><b>库存</b>（' + (useHome ? '玩家区域 ' + homeN + ' 种' : '全地图 ' + allN + ' 种') +
+        '，显示前 ' + top.length + '/' + keys.length + '）：</div><div class="si-mat">' +
+        top.map(function (k) {
+          return '<span class="mat">' + esc(global.RWWork ? global.RWWork.materialName(k) : k) + ' <b>' + res2[k] + '</b></span>';
+        }).join('') + '</div>';
+    } else {
+      html += '<div class="si-block muted">没有读到库存物资</div>';
+    }
+    box.innerHTML = html;
+  }
+
+  /** 切换「玩家区域库存 / 全地图库存」后，把估算用的库存同步过去 */
+  function applyStockChoice() {
+    var si = state.saveInfo;
+    if (!si) return;
+    si.resources = (state.useHomeStock !== false && si.hasHome) ? (si.resourcesHome || {}) : (si.resourcesAll || si.resources || {});
+  }
+
+  // ------------------------------------------------------------------ 工作量估算
+  function runEstimate() {
+    var box = $('estimateOut');
+    if (!box) return;
+    if (!global.RWWork) { box.innerHTML = '<div class="bad">估算模块没加载</div>'; return; }
+    var opts = {
+      builders: parseInt($('estBuilders').value, 10) || 1,
+      miners: parseInt($('estMiners').value, 10) || 1,
+      workHours: parseInt($('estHours').value, 10) || 16,
+      haulOverhead: (parseInt($('estHaul').value, 10) || 0) / 100
+    };
+    var rep;
+    try { rep = global.RWWork.analyse(state, opts); }
+    catch (e) { box.innerHTML = '<div class="bad">估算失败：' + esc(e.message) + '</div>'; return; }
+    window.__lastEstimate = rep;
+
+    var w = rep.work, html = '';
+    var cls = rep.verdict === 'ok' ? 'good' : rep.verdict === 'partial' ? 'warn' : 'bad';
+    var label = rep.verdict === 'ok' ? '可以实现，材料/科技都够'
+      : rep.verdict === 'partial' ? '可以建，但有缺口（材料或科技）' : '暂时建不了（地形/技能挡路）';
+    html += '<div class="estHead ' + cls + '">' + label + '</div>';
+
+    // 地形
+    var tr = rep.terrain;
+    if (tr.rockCells.length) {
+      html += '<div class="estSec bad">山体/矿石：' + tr.rockCells.length + ' 格需要先开采</div>';
+      html += '<div class="ihint" style="margin:2px 0 6px">点击定位：' +
+        '<button class="mini" data-focus="rock">跳过去看看</button></div>';
+    }
+    if (tr.terrainCells.length) {
+      html += '<div class="estSec bad">地形撑不住：' + tr.terrainCells.length + ' 格（沼泽/软沙/水面等）</div>';
+      var rs = Object.keys(tr.reasons);
+      if (rs.length) html += '<div class="meta">' + esc(rs.slice(0, 4).join('；')) + '</div>';
+    }
+    if (!tr.rockCells.length && !tr.terrainCells.length && (state.terrain || state.rocks)) {
+      html += '<div class="estSec good">地形：全部格子都能建 ✓</div>';
+    }
+    if (!state.terrain && !state.rocks) html += '<div class="estSec muted">地形：没读存档，跳过地形检查</div>';
+
+    // 科技
+    if (rep.research.done) {
+      html += '<div class="estSec good">科技：前置都解锁了 ✓</div>';
+    } else {
+      html += '<div class="estSec warn">科技：还缺 ' + rep.research.lines.length + ' 项，共 ' +
+        Math.round(rep.research.remaining) + ' 点（约 ' + fmtDays(rep.research.ticks) + '）</div>';
+      html += rep.research.lines.slice(0, 8).map(function (l) {
+        var nm = (Data.research(l.def) || {}).name || l.name;
+        return '<div class="estRow"><span>' + esc(nm) + '</span><span class="muted">' +
+          Math.round(l.progress) + '/' + l.cost + '</span></div>';
+      }).join('');
+    }
+
+    // 材料
+    if (rep.materials.length) {
+      if (rep.missingMats.length) {
+        html += '<div class="estSec warn">材料：' + rep.missingMats.length + ' 种不够</div>';
+      } else {
+        html += '<div class="estSec good">材料：库存够 ✓</div>';
+      }
+      html += '<table class="estTable"><tr><th>材料</th><th>需要</th><th>库存</th><th>缺</th></tr>' +
+        rep.materials.slice(0, 14).map(function (m) {
+          return '<tr class="' + (m.short ? 'bad' : '') + '"><td>' + esc(m.name) + '</td><td>' + m.need +
+            '</td><td>' + m.have + '</td><td>' + (m.short ? m.short : '') + '</td></tr>';
+        }).join('') + '</table>';
+      if (!state.saveInfo || !Object.keys(state.saveInfo.resources || {}).length) {
+        html += '<div class="meta">（没有读到库存，库存列按 0 算；导入存档后更准）</div>';
+      }
+    }
+
+    // 技能
+    if (rep.skill.maxSkillReq) {
+      html += '<div class="estSec ' + (rep.skill.ok ? 'good' : 'bad') + '">技能：' +
+        esc(rep.skill.name) + ' 需要建造 ' + rep.skill.maxSkillReq + '，当前最高 ' + rep.skill.best +
+        (rep.skill.ok ? ' ✓' : ' ✗ 没人能建') + '</div>';
+    }
+
+    // 工期
+    html += '<div class="estSec">工期估算</div>';
+    html += '<div class="estRow"><span>建造工时</span><span>' + Math.round(w.totalWork) + ' 点 · ' +
+      fmtDays(w.buildTicks) + '（' + w.buildersUsed + ' 人）</span></div>';
+    if (w.mineTicks) html += '<div class="estRow"><span>开采工时</span><span>' + w.mineHits + ' 次凿击 · ' +
+      fmtDays(w.mineTicks) + '（' + w.minersUsed + ' 人）</span></div>';
+    if (rep.research.ticks) html += '<div class="estRow"><span>研究工时</span><span>' + fmtDays(rep.research.ticks) + '</span></div>';
+    html += '<div class="estRow total"><span>合计</span><span>' + fmtDays(w.totalTicks) + ' · 按每天 ' + w.workHours + ' 小时算约 ' +
+      fmtWorkDays(w.totalTicks, w.workHours) + '</span></div>';
+
+    // 小人
+    function pawnTable(list, title) {
+      if (!list.length) return '';
+      return '<div class="estSec">' + title + '</div>' + list.slice(0, 8).map(function (p) {
+        var sp = Math.round(p.speed * 100);
+        return '<div class="estRow"><span>' + esc(p.name) + (p.passion && p.passion !== 'None' ? ' <span class="fire">🔥</span>' : '') +
+          '</span><span class="muted">等级 ' + p.level + ' · 速度 ' + sp + '%</span></div>';
+      }).join('');
+    }
+    html += pawnTable(rep.pawns.builders, '建造者（按建造等级）');
+    if (rep.pawns.miners.length && w.mineTicks) html += pawnTable(rep.pawns.miners, '矿工（按采矿等级）');
+    if (!rep.pawns.builders.length) {
+      html += '<div class="estSec muted">没有读到小人属性（导入存档后可按技能估算）。当前按 100% 速度算。</div>';
+    }
+    html += '<div class="meta" style="margin-top:6px">算法：建造 0.3+0.0875×等级；开采 100/MiningSpeed tick/次；' +
+      '研究 0.00825×速度×台' + (rep.research.bench) + '×难度' + (rep.research.factor) + '。1 日=60000 tick。仅供估算。</div>';
+
+    box.innerHTML = html;
+    // 点击定位
+    Array.prototype.forEach.call(box.querySelectorAll('button[data-focus]'), function (b) {
+      b.onclick = function () {
+        if (b.dataset.focus === 'rock' && tr.rockCells.length) focusCells(tr.rockCells.map(function (c) { return [c.x, c.z]; }));
+        else if (tr.terrainCells.length) focusCells(tr.terrainCells.map(function (c) { return [c.x, c.z]; }));
+      };
+    });
+  }
+
+  function fmtDays(ticks) {
+    var d = ticks / 60000;
+    if (d >= 1) return d.toFixed(d >= 10 ? 0 : 1) + ' 游戏日';
+    return (ticks / 2500).toFixed(1) + ' 游戏小时';
+  }
+  function fmtWorkDays(ticks, hours) {
+    var days = ticks / 2500 / Math.max(1, hours);
+    if (days >= 1) return days.toFixed(days >= 10 ? 0 : 1) + ' 天';
+    return (days * 24).toFixed(1) + ' 小时';
   }
 
   // ------------------------------------------------------------------ 提示
@@ -621,11 +874,42 @@
     var status = $('gameStatus'), clearBtn = $('btnGameClear');
     if (!drop || !global.RWGame) return;
 
+    // ---- 首次打开时的导入提示弹窗 ----
+    var prompt = $('gameImportModal');
+    var noAsk = $('gameImportNoAsk');
+    function promptDismissed() {
+      var s = Io.loadSettings() || {};
+      return !!s.noGamePrompt;
+    }
+    function rememberNoAsk() {
+      if (!noAsk || !noAsk.checked) return;
+      var s = Io.loadSettings() || {};
+      s.noGamePrompt = true;
+      Io.saveSettings(s);
+    }
+    function hidePrompt() { if (prompt) prompt.classList.remove('show'); }
+    function showPrompt() {
+      if (!prompt || promptDismissed()) return;
+      if (noAsk) noAsk.checked = false;
+      prompt.classList.add('show');
+    }
+    if ($('btnPromptLater')) $('btnPromptLater').onclick = function () { rememberNoAsk(); hidePrompt(); };
+    if ($('btnPromptPickGame')) $('btnPromptPickGame').onclick = function () {
+      rememberNoAsk(); hidePrompt(); input.click();
+    };
+
     function setStatus(html) { if (status) status.innerHTML = html; }
     function humanSize(b) { return b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.round(b / 1024) + ' KB'; }
 
     function useManifest(manifest, note) {
       Art.setSprites(manifest, global.RWGame.getImageURL);
+      // 单文件版启动时没有 sprites.js，原版贴图开关默认是关闭/禁用的；
+      // 导入（或从缓存恢复）贴图后要主动把它打开，否则画布仍然走矢量图。
+      if (Art.setSpriteEnabled) Art.setSpriteEnabled(true);
+      var spEl = $('useSprites');
+      if (spEl) { spEl.disabled = false; spEl.checked = true; }
+      var spRow = $('spriteRow');
+      if (spRow) { spRow.classList.remove('muted'); spRow.removeAttribute('title'); }
       buildPalette();
       RW.render();
       var n = Object.keys(manifest.items).length;
@@ -645,11 +929,14 @@
         drop.classList.remove('busy');
         applyStuff();
         useManifest(res.manifest, '导入完成，');
-        setStatus('✅ 导入完成：<b>' + res.info.buildingsTotal + '</b> 条建筑 · <b>' + res.info.sprites +
-          '</b> 张贴图<br><span class="muted">中文名来源：' + (res.langSource || '内置对照表') +
+        var mg = res.merged || {};
+        setStatus('✅ 导入完成：已替换 <b>' + (mg.replaced || 0) + '</b> 条 / 新增 <b>' + (mg.added || 0) +
+          '</b> 条建筑 · <b>' + res.info.sprites + '</b> 张贴图<br><span class="muted">中文名来源：' + (res.langSource || '内置对照表') +
           ' · 换游戏版本后重新拖一次目录即可更新</span>' +
           (res.info.mem ? '<br><span class="muted">⚠️ 这个浏览器不允许本地数据库，数据只在本次打开有效，刷新后需要重新拖一次</span>' : ''));
-        toast('已导入 ' + res.info.sprites + ' 张贴图 · ' + res.info.buildingsTotal + ' 条建筑数据（下次打开直接可用）');
+        rememberNoAsk();
+        hidePrompt();
+        toast('已导入 ' + res.info.sprites + ' 张贴图 · 建筑数据替换 ' + (mg.replaced || 0) + ' 条（下次打开直接可用）');
       }, function (e) {
         drop.classList.remove('busy');
         setStatus('❌ ' + ((e && e.message) || e));
@@ -689,6 +976,11 @@
 
     clearBtn.onclick = function () {
       global.RWGame.clearCache().then(function () {
+        if (Art.clearCache) Art.clearCache();
+        if (Art.setSpriteEnabled) Art.setSpriteEnabled(false);
+        var sp = $('useSprites');
+        if (sp) { sp.checked = false; sp.disabled = true; }
+        buildPalette(); RW.render();
         setStatus('已清除浏览器里缓存的游戏数据');
         toast('已清除，刷新页面后回到内置数据 + 矢量图');
       });
@@ -698,13 +990,16 @@
     global.RWGame.cacheInfo().then(function (info) {
       if (!info) {
         setStatus('还没导入。拖入游戏目录后，数据与贴图都会自动生成。');
+        showPrompt();
         return;
       }
+      hidePrompt();
       global.RWGame.loadCache().then(function (cache) {
-        if (!cache) { setStatus('缓存读取失败，请重新导入一次'); return; }
+        if (!cache) { setStatus('缓存读取失败，请重新导入一次'); showPrompt(); return; }
         applyStuff();
         useManifest(cache.manifest, '');
-        setStatus('✅ 已用浏览器里缓存的数据（' + info.buildingsTotal + ' 条建筑 · ' + info.sprites +
+        var cm = cache.merged || {};
+        setStatus('✅ 已用浏览器里缓存的数据（建筑替换 ' + (cm.replaced || 0) + ' 条 · ' + info.sprites +
           ' 张贴图 · ' + humanSize(info.bytes || 0) + '）<br><span class="muted">中文名来源：' +
           (info.langSource || '内置对照表') + ' · 换游戏版本后重新拖一次目录即可更新</span>');
       });
@@ -790,7 +1085,11 @@
     $('btnFit').onclick = function () { RW.fitView(); };
     $('btnZoomIn').onclick = function () { RW.zoomAt(1.2); };
     $('btnZoomOut').onclick = function () { RW.zoomAt(1 / 1.2); };
-    $('btnClear').onclick = function () { if (confirm('清空整张图？')) RW.clearAll(); };
+    $('btnClear').onclick = function (e) {
+      if (e && e.shiftKey) {
+        if (confirm('连存档原有建筑一起清空？此操作可用 Ctrl+Z 撤销。')) RW.clearAll(true);
+      } else if (confirm('清空你画的建筑/地板？存档原有建筑会保留（按住 Shift 点可连底图一起清）。')) RW.clearAll(false);
+    };
     $('btnSelRotate').onclick = function () { RW.rotateSelection(); updateBrushInfo(); updateInspector(); };
     $('btnSelCopy').onclick = doCopy;
     $('btnSelPaste').onclick = doPaste;
@@ -811,8 +1110,10 @@
 
     // 图层
     [['lyGrid', 'grid'], ['lyFloors', 'floors'], ['lyBuildings', 'buildings'],
-    ['lyPower', 'power'], ['lyRooms', 'rooms'], ['lyZones', 'zones']].forEach(function (p) {
+    ['lyPower', 'power'], ['lyRooms', 'rooms'], ['lyZones', 'zones'],
+    ['lyTerrain', 'terrain'], ['lyHome', 'home'], ['lyBlocked', 'blocked']].forEach(function (p) {
       var el = $(p[0]);
+      if (!el) return;
       el.checked = state.layers[p[1]];
       el.onchange = function () {
         state.layers[p[1]] = el.checked;
@@ -820,6 +1121,22 @@
         RW.render();
       };
     });
+    var rt = $('respectTerrain');
+    if (rt) { rt.checked = state.respectTerrain !== false; rt.onchange = function () { state.respectTerrain = this.checked; RW.render(); }; }
+    var st2 = $('strictTerrain');
+    if (st2) { st2.checked = !!state.strictTerrain; st2.onchange = function () { state.strictTerrain = this.checked; }; }
+    var sh = $('stockHome');
+    if (sh) {
+      sh.checked = state.useHomeStock !== false;
+      sh.onchange = function () {
+        state.useHomeStock = this.checked;
+        applyStockChoice();
+        updateSaveInfo();
+        if (window.__lastEstimate) runEstimate();
+      };
+    }
+    var li = $('lockImported');
+    if (li) li.onchange = function () { /* 只在导入存档时生效 */ };
 
     // 材质现在是逐物品的：在左侧物品栏长按左键（或右键）选材质
     // （旧的「统一材质」下拉已移除）
@@ -876,12 +1193,26 @@
     $('btnExportBpDir').onclick = exportBlueprintToFolder;
     $('btnExportJson').onclick = doExportJson;
 
+    // 锁定存档原有建筑
+    if ($('btnLockSel')) $('btnLockSel').onclick = function () {
+      var n = RW.setSelectionLocked(true); toast(n ? '已锁定 ' + n + ' 个（导出时排除）' : '先选中一些建筑'); updateInspector();
+    };
+    if ($('btnUnlockSel')) $('btnUnlockSel').onclick = function () {
+      var n = RW.setSelectionLocked(false); toast(n ? '已解锁 ' + n + ' 个' : '先选中一些建筑'); updateInspector();
+    };
+    if ($('btnUnlockAll')) $('btnUnlockAll').onclick = function () {
+      RW.setAllLocked(false); toast('已解锁全部存档原有建筑（现在导出会包含它们）');
+    };
+
+    // 工作量估算
+    if ($('btnEstimate')) $('btnEstimate').onclick = runEstimate;
+
     // 导入
     $('btnOpenJson').onclick = function () { $('fileJson').click(); };
     $('fileJson').onchange = function () {
       var f = this.files[0]; if (!f) return;
       X.readFile(f).then(function (t) {
-        try { RW.loadProject(JSON.parse(t)); $('mapName').value = state.mapName; RW.fitView(); toast('已打开工程'); }
+        try { RW.loadProject(JSON.parse(t)); $('mapName').value = state.mapName; RW.fitView(); updateSaveInfo(); toast('已打开工程'); }
         catch (e) { toast('打开失败：' + e.message, true); }
       });
       this.value = '';
@@ -909,7 +1240,7 @@
       var name = $('savedSel').value;
       var store = Io.loadStore();
       if (!name || !store[name]) { toast('没有这个存档'); return; }
-      RW.loadProject(store[name]); $('mapName').value = state.mapName; RW.fitView(); toast('已载入：' + name);
+      RW.loadProject(store[name]); $('mapName').value = state.mapName; RW.fitView(); updateSaveInfo(); toast('已载入：' + name);
     };
     $('btnDelLocal').onclick = function () {
       var name = $('savedSel').value;
@@ -961,6 +1292,8 @@
       else if (k === '2') { RW.setTool('select'); updateTools(); }
       else if (k === '3') { RW.setTool('erase'); updateTools(); }
       else if (k === 'g') { state.layers.grid = !state.layers.grid; $('lyGrid').checked = state.layers.grid; RW.render(); }
+      else if (k === 't') { state.layers.terrain = !state.layers.terrain; if ($('lyTerrain')) $('lyTerrain').checked = state.layers.terrain; RW.render(); }
+      else if (k === 'b') { state.layers.blocked = !state.layers.blocked; if ($('lyBlocked')) $('lyBlocked').checked = state.layers.blocked; RW.render(); }
       else if (k === 'p') { state.layers.power = !state.layers.power; $('lyPower').checked = state.layers.power; if (state.layers.power) runCheck(); RW.render(); }
       else if (k === 'o') { state.layers.rooms = !state.layers.rooms; $('lyRooms').checked = state.layers.rooms; if (state.layers.rooms) runCheck(); RW.render(); }
     });
@@ -974,7 +1307,7 @@
     });
     RW.resize();
     setTimeout(function () { RW.homeView(); }, 30);
-    updateTools(); updateBrushInfo(); runCheck(); updateInspector();
+    updateTools(); updateBrushInfo(); runCheck(); updateInspector(); updateSaveInfo();
 
     // 恢复设置
     var s = Io.loadSettings();

@@ -34,7 +34,9 @@ SCRIPT_ORDER = [
     'js/gameimport.js',            # 导入编排 + IndexedDB 缓存
     'js/icons.js',
     'js/engine.js',
+    'js/site.js',                  # 存档地形 / 山体 / 可建造性
     'js/checks.js',
+    'js/workload.js',              # 可行性 / 工作量估算
     'js/exporters.js',
     'js/io.js',
     'js/main.js',

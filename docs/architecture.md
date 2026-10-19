@@ -21,9 +21,11 @@ rimworld-planner/
 │   ├── gameimport.js           导入编排 + IndexedDB 缓存
 │   ├── icons.js                贴图渲染（原版贴图优先，缺失时用原创矢量图兜底）
 │   ├── engine.js               网格 / 相机 / 编辑 / 撤销 / 渲染
-│   ├── checks.js               布局校验（重叠·电力·房间·连通·温控）
+│   ├── site.js                 存档地形 / 山体 / 可建造性（affordance 校验、离屏地形画布）
+│   ├── checks.js               布局校验（重叠·地形·电力·房间·连通·温控）
+│   ├── workload.js             可行性 / 工作量 / 工期估算（小人技能·科技·库存）
 │   ├── exporters.js            蓝图 .xml / 工程 JSON
-│   ├── io.js                   本地存档 / RimWorld 存档读取
+│   ├── io.js                   本地存档 / RimWorld 存档读取（地形网格·小人·科技·库存）
 │   └── main.js                 界面装配
 └── tools/
     ├── extract_defs.py         从本地游戏目录生成精确尺寸表（命令行路线，可选）
@@ -41,9 +43,11 @@ rimworld-planner/
 | `RWData` | `data.js` + `buildings.generated.js` | 建筑定义表（`byId`）、地板、材质表 |
 | `RWArt` | `icons.js` + `sprites.js` | 绘制：原版贴图 / 矢量图兜底、连接图集、材质染色 |
 | `RW` | `engine.js` | 状态机 + 相机 + 编辑操作 + 撤销栈 + 渲染循环 |
-| `RWChecks` | `checks.js` | 五项布局校验 |
+| `RWSite` | `site.js` | 存档地形 / 山体查询、affordance 可建造性、地形离屏画布 |
+| `RWChecks` | `checks.js` | 六项布局校验（含地形 / 山体） |
+| `RWWork` | `workload.js` | 蓝图材料 / 科技 / 工时 / 工期估算 |
 | `RWExport` | `exporters.js` | 蓝图 `.xml` / 工程 JSON 序列化 |
-| `RWIo` | `io.js` | 本地存档、`.rws` 解析 |
+| `RWIo` | `io.js` | 本地存档、`.rws` 解析（建筑 / 地形 / 小人 / 科技 / 库存） |
 
 ## 单文件版
 

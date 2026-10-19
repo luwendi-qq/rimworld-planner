@@ -97,6 +97,53 @@
       });
     }
 
+    // ---------- 1.5 地形 / 山体（导入了存档才有数据）----------
+    if (global.RWSite && (state.terrain || state.rocks) && state.respectTerrain !== false) {
+      var rockCells = [], terrainCells = [], rockDefs = {}, terrainDefs = {};
+      state.buildings.forEach(function (b) {
+        if (b.locked) return;                     // 存档原有建筑不报地形问题
+        var def = Data.byId[b.defId]; if (!def) return;
+        var chk = global.RWSite.checkBuilding(b.defId, b.x, b.z, b.rot, b.stuff);
+        if (chk.ok) return;
+        (chk.rockCells || []).forEach(function (c) {
+          rockCells.push(c);
+          var rk = global.RWSite.rockAt(c[0], c[1]);
+          if (rk) rockDefs[rk.name] = (rockDefs[rk.name] || 0) + 1;
+        });
+        (chk.cells || []).forEach(function (c) {
+          terrainCells.push(c);
+          var t = global.RWSite.terrainAt(c[0], c[1]);
+          if (t) terrainDefs[t.name] = (terrainDefs[t.name] || 0) + 1;
+        });
+      });
+      // 新铺的地板
+      Object.keys(state.floors).forEach(function (k) {
+        if (state.lockedFloors && state.lockedFloors[k]) return;
+        var p = k.split(',');
+        var f = global.RWSite.checkFloor(state.floors[k], +p[0], +p[1]);
+        if (f.ok) return;
+        terrainCells.push([+p[0], +p[1]]);
+        var t = global.RWSite.terrainAt(+p[0], +p[1]);
+        if (t) terrainDefs[t.name] = (terrainDefs[t.name] || 0) + 1;
+      });
+      if (rockCells.length) {
+        var rkList = Object.keys(rockDefs).map(function (n) { return n + '×' + rockDefs[n]; }).join('、');
+        issues.push({
+          kind: 'terrain', level: 'error',
+          msg: '有 ' + rockCells.length + ' 格是山体/矿石（' + rkList + '），蓝图要先开采才能建造',
+          cells: rockCells
+        });
+      }
+      if (terrainCells.length) {
+        var tList = Object.keys(terrainDefs).map(function (n) { return n + '×' + terrainDefs[n]; }).join('、');
+        issues.push({
+          kind: 'terrain', level: 'error',
+          msg: '有 ' + terrainCells.length + ' 格地形撑不住蓝图（' + tList + '）：沼泽/软沙/水面需要先垫地基或改成桥',
+          cells: terrainCells
+        });
+      }
+    }
+
     // ---------- 2. 电力 ----------
     var power = analysePower(state, cellMap);
     power.problems.forEach(function (p) {
