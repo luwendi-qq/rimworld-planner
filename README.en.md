@@ -76,6 +76,8 @@ Or click **Code → Download ZIP** on the repo page and overwrite your old folde
 | **Layout checks** | Power network via the game's 6-tile connection rule; room flood-fill with the game's space-rating thresholds; outdoor reachability via BFS |
 | **Export image** | "View PNG" exports what you see, "Full PNG" auto-fits the whole layout — handy for sharing |
 | **Standard editing** | Marquee select, multi-select, drag to move, copy/paste, delete, undo/redo (incremental, 200 steps, no memory blow-up on big bases) |
+| **Favourites / recent** | Two extra tabs in the item bar (★ Favourites, 🕘 Recent) so the stuff you use most is one click away |
+| **Auto-save** | Your layout is saved to the browser as you work and restored on the next open — a crashed tab no longer means losing everything |
 | **Search** | By Chinese name, English name, or def id |
 
 Full manual → [docs/usage.md](docs/usage.md) (Chinese)
