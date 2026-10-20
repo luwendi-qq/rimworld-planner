@@ -1,0 +1,30 @@
+name: 跑测试
+
+# 纯逻辑（占地/朝向/坐标换算/蓝图导出/校验/估算）的断言测试。
+# 用 node 自带的测试运行器，零第三方依赖：
+#   本地：node --test      或      npm test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'js/**'
+      - 'tests/**'
+      - 'index.html'
+      - 'package.json'
+      - '.github/workflows/test.yml'
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: 跑测试
+        run: node --test

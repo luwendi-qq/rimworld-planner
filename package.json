@@ -1,0 +1,10 @@
+{
+  "name": "rimworld-planner",
+  "version": "1.0.0",
+  "private": true,
+  "description": "RimWorld 基地布局规划器（纯前端 · 离线 · 零运行时依赖）",
+  "license": "MIT",
+  "scripts": {
+    "test": "node --test"
+  }
+}
