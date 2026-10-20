@@ -528,7 +528,7 @@ kbd {
 .pitem b { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
 
 </style>
-<!-- 单文件构建：2026-10-20 11:50  内联模块：js/data.js, js/zh-names.js, js/buildings.generated.js, js/sprites.js, js/vendor/fzstd.js, js/gamezip.js, js/gamedefs.js, js/gameimport.js, js/icons.js, js/engine.js, js/site.js, js/rooms.js, js/checks.js, js/workload.js, js/exporters.js, js/io.js, js/main.js -->
+<!-- 单文件构建：2026-10-20 11:53  内联模块：js/data.js, js/zh-names.js, js/buildings.generated.js, js/sprites.js, js/vendor/fzstd.js, js/gamezip.js, js/gamedefs.js, js/gameimport.js, js/icons.js, js/engine.js, js/site.js, js/rooms.js, js/checks.js, js/workload.js, js/exporters.js, js/io.js, js/main.js -->
 </head>
 
 <body>
@@ -4745,13 +4745,17 @@ kbd {
    *   all   整体替换（清空 / 导入存档）{from:快照, to:快照}
    */
   function newDelta() {
-    return { bAdd: [], bDel: [], bMod: [], fMod: [], lfMod: [], pfMod: [], grid: null, all: null };
+    return { bAdd: [], bDel: [], bMod: [], fMod: [], lfMod: [], pfMod: [], rMod: [], rtMod: [], grid: null, all: null };
   }
+  var DELTA_LISTS = ['bAdd', 'bDel', 'bMod', 'fMod', 'lfMod', 'pfMod', 'rMod', 'rtMod'];
   function deltaEmpty(d) {
     if (!d) return true;
     if (d.all) return false;
-    return !(d.bAdd.length || d.bDel.length || d.bMod.length || d.fMod.length ||
-             d.lfMod.length || d.pfMod.length || d.grid);
+    for (var i = 0; i < DELTA_LISTS.length; i++) {
+      var a = d[DELTA_LISTS[i]];
+      if (a && a.length) return false;
+    }
+    return !d.grid;
   }
   function copyMap(m) {
     var o = {};
@@ -4855,8 +4859,8 @@ kbd {
     if (d.all) { restoreState(dir > 0 ? d.all.to : d.all.from); return; }
     var fwd = dir > 0;
     // 先删后加：撤销时「加回来」的正是当时被删掉的那些（uid 不变）
-    (fwd ? d.bDel : d.bAdd).forEach(function (b) { removeBuilding(b.uid, true); });
-    (fwd ? d.bAdd : d.bDel).forEach(function (b) { insertBuilding(b); });
+    (fwd ? (d.bDel || []) : (d.bAdd || [])).forEach(function (b) { removeBuilding(b.uid, true); });
+    (fwd ? (d.bAdd || []) : (d.bDel || [])).forEach(function (b) { insertBuilding(b); });
     (d.bMod || []).forEach(function (m) {
       var b = findBuilding(m.uid);
       if (!b) return;
@@ -4877,6 +4881,19 @@ kbd {
       var v = fwd ? m.to : m.from;
       if (v === null || v === undefined) delete state.plannedFloors[m.k];
       else state.plannedFloors[m.k] = v;
+    });
+    // 房间用途 / 目标温度
+    if (!state.roomRole) state.roomRole = {};
+    if (!state.roomTemp) state.roomTemp = {};
+    (d.rMod || []).forEach(function (m) {
+      var v = fwd ? m.to : m.from;
+      if (v === null || v === undefined) delete state.roomRole[m.k];
+      else state.roomRole[m.k] = v;
+    });
+    (d.rtMod || []).forEach(function (m) {
+      var v = fwd ? m.to : m.from;
+      if (v === null || v === undefined) delete state.roomTemp[m.k];
+      else state.roomTemp[m.k] = v;
     });
     if (d.grid) {
       var g = fwd ? d.grid.to : d.grid.from;
@@ -4965,6 +4982,7 @@ kbd {
     var before = snapshotState();
     if (force) {
       state.buildings = []; state.floors = {}; state.plannedFloors = {}; state.lockedFloors = {};
+      state.roomRole = {}; state.roomTemp = {};
     } else {
       state.buildings = state.buildings.filter(function (b) { return b.locked; });
       var keep = {};
@@ -4974,6 +4992,8 @@ kbd {
       var lf = {};
       Object.keys(keep).forEach(function (k) { lf[k] = true; });
       state.lockedFloors = lf;
+      // 房间都没了，指定自然也没了
+      state.roomRole = {}; state.roomTemp = {};
     }
     state.selection = {}; state.floorSelection = {};
     pushHistory({ all: { from: before, to: snapshotState() } });
@@ -6945,22 +6965,37 @@ kbd {
   /**
    * 给房间指定用途。
    * 写进它的每一格 —— 这样房间之后被拆开时，两半都还保留这个用途（和游戏一致）。
+   * 改动会记进撤销栈（撤销 = 换回原来的用途）。
    */
   function setRole(state, room, roleId, temp) {
     if (!state.roomRole) state.roomRole = {};
     if (!state.roomTemp) state.roomTemp = {};
     var def = roleById(roleId) || ROLES[0];
+    var rMod = [], rtMod = [];
     room.cells.forEach(function (c) {
       var k = c[0] + ',' + c[1];
+      var wasRole = state.roomRole[k] || null;
+      var wasTemp = state.roomTemp[k] === undefined ? null : state.roomTemp[k];
+      var newRole, newTemp;
+      if (def.id === 'none') { newRole = null; newTemp = null; }
+      else {
+        newRole = def.id;
+        newTemp = (temp != null && temp !== def.temp) ? temp : null;
+      }
+      if (wasRole !== newRole) rMod.push({ k: k, from: wasRole, to: newRole });
+      if (wasTemp !== newTemp) rtMod.push({ k: k, from: wasTemp, to: newTemp });
       if (def.id === 'none') {
         delete state.roomRole[k];
         delete state.roomTemp[k];
-        return;
+      } else {
+        state.roomRole[k] = def.id;
+        if (newTemp == null) delete state.roomTemp[k];
+        else state.roomTemp[k] = newTemp;
       }
-      state.roomRole[k] = def.id;
-      if (temp != null && temp !== def.temp) state.roomTemp[k] = temp;
-      else delete state.roomTemp[k];
     });
+    // 记进撤销栈
+    var RW = global.RW;
+    if (RW && RW.pushHistory) RW.pushHistory({ rMod: rMod, rtMod: rtMod });
     return def;
   }
 

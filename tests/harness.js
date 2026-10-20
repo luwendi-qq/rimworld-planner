@@ -178,6 +178,9 @@ function resetMap(cols, rows) {
   s.rocks = null;
   s.roofs = null;
   s.home = null;
+  s.roomRole = {};
+  s.roomTemp = {};
+  s.ambientTemp = 21;
   s.saveInfo = null;
   s.terrainReady = false;
   s.respectTerrain = true;

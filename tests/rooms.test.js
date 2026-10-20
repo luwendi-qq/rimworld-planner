@@ -81,6 +81,36 @@ test('房间：用途写进工程文件，存了再打开还在', () => {
   assert.strictEqual(state().ambientTemp, 12);
 });
 
+test('房间：改用途可以撤销', () => {
+  H.resetMap(40, 40);
+  buildRoom(5, 5, true);
+  let rep = analyse();
+  Rooms.setRole(state(), rep.rooms[0], 'bedroom');
+  rep = analyse();
+  assert.strictEqual(rep.rooms[0].role, 'bedroom');
+
+  RW.undo();
+  rep = analyse();
+  assert.strictEqual(rep.rooms[0].role, 'none', '撤销后应该回到没有指定');
+
+  RW.redo();
+  rep = analyse();
+  assert.strictEqual(rep.rooms[0].role, 'bedroom', '重做后应该又变回卧室');
+});
+
+test('房间：改目标温度可以撤销', () => {
+  H.resetMap(40, 40);
+  buildRoom(5, 5, true);
+  let rep = analyse();
+  Rooms.setRole(state(), rep.rooms[0], 'cold', 12);
+  rep = analyse();
+  assert.strictEqual(rep.rooms[0].temp, 12);
+
+  RW.undo();
+  rep = analyse();
+  assert.strictEqual(rep.rooms[0].role, 'none');
+});
+
 // ---------------------------------------------------------------- 用途检查
 test('房间：卧室里没有床会被提示', () => {
   H.resetMap(40, 40);

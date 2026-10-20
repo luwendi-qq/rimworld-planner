@@ -284,13 +284,17 @@
    *   all   整体替换（清空 / 导入存档）{from:快照, to:快照}
    */
   function newDelta() {
-    return { bAdd: [], bDel: [], bMod: [], fMod: [], lfMod: [], pfMod: [], grid: null, all: null };
+    return { bAdd: [], bDel: [], bMod: [], fMod: [], lfMod: [], pfMod: [], rMod: [], rtMod: [], grid: null, all: null };
   }
+  var DELTA_LISTS = ['bAdd', 'bDel', 'bMod', 'fMod', 'lfMod', 'pfMod', 'rMod', 'rtMod'];
   function deltaEmpty(d) {
     if (!d) return true;
     if (d.all) return false;
-    return !(d.bAdd.length || d.bDel.length || d.bMod.length || d.fMod.length ||
-             d.lfMod.length || d.pfMod.length || d.grid);
+    for (var i = 0; i < DELTA_LISTS.length; i++) {
+      var a = d[DELTA_LISTS[i]];
+      if (a && a.length) return false;
+    }
+    return !d.grid;
   }
   function copyMap(m) {
     var o = {};
@@ -394,8 +398,8 @@
     if (d.all) { restoreState(dir > 0 ? d.all.to : d.all.from); return; }
     var fwd = dir > 0;
     // 先删后加：撤销时「加回来」的正是当时被删掉的那些（uid 不变）
-    (fwd ? d.bDel : d.bAdd).forEach(function (b) { removeBuilding(b.uid, true); });
-    (fwd ? d.bAdd : d.bDel).forEach(function (b) { insertBuilding(b); });
+    (fwd ? (d.bDel || []) : (d.bAdd || [])).forEach(function (b) { removeBuilding(b.uid, true); });
+    (fwd ? (d.bAdd || []) : (d.bDel || [])).forEach(function (b) { insertBuilding(b); });
     (d.bMod || []).forEach(function (m) {
       var b = findBuilding(m.uid);
       if (!b) return;
@@ -416,6 +420,19 @@
       var v = fwd ? m.to : m.from;
       if (v === null || v === undefined) delete state.plannedFloors[m.k];
       else state.plannedFloors[m.k] = v;
+    });
+    // 房间用途 / 目标温度
+    if (!state.roomRole) state.roomRole = {};
+    if (!state.roomTemp) state.roomTemp = {};
+    (d.rMod || []).forEach(function (m) {
+      var v = fwd ? m.to : m.from;
+      if (v === null || v === undefined) delete state.roomRole[m.k];
+      else state.roomRole[m.k] = v;
+    });
+    (d.rtMod || []).forEach(function (m) {
+      var v = fwd ? m.to : m.from;
+      if (v === null || v === undefined) delete state.roomTemp[m.k];
+      else state.roomTemp[m.k] = v;
     });
     if (d.grid) {
       var g = fwd ? d.grid.to : d.grid.from;
@@ -504,6 +521,7 @@
     var before = snapshotState();
     if (force) {
       state.buildings = []; state.floors = {}; state.plannedFloors = {}; state.lockedFloors = {};
+      state.roomRole = {}; state.roomTemp = {};
     } else {
       state.buildings = state.buildings.filter(function (b) { return b.locked; });
       var keep = {};
@@ -513,6 +531,8 @@
       var lf = {};
       Object.keys(keep).forEach(function (k) { lf[k] = true; });
       state.lockedFloors = lf;
+      // 房间都没了，指定自然也没了
+      state.roomRole = {}; state.roomTemp = {};
     }
     state.selection = {}; state.floorSelection = {};
     pushHistory({ all: { from: before, to: snapshotState() } });

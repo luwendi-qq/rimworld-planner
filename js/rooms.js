@@ -73,22 +73,37 @@
   /**
    * 给房间指定用途。
    * 写进它的每一格 —— 这样房间之后被拆开时，两半都还保留这个用途（和游戏一致）。
+   * 改动会记进撤销栈（撤销 = 换回原来的用途）。
    */
   function setRole(state, room, roleId, temp) {
     if (!state.roomRole) state.roomRole = {};
     if (!state.roomTemp) state.roomTemp = {};
     var def = roleById(roleId) || ROLES[0];
+    var rMod = [], rtMod = [];
     room.cells.forEach(function (c) {
       var k = c[0] + ',' + c[1];
+      var wasRole = state.roomRole[k] || null;
+      var wasTemp = state.roomTemp[k] === undefined ? null : state.roomTemp[k];
+      var newRole, newTemp;
+      if (def.id === 'none') { newRole = null; newTemp = null; }
+      else {
+        newRole = def.id;
+        newTemp = (temp != null && temp !== def.temp) ? temp : null;
+      }
+      if (wasRole !== newRole) rMod.push({ k: k, from: wasRole, to: newRole });
+      if (wasTemp !== newTemp) rtMod.push({ k: k, from: wasTemp, to: newTemp });
       if (def.id === 'none') {
         delete state.roomRole[k];
         delete state.roomTemp[k];
-        return;
+      } else {
+        state.roomRole[k] = def.id;
+        if (newTemp == null) delete state.roomTemp[k];
+        else state.roomTemp[k] = newTemp;
       }
-      state.roomRole[k] = def.id;
-      if (temp != null && temp !== def.temp) state.roomTemp[k] = temp;
-      else delete state.roomTemp[k];
     });
+    // 记进撤销栈
+    var RW = global.RW;
+    if (RW && RW.pushHistory) RW.pushHistory({ rMod: rMod, rtMod: rtMod });
     return def;
   }
 
