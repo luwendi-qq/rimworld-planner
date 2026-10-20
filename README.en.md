@@ -17,14 +17,17 @@
 A browser-based **layout planner for RimWorld bases**. Place buildings on the real grid footprint, run a pass of layout checks, then export a `.xml` blueprint you can drop back into the game.
 
 - **Correct footprints** — 250×250 grid (configurable), `R` to rotate; multi-cell buildings (beds, tables, fabrication benches) change footprint with rotation
+- **Room roles** — tag a room as bedroom / kitchen / workshop / cold storage / freezer; checks then verify the room has what it needs and how many coolers its target temperature calls for
 - **Layout checks** — overlap · power network · room detection & space rating · reachability · room roles & temperature estimate
 - **Export to game** — real Blueprints-mod `.xml`, **including each building's material and rotation**; workers will build it for real
 - **Import your save** — load an existing `.rws` colony as a backdrop and keep planning; it also reads the map **terrain/mountain**, **colonist skills**, **research progress** and **stored materials**
 - **Terrain-aware checks** — marsh only has the Light affordance (walls need Heavy), water needs a bridge first, mountain rock must be mined
 - **Workload estimate** — combines colonist skills, research prerequisites and stockpile to tell you whether a blueprint is feasible, how much material it needs and roughly how many in-game days it takes
 - **Lock the backdrop** — save-imported buildings are locked by default (no accidental edits) and excluded from the blueprint export, so you only ship your new plan
+- **Template library** — stop drawing the same standard bedroom forty times: save it once, stamp it out with one click
 - **Player home area** — reads `Area_Home` and draws it in green; stockpile counts default to the player area (switchable to whole-map)
 - **Click room to locate** — clicking a room in the room list jumps the view to it
+- **Auto-save** — your layout is saved to the browser as you work and restored on the next open
 - **First-run import prompt** — on first launch the app asks once to import your RimWorld folder (with a "don't remind me" option); the import panel stays available
 - **Chinese UI** — building and material names match the game (built-in table, or the official Simplified Chinese language pack if present)
 - **Optional vanilla textures** — drop your RimWorld install folder into the page and the canvas shows the real game art; skip it and you get clean vector fallbacks
@@ -176,6 +179,20 @@ node --test        # or: npm test
 ```
 
 Code layout and each file's job → [docs/architecture.md](docs/architecture.md) (Chinese)
+
+## Documentation
+
+| Doc | What's in it |
+| --- | --- |
+| [docs/usage.md](docs/usage.md) | Drawing rules, item bar, room roles, templates, UI, shortcuts (Chinese) |
+| [docs/checks.md](docs/checks.md) | How the checks actually work: power / rooms / temperature (Chinese) |
+| [docs/import-export.md](docs/import-export.md) | Blueprint export, save import, Blueprints folder paths (Chinese) |
+| [docs/data.md](docs/data.md) | Data accuracy and the three ways to extract defs from the game (Chinese) |
+| [docs/textures.md](docs/textures.md) | The two ways to get vanilla textures and how faithful they are (Chinese) |
+| [docs/architecture.md](docs/architecture.md) | Code layout, undo-stack design, tests (Chinese) |
+| [docs/faq.md](docs/faq.md) | Frequently asked questions (Chinese) |
+| [tools/README.md](tools/README.md) | What the three Python scripts do and what they need (Chinese) |
+| [CHANGELOG.md](CHANGELOG.md) | What changed (Chinese) |
 
 ## Credits & licensing
 

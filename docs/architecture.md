@@ -31,19 +31,23 @@ rimworld-planner/
 └── tools/
     ├── extract_defs.py         从本地游戏目录生成精确尺寸表（命令行路线，可选）
     ├── extract_textures.py     从本地游戏目录提取原版贴图（命令行路线，可选）
-    └── build_single.py         打包单文件版
-└── tests/                      纯逻辑断言测试（node 自带测试运行器，零依赖）
-    ├── harness.js              在 Node 里加载浏览器端脚本的沙箱
-    ├── geometry.test.js        占地 / 朝向 / 坐标换算
-    ├── blueprint.test.js       蓝图 XML 结构与内容
-    ├── checks.test.js          冲突 / 电力 / 房间 / 可达性
-    ├── rooms.test.js           房间指定 / 温控需求 / 制冷机冷热端
-    ├── site.test.js            地形 / 山体 / 可建造性
-    └── workload.test.js        材料 / 科技 / 工期估算
+    ├── build_single.py         打包单文件版
+    └── README.md               三个脚本的说明
+tests/                          纯逻辑断言测试（node 自带测试运行器，零依赖）
+├── harness.js                  在 Node 里加载浏览器端脚本的沙箱
+├── geometry.test.js            占地 / 朝向 / 坐标换算
+├── blueprint.test.js           蓝图 XML 结构与内容
+├── checks.test.js              冲突 / 电力 / 房间 / 可达性
+├── rooms.test.js               房间指定 / 温控需求 / 制冷机冷热端
+├── site.test.js                地形 / 山体 / 可建造性
+├── workload.test.js            材料 / 科技 / 工期估算
+├── history.test.js             撤销 / 重做（增量式历史）
+├── export-png.test.js          导出 PNG
+└── data.test.js                建筑数据库的完整性
 ```
 
 > `js/buildings.generated.js` 和 `js/sprites.js` 都是 `tools/` 里脚本的产物。
-> 前者（尺寸/电力表格，无美术数据）在仓库里；后者只在本机提取过贴图时才有，不进仓库。
+> 前者（尺寸/电力/造价/工时/科技表格，无美术数据）在仓库里；后者只在本机提取过贴图时才有，不进仓库。
 
 ## 全局对象
 
@@ -54,10 +58,32 @@ rimworld-planner/
 | `RW` | `engine.js` | 状态机 + 相机 + 编辑操作 + 撤销栈 + 渲染循环 |
 | `RWSite` | `site.js` | 存档地形 / 山体查询、affordance 可建造性、地形离屏画布 |
 | `RWRooms` | `rooms.js` | 房间用途表、用途读写、温控需求估算 |
-| `RWChecks` | `checks.js` | 六项布局校验（含地形 / 山体 / 房间指定） |
+| `RWChecks` | `checks.js` | 布局校验（重叠·地形·电力·房间·连通·温控·用途） |
 | `RWWork` | `workload.js` | 蓝图材料 / 科技 / 工时 / 工期估算 |
 | `RWExport` | `exporters.js` | 蓝图 `.xml` / 工程 JSON 序列化 |
 | `RWIo` | `io.js` | 本地存档、`.rws` 解析（建筑 / 地形 / 小人 / 科技 / 库存） |
+
+## 撤销栈（增量式）
+
+`engine.js` 里的历史**不存整张图的快照**，而是记「这次改了什么」的增量：
+
+```js
+{
+  bAdd:  [building],                 // 新增的建筑
+  bDel:  [building],                 // 删除的建筑（撤销时原样放回，uid 不变）
+  bMod:  [{uid, from:{...}, to:{...}}],  // 属性变化（旋转 / 材质 / 位置 / 锁定）
+  fMod:  [{k, from, to}],            // 地板
+  lfMod: [{k, from, to}],            // 锁定的地板
+  pfMod: [{k, from, to}],            // 规划层
+  rMod:  [{k, from, to}],            // 房间用途
+  rtMod: [{k, from, to}],            // 房间目标温度
+  grid:  {from:{cols,rows}, to:{...}},
+  all:   {from: 快照, to: 快照}       // 整体替换（清空 / 导入存档）
+}
+```
+
+撤销就是把 `to` 换回 `from`，重做再换回去。好处是撤销栈的体积是 **O(改动量)** 而不是
+**O(整张图)**：250×250 的基地铺满地板，50 步编辑从 15.5 MB 降到 8.1 KB。
 
 ## 单文件版
 
@@ -67,7 +93,7 @@ rimworld-planner/
 rimworld-planner.single.html     ← 双击即用，没有任何外部依赖
 ```
 
-CSS 和全部 JS 都内联在里面（约 390 KB）。**性能没有差别**：代码总量 ~200 KB，解析是毫秒级，
+CSS 和全部 JS 都内联在里面（约 750 KB）。**性能没有差别**：代码总量 ~330 KB，解析是毫秒级，
 真正的开销在画布渲染上，两个版本完全一样。实测（jsdom 冷启动）单文件甚至更快一点，
 因为不用逐个读取十几个脚本文件。
 
@@ -86,7 +112,7 @@ python3 tools/build_single.py --out ~/rimworld-planner.single.html
 
 两个版本可以并存：多文件版方便改代码，单文件版方便拷来拷去。
 
-> 仓库里带了 [GitHub Actions](.github/workflows/)，每次改到源码就会自动重跑
+> 仓库里带了 [GitHub Actions](../.github/workflows/)，每次改到源码就会自动重跑
 > `build_single.py` 并把新的单文件版提交回来，所以 `rimworld-planner.single.html` 永远和源码同步。
 > 你本地改完源码想立刻生效，自己跑一次上面的命令即可。
 
@@ -105,9 +131,13 @@ node --test        # 或 npm test
 | --- | --- |
 | `tests/geometry.test.js` | `footprint()` 旋转占地、`anchorOffset()` 锚点偏移、flipX/flipZ 坐标翻转、存档 → 编辑器 → 蓝图的往返一致性 |
 | `tests/blueprint.test.js` | 蓝图 XML 骨架、`ThingDef`/`TerrainDef`/`Stuff`/`Position`/`Rotation` 字段、「只导出新增」 |
-| `tests/checks.test.js` | 占地冲突、电力组网与缺口、房间识别与可达性、作用范围遮挡 |
+| `tests/checks.test.js` | 占地冲突、电力组网与缺口（6 格边界 / 跨分桶的大建筑）、房间识别与可达性、作用范围遮挡 |
+| `tests/rooms.test.js` | 房间用途读写与撤销、用途要求的检查、温控需求（冷冻 > 冷藏、目标温度可改）、制冷机冷热端 |
 | `tests/site.test.js` | `terrainAffordance` 可建造性、山体需先开采 |
 | `tests/workload.test.js` | 材料缺口、科技前置、技能门槛、「能建/有条件/建不了」结论 |
+| `tests/history.test.js` | 撤销/重做：建筑、地板、旋转、材质、锁定、网格、房间用途 |
+| `tests/export-png.test.js` | PNG 导出的包围盒、尺寸上限、导出后画布状态不被改坏 |
+| `tests/data.test.js` | 建筑库完整性：`noBuild` 不误伤、分类不许再是大杂烩、常用建筑必须有造价或工时 |
 
 > 改 `anchorOffset()` 之前请先看 [import-export.md 的「坐标与朝向」](import-export.md#坐标与朝向)，
 > 那套偏移在真实存档的 764 个建筑上验证过「冲突 0 格」。
