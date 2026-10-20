@@ -205,6 +205,18 @@
       </div>
 
       <div class="panel">
+        <h3>模板</h3>
+        <div class="muted" style="font-size:11.5px">
+          把一块选区存成模板，之后一键贴出来 —— 同一个标准卧室不用画几十遍。
+        </div>
+        <div style="display:flex;gap:4px;margin-top:6px">
+          <input id="tplName" type="text" placeholder="模板名（如 标准卧室）" style="flex:1">
+          <button id="btnTplSave" class="cmd" title="把当前选中的建筑和地板存成模板">存为模板</button>
+        </div>
+        <div id="tplList" style="margin-top:6px"></div>
+      </div>
+
+      <div class="panel">
         <h3>校验结果</h3>
         <button id="btnCheck2" class="cmd" style="width:100%;margin-bottom:6px">运行校验</button>
         <label class="chk" style="margin-bottom:6px;display:block"

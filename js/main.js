@@ -685,6 +685,56 @@
     }
   }
 
+  // ------------------------------------------------------------------ 模板
+  /**
+   * 模板 = 存起来的「剪贴板」。同一个标准卧室要画几十遍，
+   * 存一次之后一键贴出来，省事也省心。
+   */
+  function loadTemplates() {
+    var s = Io.loadSettings() || {};
+    state.templates = Array.isArray(s.templates) ? s.templates : [];
+  }
+  function saveTemplates() {
+    var s = Io.loadSettings() || {};
+    s.templates = state.templates || [];
+    Io.saveSettings(s);
+  }
+  function renderTemplates() {
+    var box = $('tplList');
+    if (!box) return;
+    var list = state.templates || [];
+    if (!list.length) {
+      box.innerHTML = '<div class="muted" style="font-size:11.5px">还没有模板。先框选一块区域，再点「存为模板」。</div>';
+      return;
+    }
+    box.innerHTML = list.map(function (t, i) {
+      var n = (t.clip && t.clip.items ? t.clip.items.length : 0);
+      var f = (t.clip && t.clip.floors ? t.clip.floors.length : 0);
+      return '<div class="tplRow" data-i="' + i + '">' +
+        '<span class="tplName" title="点击贴到鼠标位置">' + esc(t.name) + '</span>' +
+        '<span class="muted" style="font-size:11px">' + n + ' 建筑' + (f ? ' / ' + f + ' 地板' : '') + '</span>' +
+        '<button class="tplDel ghost" data-i="' + i + '" title="删除这个模板">×</button>' +
+        '</div>';
+    }).join('');
+    Array.prototype.forEach.call(box.querySelectorAll('.tplName'), function (el) {
+      el.onclick = function () {
+        var t = (state.templates || [])[+el.parentNode.dataset.i];
+        if (!t || !t.clip) return;
+        var hx = state.hover ? state.hover.x : 0, hz = state.hover ? state.hover.z : 0;
+        RW.pasteAt(t.clip, hx, hz);
+        toast('已贴上模板「' + t.name + '」');
+      };
+    });
+    Array.prototype.forEach.call(box.querySelectorAll('.tplDel'), function (el) {
+      el.onclick = function (e) {
+        e.stopPropagation();
+        state.templates.splice(+el.dataset.i, 1);
+        saveTemplates();
+        renderTemplates();
+      };
+    });
+  }
+
   function doExportJson() {
     X.download(safeName(currentName()) + '.rwplan.json', JSON.stringify(RW.exportProject(), null, 2), 'application/json');
   }
@@ -1176,6 +1226,8 @@
       if (s.recent) state.recent = s.recent;
       if (s.ambientTemp != null) state.ambientTemp = s.ambientTemp;
     })();
+    loadTemplates();
+    renderTemplates();
     buildTabs();
     buildPalette();
     initGameImport();
@@ -1245,6 +1297,24 @@
       var t = state.paste;
       if (!t) { toast('剪贴板是空的，先复制选中内容'); return; }
       RW.pasteAt(t, state.hover ? state.hover.x : 0, state.hover ? state.hover.z : 0);
+    }
+
+    // 模板
+    if ($('btnTplSave')) {
+      $('btnTplSave').onclick = function () {
+        var clip = RW.copySelection();
+        if (!clip || !clip.items.length) { toast('先框选一块区域（建筑或地板都行）再存模板'); return; }
+        var name = ($('tplName').value || '').trim() || ('模板 ' + ((state.templates || []).length + 1));
+        var list = state.templates || (state.templates = []);
+        var exist = -1;
+        list.forEach(function (t, i) { if (t.name === name) exist = i; });
+        var rec = { name: name, clip: clip };
+        if (exist >= 0) list[exist] = rec; else list.push(rec);
+        saveTemplates();
+        renderTemplates();
+        $('tplName').value = '';
+        toast('已保存模板「' + name + '」');
+      };
     }
 
     // 图层

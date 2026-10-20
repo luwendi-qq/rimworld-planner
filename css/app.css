@@ -429,6 +429,15 @@ button.mini { padding: 0 6px; font-size: 10.5px; }
 .prow, .rrow, .srow { border-radius: 3px; }
 .srow:hover { background: rgba(255,255,255,.10); }
 .issue { border-radius: 3px; }
+/* 模板列表 */
+.tplRow {
+  display: flex; align-items: center; gap: 6px; font-size: 12px;
+  padding: 3px 4px; border-radius: 4px;
+}
+.tplRow:hover { background: rgba(255,255,255,.08); }
+.tplName { flex: 1; cursor: pointer; color: var(--accent2); }
+.tplName:hover { text-decoration: underline; }
+.tplDel { padding: 0 6px; line-height: 1.4; }
 /* 物品栏上的收藏星标 */
 .favMark {
   float: right; margin-left: 4px; font-style: normal; font-size: 13px;
