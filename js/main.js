@@ -452,13 +452,20 @@
     var box = $('issuesList');
     box.innerHTML = '';
     var issues = lastReport.issues;
-    if (!issues.length) {
-      box.innerHTML = '<div class="ok">未发现问题 👍</div>';
+    var showApprox = $('showApprox') ? $('showApprox').checked : true;
+    var shown = issues.filter(function (it) { return showApprox || !it.approx; });
+    if (!shown.length) {
+      box.innerHTML = issues.length
+        ? '<div class="muted">没有确定的问题（' + issues.length + ' 条近似提示已隐藏）</div>'
+        : '<div class="ok">未发现问题 👍</div>';
     } else {
-      issues.forEach(function (it) {
+      shown.forEach(function (it) {
         var d = document.createElement('div');
         d.className = 'issue ' + it.level;
-        d.innerHTML = '<span class="dot"></span><span>' + esc(it.msg) + '</span>';
+        var mark = it.approx
+          ? '<span class="approxMark" title="这条来自本工具的近似模型，不完全等于游戏里的规则">≈</span>'
+          : '';
+        d.innerHTML = '<span class="dot"></span><span>' + mark + esc(it.msg) + '</span>';
         d.onclick = function () { focusCells(it.cells); };
         box.appendChild(d);
       });
@@ -1322,6 +1329,9 @@
 
     // 校验
     $('btnCheck2').onclick = runCheck;
+    if ($('showApprox')) {
+      $('showApprox').onchange = function () { runCheck(); };
+    }
 
     // 环境温度（算制冷 / 加热需求用）
     if ($('ambientTemp')) {

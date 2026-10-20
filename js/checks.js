@@ -168,7 +168,7 @@
     var power = analysePower(state, cellMap);
     power.problems.forEach(function (p) {
       // 电网是近似模型（游戏内的连接规则更宽松），所以只当提示、不当错误
-      issues.push({ kind: 'power', level: 'warn', msg: p.msg, cells: p.cells });
+      issues.push({ kind: 'power', level: 'warn', approx: true, msg: p.msg, cells: p.cells });
     });
 
     // ---------- 2.5 作用范围被占用 ----------
@@ -189,7 +189,7 @@
         }
         if (blocked.length) {
           issues.push({
-            kind: 'zoneBlocked', level: 'warn',
+            kind: 'zoneBlocked', level: 'warn', approx: true,
             msg: '「' + def.name + '」的' + zn.label + '被挡住了（有 ' + blocked.length + ' 格被实体占用，会导致它不工作）',
             cells: blocked
           });
@@ -204,14 +204,14 @@
       if (r.doors === 0) {
         // 天然岩洞 / 远古遗迹本来就没门，玩家忘了开门也可能。属于提示，不是错误。
         issues.push({
-          kind: 'sealed', level: 'info',
+          kind: 'sealed', level: 'info', approx: true,
           msg: '房间 #' + (idx + 1) + '（' + r.area + ' 格）是封闭的、没有门' +
             (r.ancient ? '（天然/遗迹结构，通常不用管）' : '（天然岩洞、遗迹，或你还没装门）'),
           cells: r.cells
         });
       } else if (!r.reachable) {
         issues.push({
-          kind: 'unreachable', level: 'warn',
+          kind: 'unreachable', level: 'warn', approx: true,
           msg: '房间 #' + (idx + 1) + '（' + r.area + ' 格）无法通到室外',
           cells: r.cells
         });
@@ -249,7 +249,7 @@
         var label = '房间 #' + (idx + 1);
         if (r.role !== 'none' && r.def && r.def.need && !Rooms.meetsNeed(r, r.def.need)) {
           issues.push({
-            kind: 'roomNeed', level: 'warn',
+            kind: 'roomNeed', level: 'warn', approx: true,
             msg: label + ' 指定为「' + r.roleName + '」，但里面没有' + needText(r.def.need) +
                  '（' + r.roleName + '需要：' + r.def.desc + '）',
             cells: r.cells
@@ -266,7 +266,7 @@
         // 温控
         if (r.tempNeed.kind === 'cool' && r.coolers < r.tempNeed.need) {
           issues.push({
-            kind: 'temp', level: 'info',
+            kind: 'temp', level: 'info', approx: true,
             msg: label + '（' + r.roleName + '，目标 ' + r.temp + '°C，环境 ' + ambient + '°C）估算需要约 ' +
                  r.tempNeed.need + ' 台制冷器，当前只有 ' + r.coolers + ' 台',
             cells: r.cells
@@ -274,7 +274,7 @@
         }
         if (r.tempNeed.kind === 'heat' && r.heaters < r.tempNeed.need) {
           issues.push({
-            kind: 'temp', level: 'info',
+            kind: 'temp', level: 'info', approx: true,
             msg: label + '（' + r.roleName + '，目标 ' + r.temp + '°C，环境 ' + ambient + '°C）估算需要约 ' +
                  r.tempNeed.need + ' 台加热器，当前只有 ' + r.heaters + ' 台',
             cells: r.cells
@@ -305,20 +305,20 @@
         var a = sides[0], b2 = sides[1];
         if (!a && !b2) {
           issues.push({
-            kind: 'coolerSide', level: 'warn',
+            kind: 'coolerSide', level: 'warn', approx: true,
             msg: '有一台制冷机两侧都不是房间，它冷不到任何地方（要装在房间的墙上）',
             cells: [[b.x, b.z]]
           });
         } else if (a && b2 && a !== b2) {
           issues.push({
-            kind: 'coolerSide', level: 'warn',
+            kind: 'coolerSide', level: 'warn', approx: true,
             msg: '有一台制冷机两侧是两个不同的房间：冷的那间会降温、热的那间会升温。' +
                  '把它挪到「一侧是房间、另一侧通室外」的位置才对',
             cells: [[b.x, b.z]]
           });
         } else if (a && b2 && a === b2) {
           issues.push({
-            kind: 'coolerSide', level: 'info',
+            kind: 'coolerSide', level: 'info', approx: true,
             msg: '有一台制冷机装在房间内部，冷热端在同一个房间里，制不成冷',
             cells: [[b.x, b.z]]
           });
@@ -368,23 +368,55 @@
     });
 
     // 连边：任意一侧是输电建筑、且两者相距不超过 6 格
+    //
+    // 性能：只从「输电建筑」这一侧发起（用电器之间本来就不会相连），
+    // 并且用空间分桶（16×16 一格）缩小候选范围 ——
+    // 早先每个电力建筑都要扫 13×13 = 169 个格子，几百个设备时会很慢。
+    var BUCKET = 16;
+    var buckets = {};
+    items.forEach(function (it) {
+      // 一个建筑可能横跨好几个桶（大型建筑 / 太阳能板），它占的每个桶都登记它
+      var bx0 = Math.floor(it.x / BUCKET), bx1 = Math.floor((it.x + it.w - 1) / BUCKET);
+      var bz0 = Math.floor(it.z / BUCKET), bz1 = Math.floor((it.z + it.h - 1) / BUCKET);
+      for (var bx = bx0; bx <= bx1; bx++) {
+        for (var bz = bz0; bz <= bz1; bz++) {
+          var bk = bx + ',' + bz;
+          (buckets[bk] = buckets[bk] || []).push(it);
+        }
+      }
+    });
+    function nearItems(A) {
+      var out = [];
+      var x0 = A.x - POWER_RANGE, x1 = A.x + A.w - 1 + POWER_RANGE;
+      var z0 = A.z - POWER_RANGE, z1 = A.z + A.h - 1 + POWER_RANGE;
+      var bx0 = Math.floor(x0 / BUCKET), bx1 = Math.floor(x1 / BUCKET);
+      var bz0 = Math.floor(z0 / BUCKET), bz1 = Math.floor(z1 / BUCKET);
+      for (var bx = bx0; bx <= bx1; bx++) {
+        for (var bz = bz0; bz <= bz1; bz++) {
+          var list = buckets[bx + ',' + bz];
+          if (!list) continue;
+          for (var i = 0; i < list.length; i++) out.push(list[i]);
+        }
+      }
+      return out;
+    }
+
     var links = [], seen = {};
     items.forEach(function (A) {
+      if (!A.tx) return;                 // 只要输电建筑发起就够了
       var ka = key(A.x, A.z);
-      for (var x = A.x - POWER_RANGE; x < A.x + A.w + POWER_RANGE; x++) {
-        for (var z = A.z - POWER_RANGE; z < A.z + A.h + POWER_RANGE; z++) {
-          var list = byCell[key(x, z)];
-          if (!list) continue;
-          for (var i = 0; i < list.length; i++) {
-            var B = list[i];
-            if (B === A) continue;
-            if (!A.tx && !B.tx) continue;      // 两个用电器之间不会相连
-            var kb = key(B.x, B.z);
-            union(ka, kb);
-            var ek = ka < kb ? ka + '>' + kb : kb + '>' + ka;
-            if (!seen[ek]) { seen[ek] = 1; links.push({ a: [A.x, A.z], b: [B.x, B.z] }); }
-          }
-        }
+      var cand = nearItems(A);
+      for (var n = 0; n < cand.length; n++) {
+        var B = cand[n];
+        if (B === A) continue;
+        // 距离判定：两栋建筑占的格子最近也要在 6 格之内
+        var dx = Math.max(0, Math.max(B.x - (A.x + A.w - 1), A.x - (B.x + B.w - 1)));
+        var dz = Math.max(0, Math.max(B.z - (A.z + A.h - 1), A.z - (B.z + B.h - 1)));
+        if (dx > POWER_RANGE || dz > POWER_RANGE) continue;
+        var kb = key(B.x, B.z);
+        union(ka, kb);
+        var ek = ka < kb ? ka + '>' + kb : kb + '>' + ka;
+        if (!seen[ek]) { seen[ek] = 1; links.push({ a: [A.x, A.z], b: [B.x, B.z] }); }
       }
     });
 

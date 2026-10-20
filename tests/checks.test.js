@@ -124,6 +124,35 @@ test('电力：电池算储电，不算发电', () => {
   assert.strictEqual(net.store, 600);
 });
 
+test('电力：6 格之内才算连上，7 格就不算', () => {
+  H.resetMap(40, 40);
+  RW.placeBuilding('conduit', 10, 10, 0);
+  RW.placeBuilding('cooler', 16, 10, 0);         // 正好 6 格 → 连上
+  let rep = Checks.analyse(RW.state);
+  let net = rep.power.nets.find((n) => n.use > 0);
+  assert.ok(net, '6 格内的用电器应该连上电网');
+  assert.strictEqual(net.use, 200);
+
+  H.resetMap(40, 40);
+  RW.placeBuilding('conduit', 10, 10, 0);
+  RW.placeBuilding('cooler', 17, 10, 0);         // 7 格 → 连不上
+  rep = Checks.analyse(RW.state);
+  const power = issuesOfKind(rep, 'power');
+  assert.ok(power.length > 0, '7 格外的用电器应该被提示没有电缆');
+});
+
+test('电力：大建筑横跨好几个分桶也不会漏连', () => {
+  H.resetMap(60, 60);
+  // 4×4 的发电机占 (5,5)-(8,8)，电缆在它右边 4 格处
+  RW.placeBuilding('solar_generator', 5, 5, 0);
+  RW.placeBuilding('conduit', 12, 6, 0);
+  RW.placeBuilding('cooler', 13, 6, 0);
+  const rep = Checks.analyse(RW.state);
+  const net = rep.power.nets.find((n) => n.gen > 0);
+  assert.ok(net, '应该连成一张网');
+  assert.strictEqual(net.use, 200);
+});
+
 // ---------------------------------------------------------------- 房间
 test('房间：围起来的区域会被识别成一个房间', () => {
   H.resetMap(30, 30);

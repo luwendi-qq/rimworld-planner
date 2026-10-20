@@ -429,6 +429,11 @@ button.mini { padding: 0 6px; font-size: 10.5px; }
 .prow, .rrow, .srow { border-radius: 3px; }
 .srow:hover { background: rgba(255,255,255,.10); }
 .issue { border-radius: 3px; }
+/* 近似模型标记：带 ≈ 的提示来自本工具自己的近似规则 */
+.approxMark {
+  display: inline-block; margin-right: 4px; color: var(--fg2);
+  font-size: 12px; cursor: help; border-bottom: 1px dotted var(--fg2);
+}
 .ok { color: var(--ok); font-size: 12px; padding: 4px; }
 .bad { color: var(--err); }
 .good { color: var(--ok); }
