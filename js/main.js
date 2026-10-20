@@ -66,7 +66,6 @@
       box.appendChild(b);
     });
     Data.CATEGORIES.forEach(function (c) {
-      if (c.id === 'special') return;   // 造不出来的东西不给页签（搜索还能搜到）
       var n = Data.BUILDINGS.filter(function (b) { return b.cat === c.id; }).length;
       var b = document.createElement('button');
       b.className = 'tab' + (c.id === activeCat ? ' on' : '');
@@ -117,7 +116,7 @@
     }
     if (def.skillReq) out += '\n建造技能 ' + def.skillReq;
     if (def.hp) out += '\n耐久 ' + def.hp;
-    if (def.menu === 0) out += '\n不在建筑师菜单里（做出来的 / 剧情给的）';
+    if (def.menu === 0) out += '\n不在建筑师菜单里（工作台制作 / 任务奖励）';
     return out;
   }
 
@@ -166,7 +165,7 @@
       if (def) {
         label.innerHTML = '<b>' + esc(def.name) + '</b><i>' + def.size[0] + '×' + def.size[1] +
           (def.powerGen ? ' ⚡' + def.powerGen : (def.powerUse ? ' ⚡-' + def.powerUse : '')) +
-          (def.noBuild ? ' <em title="游戏里玩家造不出来，只能读存档时认出来">✖</em>' : '') +
+          (def.menu === 0 ? ' <em title="不在建筑师菜单里（工作台制作 / 任务奖励）">○</em>' : '') +
           (def.v && !def.exact ? ' <em title="尺寸可能随版本变动，请以游戏内为准">?</em>' : '') + '</i>' +
           '<i class="stuff" data-stuff="' + esc(def.id) + '"></i>';
         var dn = def.def || def.id;
@@ -174,7 +173,7 @@
         el.title = def.name +
           (en && en !== def.name && en.toLowerCase() !== String(dn).toLowerCase() ? '（' + en + '）' : '') +
           (def.dlc ? '　[' + def.dlc + ']' : '') +
-          (def.noBuild ? '\n⚠ 游戏里玩家造不出来（飞船 / 轨道 / 剧情道具），只能读存档时认出来' : '') +
+          (def.menu === 0 ? '\n○ 不在建筑师菜单里（工作台制作 / 任务奖励）' : '') +
           '\nid: ' + dn +
           '\n占地 ' + def.size[0] + '×' + def.size[1] +
           (def.powerGen ? '\n发电 ' + def.powerGen + 'W' : '') +
@@ -203,12 +202,8 @@
         label.appendChild(fav);
       }
       el.onclick = function () {
-        if (item.def) {
-          if (item.def.noBuild) {
-            toast('「' + item.def.name + '」在游戏里玩家造不出来（飞船 / 轨道 / 剧情道具），画了也建不了', true);
-          }
-          RW.setBrush('building', item.def.id);
-        } else RW.setBrush('floor', item.floor.id);
+        if (item.def) RW.setBrush('building', item.def.id);
+        else RW.setBrush('floor', item.floor.id);
         markActive(el);
         updateBrushInfo();
       };
@@ -508,6 +503,21 @@
           '<select id="selStuff" style="font-size:11.5px">' + opts + '</select>' +
           ' <span class="muted">（改选中建筑的材质）</span></div>';
       }
+      // 床：医疗 / 囚犯开关（游戏里床的 Inspector 选项）
+      var bedSel = sel.filter(function (b) {
+        var d = Data.byId[b.defId];
+        return d && d.bed && d.bed.human !== false;
+      });
+      if (bedSel.length) {
+        var firstDef = Data.byId[bedSel[0].defId];
+        var curBed = bedSel[0].bedMode || (firstDef.bed.medical ? 'medical' : 'normal');
+        var bedOpts = [['normal', '普通'], ['medical', '医疗'], ['prison', '囚犯']].map(function (p) {
+          return '<option value="' + p[0] + '"' + (p[0] === curBed ? ' selected' : '') + '>' + p[1] + '</option>';
+        }).join('');
+        html += '<div class="icell" style="margin-top:6px">床的用途 ' +
+          '<select id="selBedMode" style="font-size:11.5px">' + bedOpts + '</select>' +
+          ' <span class="muted">（影响房间角色判定）</span></div>';
+      }
       if (flSel.length && !sel.length) {
         html += '<div class="ihint" style="margin-top:6px">按 <kbd>Delete</kbd> 或点「删除选中」就能把这些地板删掉。</div>';
       }
@@ -531,13 +541,21 @@
         refreshStuffBadges();
       };
     }
+    var bedModeEl = $('selBedMode');
+    if (bedModeEl) {
+      bedModeEl.onchange = function () {
+        RW.setSelectionBedMode(this.value);
+        updateInspector();
+      };
+    }
 
     var n = sel.length;
+    var anySel = n > 0 || flSel.length > 0;
     $('btnSelRotate').disabled = !n;
-    $('btnSelCopy').disabled = !n;
+    $('btnSelCopy').disabled = !anySel;
     $('btnSelPaste').disabled = !state.paste;
-    $('btnSelDelete').disabled = !n;
-    $('btnSelClear').disabled = !n;
+    $('btnSelDelete').disabled = !anySel;
+    $('btnSelClear').disabled = !anySel;
   }
 
   // ------------------------------------------------------------------ 校验面板
@@ -579,18 +597,9 @@
 
     // 房间
     var rb = $('roomList');
-    var roleOptions = function (cur) {
-      if (!Rooms) return '';
-      return Rooms.ROLES.map(function (x) {
-        return '<option value="' + x.id + '"' + (x.id === cur ? ' selected' : '') + '>' + esc(x.name) + '</option>';
-      }).join('');
-    };
     rb.innerHTML = lastReport.rooms.length ? lastReport.rooms.map(function (r, i) {
-      var tempRow = '';
-      if (r.role === 'cold' || r.role === 'freezer') {
-        tempRow = '<label class="roomTemp">目标 <input type="number" class="roomTempIn" data-idx="' + i +
-                  '" value="' + r.temp + '" min="-60" max="60" step="1"> °C</label>';
-      }
+      var tempRow = '<label class="roomTemp" title="本工具的规划参数，不是游戏里的房间属性">目标 <input type="number" ' +
+        'class="roomTempIn" data-idx="' + i + '" value="' + r.temp + '" min="-60" max="60" step="1"> °C</label>';
       var tempInfo = '';
       if (r.tempNeed && r.tempNeed.kind === 'cool' && r.tempNeed.need > 0) {
         tempInfo = ' · 需制冷 ' + r.coolers + '/' + r.tempNeed.need;
@@ -601,23 +610,14 @@
         '<div class="roomJump" data-idx="' + i + '" title="点击定位到这个房间"><b>房间 #' + (i + 1) + '</b> ' +
         r.area + ' 格 · 空间 ' + r.space + '（' + r.spaceText + '）· 门 ' + r.doors +
         tempInfo + ' ' + (r.reachable ? '' : '<span class="bad">不通</span>') + '</div>' +
-        '<div class="roomRoleRow"><select class="roomRole" data-idx="' + i + '" title="指定这个房间的用途">' +
-        roleOptions(r.role) + '</select>' + tempRow + '</div>' +
+        '<div class="roomRoleRow"><span class="roomRoleName" title="按房间里的内容自动判定：' +
+        esc(r.roleWhy || r.roleName) + '">角色：<b>' + esc(r.roleName) + '</b></span>' + tempRow + '</div>' +
         '</div>';
     }).join('') : '<div class="muted">没有封闭的房间</div>';
     Array.prototype.forEach.call(rb.querySelectorAll('.roomJump'), function (el) {
       el.onclick = function () {
         var r = lastReport.rooms[+el.dataset.idx];
         if (r) focusCells(r.cells);
-      };
-    });
-    Array.prototype.forEach.call(rb.querySelectorAll('.roomRole'), function (el) {
-      el.onchange = function () {
-        if (!Rooms) return;
-        var r = lastReport.rooms[+el.dataset.idx];
-        if (!r) return;
-        Rooms.setRole(state, r, this.value);
-        runCheck();
       };
     });
     Array.prototype.forEach.call(rb.querySelectorAll('.roomTempIn'), function (el) {
@@ -627,7 +627,8 @@
         if (!r) return;
         var t = parseFloat(this.value);
         if (isNaN(t)) return;
-        Rooms.setRole(state, r, r.role, t);
+        Rooms.setTemperature(state, r, t);
+        savePrefs();
         runCheck();
       };
     });
@@ -641,6 +642,16 @@
     Array.prototype.forEach.call($('statsList').querySelectorAll('.srow'), function (el) {
       el.onclick = function () { highlightType(el.dataset.id); };
     });
+  }
+
+  /** 编辑时合并多次 change，避免每落一格都跑一遍洪水填充 + 电力 */
+  var checkTimer = null;
+  function scheduleCheck() {
+    if (checkTimer) return;
+    checkTimer = setTimeout(function () {
+      checkTimer = null;
+      runCheck();
+    }, 120);
   }
 
   function focusCells(cells) {
@@ -741,7 +752,7 @@
   function saveTemplates() {
     var s = Io.loadSettings() || {};
     s.templates = state.templates || [];
-    Io.saveSettings(s);
+    return Io.saveSettings(s);
   }
   function renderTemplates() {
     var box = $('tplList');
@@ -1330,10 +1341,10 @@
     $('btnSelClear').onclick = function () { RW.setSelection([]); RW.render(); updateInspector(); };
     function doCopy() {
       var c = RW.copySelection();
-      if (!c) { toast('先选中一些建筑'); return; }
+      if (!c) { toast('先选中一些建筑或地板'); return; }
       state.paste = c; state.paste.at = { x: state.hover ? state.hover.x : 0, z: state.hover ? state.hover.z : 0 };
       RW.setTool('place'); updateTools();
-      toast('已复制 ' + c.items.length + ' 个建筑，点击画布放置');
+      toast('已复制 ' + c.items.length + ' 个建筑' + (c.floors.length ? ' / ' + c.floors.length + ' 格地板' : '') + '，点击画布放置');
     }
     function doPaste() {
       var t = state.paste;
@@ -1345,14 +1356,19 @@
     if ($('btnTplSave')) {
       $('btnTplSave').onclick = function () {
         var clip = RW.copySelection();
-        if (!clip || !clip.items.length) { toast('先框选一块区域（建筑或地板都行）再存模板'); return; }
+        if (!clip || (!clip.items.length && !clip.floors.length)) { toast('先框选一块区域（建筑或地板都行）再存模板'); return; }
         var name = ($('tplName').value || '').trim() || ('模板 ' + ((state.templates || []).length + 1));
         var list = state.templates || (state.templates = []);
         var exist = -1;
         list.forEach(function (t, i) { if (t.name === name) exist = i; });
         var rec = { name: name, clip: clip };
+        var prev = exist >= 0 ? list[exist] : null;
         if (exist >= 0) list[exist] = rec; else list.push(rec);
-        saveTemplates();
+        if (!saveTemplates()) {
+          if (prev) list[exist] = prev; else list.pop();
+          toast('模板保存失败：浏览器存储空间不够（模板太大 / 存了太多工程）', true);
+          return;
+        }
         renderTemplates();
         $('tplName').value = '';
         toast('已保存模板「' + name + '」');
@@ -1554,6 +1570,10 @@
         autoSaveNow(true);
       }, 20000);
       RW.on('change', function () { autoDirty = true; });
+      // 关页面 / 刷新前把最后一段改动落盘（localStorage 是同步的）
+      global.addEventListener('beforeunload', function () {
+        if (autoDirty) autoSaveNow(true);
+      });
     }
 
     // 校验
@@ -1569,6 +1589,7 @@
         var t = parseFloat(this.value);
         if (isNaN(t)) { this.value = state.ambientTemp; return; }
         state.ambientTemp = t;
+        savePrefs();
         runCheck();
       };
     }
@@ -1577,9 +1598,10 @@
     RW.on('change', function () {
       updateInspector();
       // 电力 / 房间图层开着就重跑校验；
-      // 已经列出了房间时也要重跑 —— 否则撤销之后房间列表还是旧的
+      // 已经列出了房间时也要重跑 —— 否则撤销之后房间列表还是旧的。
+      // 用 120ms 防抖，连续铺地板/拖框时不会每格都做一次完整分析。
       var rl = $('roomList');
-      if (state.layers.power || state.layers.rooms || (rl && rl.children.length)) runCheck();
+      if (state.layers.power || state.layers.rooms || (rl && rl.children.length)) scheduleCheck();
     });
     // 收藏 / 最近使用记到本机（做个防抖，别每次改动都写一遍 localStorage）
     (function () {

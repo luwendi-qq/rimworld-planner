@@ -36,26 +36,6 @@
     return '极其宽敞';
   }
 
-  // 房间用途要求的人话描述
-  var NEED_CN = { bed: '床', solid: '家具' };
-  var NEED_CAT_CN = { production: '工作台', joy: '娱乐设施' };
-  function needText(need) {
-    if (!need) return '必要的东西';
-    var parts = [];
-    if (need.defs && need.defs.length) {
-      parts.push(need.defs.map(function (d) {
-        var def = Data.byId[d]; return def ? def.name : d;
-      }).join(' / '));
-    }
-    if (need.tags && need.tags.length) {
-      parts.push(need.tags.map(function (t) { return NEED_CN[t] || t; }).join(' / '));
-    }
-    if (need.cats && need.cats.length) {
-      parts.push(need.cats.map(function (c) { return NEED_CAT_CN[c] || c; }).join(' / '));
-    }
-    return parts.join('、') || '必要的东西';
-  }
-
   function analyse(state) {
     var RW = global.RW;
     var key = RW.key;
@@ -221,88 +201,74 @@
       }
     });
 
-    // ---------- 5. 房间指定 + 温控 ----------
+    // ---------- 5. 房间角色（自动推导）+ 温控 ----------
     var Rooms = global.RWRooms;
     var ambient = state.ambientTemp == null ? 21 : state.ambientTemp;
     rooms.rooms.forEach(function (r, idx) {
       var ro = Rooms
-        ? Rooms.roleOf(state, r)
-        : { role: 'none', name: '普通房间', temp: 21, def: null };
+        ? Rooms.deriveRole(r)
+        : { role: 'room', name: '房间', def: null, why: '' };
       r.role = ro.role;
       r.roleName = ro.name;
-      r.temp = ro.temp;
-      r.def = ro.def;
+      r.roleWhy = ro.why;
+      r.roleDef = ro.def;
       r.ambient = ambient;
+      r.temp = Rooms ? Rooms.temperatureOf(state, r) : 21;
       var need = Rooms
-        ? Rooms.temperatureNeed(r, ambient, ro.temp)
+        ? Rooms.temperatureNeed(r, ambient, r.temp)
         : { kind: 'cool', need: Math.max(1, Math.ceil(r.area / 30)), delta: 21 };
       r.tempNeed = need;
       // 兼容旧字段：cooling / heating 表示「需要几台」
       r.cooling = need.kind === 'cool' ? need.need : 0;
       r.heating = need.kind === 'heat' ? need.need : 0;
       r.coolingOld = Math.max(1, Math.ceil(r.area / 30));   // 老的经验值，仅供参考
-    });
 
-    // 用途要求的检查
-    if (Rooms) {
-      rooms.rooms.forEach(function (r, idx) {
-        var label = '房间 #' + (idx + 1);
-        if (r.role !== 'none' && r.def && r.def.need && !Rooms.meetsNeed(r, r.def.need)) {
-          issues.push({
-            kind: 'roomNeed', level: 'warn', approx: true,
-            msg: label + ' 指定为「' + r.roleName + '」，但里面没有' + needText(r.def.need) +
-                 '（' + r.roleName + '需要：' + r.def.desc + '）',
-            cells: r.cells
-          });
-        }
-        // 有床却没指定成卧室
-        if (r.beds > 0 && r.role !== 'bedroom' && r.role !== 'barracks' && r.role !== 'prison' && !r.ancient) {
-          issues.push({
-            kind: 'roomRole', level: 'info',
-            msg: label + ' 里有 ' + r.beds + ' 张床，指定成「卧室」殖民者才能在这儿睡',
-            cells: r.cells
-          });
-        }
-        // 温控
-        if (r.tempNeed.kind === 'cool' && r.coolers < r.tempNeed.need) {
-          issues.push({
-            kind: 'temp', level: 'info', approx: true,
-            msg: label + '（' + r.roleName + '，目标 ' + r.temp + '°C，环境 ' + ambient + '°C）估算需要约 ' +
-                 r.tempNeed.need + ' 台制冷器，当前只有 ' + r.coolers + ' 台',
-            cells: r.cells
-          });
-        }
-        if (r.tempNeed.kind === 'heat' && r.heaters < r.tempNeed.need) {
-          issues.push({
-            kind: 'temp', level: 'info', approx: true,
-            msg: label + '（' + r.roleName + '，目标 ' + r.temp + '°C，环境 ' + ambient + '°C）估算需要约 ' +
-                 r.tempNeed.need + ' 台加热器，当前只有 ' + r.heaters + ' 台',
-            cells: r.cells
-          });
-        }
-      });
-    }
+      // 温控（本工具的近似模型，不是游戏物理）
+      if (r.tempNeed.kind === 'cool' && r.coolers < r.tempNeed.need) {
+        issues.push({
+          kind: 'temp', level: 'info', approx: true,
+          msg: '房间 #' + (idx + 1) + '（' + r.roleName + '，目标 ' + r.temp + '°C，环境 ' + ambient + '°C）估算需要约 ' +
+               r.tempNeed.need + ' 台制冷器，当前只有 ' + r.coolers + ' 台',
+          cells: r.cells
+        });
+      }
+      if (r.tempNeed.kind === 'heat' && r.heaters < r.tempNeed.need) {
+        issues.push({
+          kind: 'temp', level: 'info', approx: true,
+          msg: '房间 #' + (idx + 1) + '（' + r.roleName + '，目标 ' + r.temp + '°C，环境 ' + ambient + '°C）估算需要约 ' +
+               r.tempNeed.need + ' 台加热器，当前只有 ' + r.heaters + ' 台',
+          cells: r.cells
+        });
+      }
+    });
 
     // ---------- 5.5 制冷机的冷热端 ----------
     // 游戏里制冷机是「一冷一热」：冷的那侧房间降温，热的那侧房间升温。
     // 所以最常见的翻车点就是：它两侧各是一个房间 —— 一个变冷一个变热。
-    // 这个判断不依赖朝向，所以两边到底是哪边冷都无所谓。
+    // 判断不依赖朝向；有存档屋顶数据时，没屋顶的院子算室外（和游戏一致）。
     (function () {
       var rgOf = {};
       rooms.regions.forEach(function (rg) {
         rg.cells.forEach(function (c) { rgOf[key(c[0], c[1])] = rg; });
       });
+      function indoorSide(cell) {
+        var rg = rgOf[key(cell[0], cell[1])] || null;
+        if (!rg) return null;
+        if (state.roofs && state.roofs.cells && global.RWSite && global.RWSite.roofAt) {
+          // 有屋顶数据：没屋顶的格子按室外算（院子 / 露天平台）
+          return global.RWSite.roofAt(cell[0], cell[1]) > 0 ? rg : null;
+        }
+        return rg.outdoor ? null : rg;
+      }
       state.buildings.forEach(function (b) {
         var def = Data.byId[b.defId];
         if (!def || def.id !== 'cooler') return;
         var zs = RW.zonesOf(def, b.rot);
         if (zs.length < 2) return;
-        var sides = zs.map(function (zn) {
-          var cx = b.x + zn.x + Math.floor(zn.w / 2);
-          var cz = b.z + zn.z + Math.floor(zn.h / 2);
-          return rgOf[key(cx, cz)] || null;
+        var sideCells = zs.map(function (zn) {
+          return [b.x + zn.x + Math.floor(zn.w / 2), b.z + zn.z + Math.floor(zn.h / 2)];
         });
-        var a = sides[0], b2 = sides[1];
+        var a = indoorSide(sideCells[0]), b2 = indoorSide(sideCells[1]);
         if (!a && !b2) {
           issues.push({
             kind: 'coolerSide', level: 'warn', approx: true,
@@ -586,7 +552,10 @@
           if (once) { counted[b.uid] = true; things.push(b); }
           if (once && (def.id === 'cooler' || def.id === 'passive_cooler')) coolers++;
           if (once && def.id === 'heater') heaters++;
-          if (once && has(def, 'bed')) beds++;
+          if (once) {
+            var bed = global.RWRooms && global.RWRooms.bedOf ? global.RWRooms.bedOf(b) : null;
+            if (bed && bed.human) beds++;
+          }
           if (isAncient(def)) ancient = true;
         });
       });

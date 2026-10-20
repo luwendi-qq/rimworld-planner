@@ -284,7 +284,7 @@ def resolve(el, named):
                'blockPlants', 'blockLight', 'altitudeLayer', 'hasInteractionCell',
                'rotatable', 'specialDisplayRadius', 'buildingSize', 'uiOrder',
                'useStuffTerrainAffordance', 'mineable', 'constructionSkillPrerequisite',
-               'costStuffCount']
+               'costStuffCount', 'surfaceType', 'isAltar']
     # 先全部置 None，避免调用方 .get() 之外的下标取值踩空
     for s in scalars:
         merged[s] = None
@@ -301,8 +301,10 @@ def resolve(el, named):
         bd = child(node, 'building')
         if bd is not None:
             for c in bd:
-                if c.text:
-                    merged['building'][strip_ns(c.tag)] = c.text.strip()
+                key = strip_ns(c.tag)
+                val = (c.text or '').strip()
+                # 空元素是「显式清空父类的值」，不能当成没写
+                merged['building'][key] = val
         gd = child(node, 'graphicData')
         if gd is not None:
             for c in gd:
@@ -874,6 +876,58 @@ def main():
             entry['fill'] = round(fill, 3)
         # 是否在游戏「建筑师」菜单里（有 designationCategory 才是玩家能直接造的）
         entry['menu'] = 1 if design_cat else 0
+
+        # ---- 房间角色推导用的字段（对应游戏 RoomRoleWorker，不是玩家手填的）----
+        # 这些字段只影响「这间房会被游戏判成什么角色」，不参与占地/建造校验。
+        bld = merged['building']
+        thing_class = merged.get('thingClass') or ''
+        def _flag(name, default=None):
+            v = bld.get(name)
+            if v is None:
+                return default
+            return v.strip().lower() in ('true', '1')
+
+        # 桌子：游戏用 surfaceType=Eat 判断餐厅
+        if (merged.get('surfaceType') or '') == 'Eat':
+            entry['surfaceEat'] = 1
+        # 工作台：游戏用 workTableRoomRole 判断厨房 / 工坊 / 实验室
+        work_role = bld.get('workTableRoomRole')
+        if work_role:
+            entry['workRole'] = work_role.strip()
+        # 床：游戏用 bed_* 字段判断卧室 / 兵营 / 病房 / 畜栏
+        if 'Building_Bed' in thing_class:
+            entry['bed'] = {
+                'human': _flag('bed_humanlike', True) is not False,
+                'medical': _flag('bed_defaultMedical', False) is True,
+                'counts': _flag('bed_countsForBedroomOrBarracks', True) is not False,
+                'maxBody': safe_float(bld.get('bed_maxBodySize'), 1.5),
+            }
+        # 储藏建筑（架子/储物柜）→ 储藏室
+        if 'Building_Storage' in thing_class:
+            entry['storage'] = 1
+        # 棺材 → 陵墓；王座 → 王座厅
+        if 'Building_Sarcophagus' in thing_class:
+            entry['sarcophagus'] = 1
+        if 'Building_Throne' in thing_class:
+            entry['throne'] = 1
+        # 祭坛 → 礼拜室（游戏还要求 Ideology 的 meme，这里只做近似）
+        if (merged.get('isAltar') or '').lower() == 'true':
+            entry['altar'] = 1
+        # 少量按 defName 识别的特殊房间设施
+        if def_name in ('SchoolDesk', 'Blackboard'):
+            entry['classroom'] = 1
+        # 屠宰台没有 workTableRoomRole，但游戏 Kitchen 角色会按「产出可食用营养」把它算进厨房
+        if def_name == 'TableButcher':
+            entry['foodPrep'] = 1
+        if def_name == 'PsychicRitualSpot':
+            entry['ceremonial'] = 1
+        if def_name == 'DeathrestCasket':
+            entry['deathrest'] = 1
+        if def_name in ('Electroharvester', 'ElectricInhibitor', 'BioferriteHarvester'):
+            entry['containment'] = 1
+        if def_name in ('HoldingPlatform', 'HoldingPlatformSmall', 'EntityHolder'):
+            entry['entityHolder'] = 1
+
         if power_use:
             entry['powerUse'] = power_use
         if power_gen:

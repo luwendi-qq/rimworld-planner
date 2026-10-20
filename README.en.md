@@ -17,8 +17,8 @@
 A browser-based **layout planner for RimWorld bases**. Place buildings on the real grid footprint, run a pass of layout checks, then export a `.xml` blueprint you can drop back into the game.
 
 - **Correct footprints** — 250×250 grid (configurable), `R` to rotate; multi-cell buildings (beds, tables, fabrication benches) change footprint with rotation
-- **Room roles** — tag a room as bedroom / kitchen / workshop / cold storage / freezer; checks then verify the room has what it needs and how many coolers its target temperature calls for
-- **Layout checks** — overlap · power network · room detection & space rating · reachability · room roles & temperature estimate
+- **Room roles, derived like the game** — bedroom / barracks / kitchen / workshop… are inferred from what is inside the room (as `RoomRoleWorker` does); no manual tagging. Cooling targets are separate and estimated
+- **Layout checks** — overlap · power network · room detection & role derivation · space rating · reachability · temperature estimate
 - **Export to game** — real Blueprints-mod `.xml`, **including each building's material and rotation**; workers will build it for real
 - **Import your save** — load an existing `.rws` colony as a backdrop and keep planning; it also reads the map **terrain/mountain**, **colonist skills**, **research progress** and **stored materials**
 - **Terrain-aware checks** — marsh only has the Light affordance (walls need Heavy), water needs a bridge first, mountain rock must be mined
@@ -74,7 +74,8 @@ Or click **Code → Download ZIP** on the repo page and overwrite your old folde
 | **Never silently overwrites** | Drawing onto an existing building is blocked ("delete that tile first") instead of quietly replacing your plan; conduits can still go under walls and coolers / wall lamps can share a tile with a wall |
 | **Auto-connecting conduits** | Conduits draw connections toward their neighbours; a lone tile becomes a junction box |
 | **Per-item materials** | 53 stuffs (wood/stone/metal/fabric/leather), long-press to pick, remembered per building — and imported from your save |
-| **Room roles** | Tag a room as bedroom / kitchen / workshop / cold storage / freezer; checks then verify the room has what it needs and how many coolers its target temperature calls for |
+| **Room roles** | Derived from the room's contents using the game's `RoomRoleWorker` rules (bed / stove / workbench / table / shelf…). Beds can be toggled normal / medical / prisoner in the inspector |
+| **Temperature estimate** | Set a target temperature per room (planner-only); coolers/heaters are estimated with `ceil(area × ΔT ÷ 630)` |
 | **Template library** | Save a selection as a named template (standard bedroom, dining room…) and stamp it out with one click instead of drawing it dozens of times |
 | **Layout checks** | Power network via the game's 6-tile connection rule; room flood-fill with the game's space-rating thresholds; outdoor reachability via BFS |
 | **Export image** | "Export image" saves the whole layout (auto-fitted to its bounding box) as a PNG — handy for sharing |

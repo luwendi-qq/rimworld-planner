@@ -43,8 +43,7 @@
     { id: 'ritual', name: '仪式祭祀' },
     { id: 'funeral', name: '丧葬' },
     { id: 'tech', name: '科幻科技' },
-    { id: 'misc', name: '杂项' },
-    { id: 'special', name: '特殊（造不出来）' }
+    { id: 'misc', name: '杂项' }
   ];
 
   // 常用「地板层」贴图（只影响观感，不参与校验）
@@ -340,13 +339,6 @@
   };
 
   /**
-   * 玩家在游戏里造不出来的东西：飞船件、轨道设施、剧情给的运输舱。
-   * 留着它们是为了「读存档时能认出来」，但不该出现在物品栏里让人去摆。
-   * 按 defName 判定，所以内置库和游戏提取的数据一视同仁。
-   */
-  var NOT_BUILDABLE = /^(Ship|Gravship|GravAnchor|GravFieldExtender|PilotConsole|PassengerShuttle|TransportPod|Orbital)/;
-
-  /**
    * 分类细化：游戏把很多东西都塞在「Miscellaneous」里，
    * 这里按性质分开，找东西方便得多。
    */
@@ -373,13 +365,8 @@
         var am = ART_MAP[b.def || b.id];
         if (am) b.art = am;
       }
-      var key = normDef(b.def || b.id || b.en || '');
-      // 造不出来的东西：单独归一类，物品栏默认不显示
-      if (NOT_BUILDABLE.test(b.def || b.id || '')) {
-        b.noBuild = 1;
-        b.cat = 'special';
-      } else if (b.cat === 'misc') {
-        // 杂项太杂，按性质再分一分
+      // 杂项太杂，按性质再分一分
+      if (b.cat === 'misc') {
         for (var r = 0; r < CAT_RULES.length; r++) {
           if (CAT_RULES[r].re.test(b.def || b.id || '')) { b.cat = CAT_RULES[r].cat; break; }
         }

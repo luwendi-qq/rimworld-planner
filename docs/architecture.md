@@ -22,7 +22,7 @@ rimworld-planner/
 │   ├── icons.js                贴图渲染（原版贴图优先，缺失时用原创矢量图兜底）
 │   ├── engine.js               网格 / 相机 / 编辑 / 撤销 / 渲染
 │   ├── site.js                 存档地形 / 山体 / 可建造性（affordance 校验、离屏地形画布）
-│   ├── rooms.js                房间指定（用途 / 目标温度）+ 温控估算模型
+│   ├── rooms.js                房间角色推导（按游戏 RoomRoleWorker）+ 温控估算模型
 │   ├── checks.js               布局校验（重叠·地形·电力·房间·连通·温控）
 │   ├── workload.js             可行性 / 工作量 / 工期估算（小人技能·科技·库存）
 │   ├── exporters.js            蓝图 .xml / 工程 JSON
@@ -38,7 +38,7 @@ tests/                          纯逻辑断言测试（node 自带测试运行�
 ├── geometry.test.js            占地 / 朝向 / 坐标换算
 ├── blueprint.test.js           蓝图 XML 结构与内容
 ├── checks.test.js              冲突 / 电力 / 房间 / 可达性
-├── rooms.test.js               房间指定 / 温控需求 / 制冷机冷热端
+├── rooms.test.js               房间角色自动推导 / 目标温度 / 温控需求
 ├── site.test.js                地形 / 山体 / 可建造性
 ├── workload.test.js            材料 / 科技 / 工期估算
 ├── history.test.js             撤销 / 重做（增量式历史）
@@ -57,8 +57,8 @@ tests/                          纯逻辑断言测试（node 自带测试运行�
 | `RWArt` | `icons.js` + `sprites.js` | 绘制：原版贴图 / 矢量图兜底、连接图集、材质染色 |
 | `RW` | `engine.js` | 状态机 + 相机 + 编辑操作 + 撤销栈 + 渲染循环 |
 | `RWSite` | `site.js` | 存档地形 / 山体查询、affordance 可建造性、地形离屏画布 |
-| `RWRooms` | `rooms.js` | 房间用途表、用途读写、温控需求估算 |
-| `RWChecks` | `checks.js` | 布局校验（重叠·地形·电力·房间·连通·温控·用途） |
+| `RWRooms` | `rooms.js` | 房间角色自动推导、目标温度读写、温控需求估算 |
+| `RWChecks` | `checks.js` | 布局校验（重叠·地形·电力·房间·连通·温控·角色） |
 | `RWWork` | `workload.js` | 蓝图材料 / 科技 / 工时 / 工期估算 |
 | `RWExport` | `exporters.js` | 蓝图 `.xml` / 工程 JSON 序列化 |
 | `RWIo` | `io.js` | 本地存档、`.rws` 解析（建筑 / 地形 / 小人 / 科技 / 库存） |
@@ -75,8 +75,7 @@ tests/                          纯逻辑断言测试（node 自带测试运行�
   fMod:  [{k, from, to}],            // 地板
   lfMod: [{k, from, to}],            // 锁定的地板
   pfMod: [{k, from, to}],            // 规划层
-  rMod:  [{k, from, to}],            // 房间用途
-  rtMod: [{k, from, to}],            // 房间目标温度
+  rtMod: [{k, from, to}],            // 房间目标温度（规划参数）
   grid:  {from:{cols,rows}, to:{...}},
   all:   {from: 快照, to: 快照}       // 整体替换（清空 / 导入存档）
 }
@@ -132,12 +131,12 @@ node --test        # 或 npm test
 | `tests/geometry.test.js` | `footprint()` 旋转占地、`anchorOffset()` 锚点偏移、flipX/flipZ 坐标翻转、存档 → 编辑器 → 蓝图的往返一致性 |
 | `tests/blueprint.test.js` | 蓝图 XML 骨架、`ThingDef`/`TerrainDef`/`Stuff`/`Position`/`Rotation` 字段、「只导出新增」 |
 | `tests/checks.test.js` | 占地冲突、电力组网与缺口（6 格边界 / 跨分桶的大建筑）、房间识别与可达性、作用范围遮挡 |
-| `tests/rooms.test.js` | 房间用途读写与撤销、用途要求的检查、温控需求（冷冻 > 冷藏、目标温度可改）、制冷机冷热端 |
+| `tests/rooms.test.js` | 房间角色自动推导（卧室/兵营/病房/囚室/厨房/工坊/餐厅…）、目标温度与撤销、温控需求 |
 | `tests/site.test.js` | `terrainAffordance` 可建造性、山体需先开采 |
 | `tests/workload.test.js` | 材料缺口、科技前置、技能门槛、「能建/有条件/建不了」结论 |
-| `tests/history.test.js` | 撤销/重做：建筑、地板、旋转、材质、锁定、网格、房间用途 |
+| `tests/history.test.js` | 撤销/重做：建筑、地板、旋转、材质、床的医疗/囚犯开关、网格、导入快照 |
 | `tests/export-png.test.js` | PNG 导出的包围盒、尺寸上限、导出后画布状态不被改坏 |
-| `tests/data.test.js` | 建筑库完整性：`noBuild` 不误伤、分类不许再是大杂烩、常用建筑必须有造价或工时 |
+| `tests/data.test.js` | 建筑库完整性：可建造建筑不被误标、房间推导字段、分类不许再是大杂烩、常用建筑必须有造价或工时 |
 
 > 改 `anchorOffset()` 之前请先看 [import-export.md 的「坐标与朝向」](import-export.md#坐标与朝向)，
 > 那套偏移在真实存档的 764 个建筑上验证过「冲突 0 格」。

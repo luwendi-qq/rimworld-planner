@@ -26,8 +26,11 @@
   function deleteNamed(name) { var s = loadStore(); delete s[name]; return saveStore(s); }
 
   function saveSettings(o) {
-    if (!lsAvailable()) return;
-    try { localStorage.setItem(LS_SETS, JSON.stringify(o)); } catch (e) { }
+    if (!lsAvailable()) return false;
+    try {
+      localStorage.setItem(LS_SETS, JSON.stringify(o));
+      return true;
+    } catch (e) { return false; }
   }
   function loadSettings() {
     if (!lsAvailable()) return null;
@@ -650,18 +653,20 @@
     var flipZ = opts.flipZ !== false;   // 默认开
     var flipX = !!opts.flipX;
 
-    // 翻转设置要写回状态：导出蓝图时用的是 state.flipX / state.flipZ，
-    // 如果这里不写回，「翻转 X 轴」导入的存档导出来会左右镜像。
+    // 导入是「替换当前内容」而不是叠加上去 —— 先记一份整体快照（含旧的地形 / 屋顶 / 翻转设置），
+    // 撤销时整张还原。注意：快照要在写回 flipX / flipZ 之前取。
+    var before = RW.snapshotState();
     RW.state.flipZ = flipZ;
     RW.state.flipX = flipX;
 
-    // 导入是「替换当前内容」而不是叠加上去 —— 记一份整体快照，撤销时整张还原
-    var before = RW.snapshotState();
     if (!opts.keepExisting) {
       RW.state.buildings = [];
       RW.state.floors = {};
+      RW.state.plannedFloors = {};
       RW.state.lockedFloors = {};
+      RW.state.roomTemp = {};
       RW.state.selection = {};
+      RW.state.floorSelection = {};
     }
     RW.setGrid(W, H, true);
 

@@ -16,8 +16,7 @@
     floors: {},          // "x,z" -> floorId
     plannedFloors: {},   // "x,z" -> 1=规划中(蓝图) 2=规划中但被禁用
     lockedFloors: {},    // "x,z" -> true（存档原有地板，导出时排除）
-    roomRole: {},        // "x,z" -> 房间用途 id（卧室/厨房/…），写在房间的每一格上
-    roomTemp: {},        // "x,z" -> 自定义目标温度（只在和用途默认值不同时才写）
+    roomTemp: {},        // "x,z" -> 规划目标温度（只对本工具的温度估算生效）
     ambientTemp: 21,     // 环境（室外）温度，°C
     nextUid: 1,
     selection: {},       // uid -> true（建筑）
@@ -284,9 +283,9 @@
    *   all   整体替换（清空 / 导入存档）{from:快照, to:快照}
    */
   function newDelta() {
-    return { bAdd: [], bDel: [], bMod: [], fMod: [], lfMod: [], pfMod: [], rMod: [], rtMod: [], grid: null, all: null };
+    return { bAdd: [], bDel: [], bMod: [], fMod: [], lfMod: [], pfMod: [], rtMod: [], grid: null, all: null };
   }
-  var DELTA_LISTS = ['bAdd', 'bDel', 'bMod', 'fMod', 'lfMod', 'pfMod', 'rMod', 'rtMod'];
+  var DELTA_LISTS = ['bAdd', 'bDel', 'bMod', 'fMod', 'lfMod', 'pfMod', 'rtMod'];
   function deltaEmpty(d) {
     if (!d) return true;
     if (d.all) return false;
@@ -308,7 +307,8 @@
       cols: state.cols, rows: state.rows, nextUid: state.nextUid,
       buildings: state.buildings.map(function (b) {
         var o = { uid: b.uid, defId: b.defId, x: b.x, z: b.z, rot: b.rot || 0,
-                  color: b.color || null, stuff: b.stuff === undefined ? null : b.stuff };
+                  color: b.color || null, stuff: b.stuff === undefined ? null : b.stuff,
+                  bedMode: b.bedMode || null };
         if (b.locked) o.locked = true;
         if (b.src) o.src = b.src;
         if (b.planned) o.planned = true;
@@ -317,16 +317,25 @@
       floors: copyMap(state.floors),
       lockedFloors: copyMap(state.lockedFloors),
       plannedFloors: copyMap(state.plannedFloors),
-      roomRole: copyMap(state.roomRole),
       roomTemp: copyMap(state.roomTemp),
-      ambientTemp: state.ambientTemp
+      ambientTemp: state.ambientTemp,
+      // 导入存档会整体换掉这些；撤销导入时必须一起还原，否则地形底图会留在新存档上
+      terrain: state.terrain || null,
+      rocks: state.rocks || null,
+      home: state.home || null,
+      roofs: state.roofs || null,
+      saveInfo: state.saveInfo || null,
+      layers: copyMap(state.layers),
+      flipX: !!state.flipX,
+      flipZ: state.flipZ !== false
     };
   }
   function restoreState(s) {
     state.cols = s.cols; state.rows = s.rows; state.nextUid = s.nextUid;
     state.buildings = s.buildings.map(function (b) {
       var o = { uid: b.uid, defId: b.defId, x: b.x, z: b.z, rot: b.rot || 0,
-                color: b.color || null, stuff: b.stuff === undefined ? null : b.stuff };
+                color: b.color || null, stuff: b.stuff === undefined ? null : b.stuff,
+                bedMode: b.bedMode || null };
       if (b.locked) o.locked = true;
       if (b.src) o.src = b.src;
       if (b.planned) o.planned = true;
@@ -335,9 +344,19 @@
     state.floors = copyMap(s.floors);
     state.lockedFloors = copyMap(s.lockedFloors);
     state.plannedFloors = copyMap(s.plannedFloors);
-    state.roomRole = copyMap(s.roomRole);
     state.roomTemp = copyMap(s.roomTemp);
     if (s.ambientTemp != null) state.ambientTemp = s.ambientTemp;
+    state.terrain = s.terrain || null;
+    state.rocks = s.rocks || null;
+    state.home = s.home || null;
+    state.roofs = s.roofs || null;
+    state.terrainReady = !!state.terrain;
+    state.saveInfo = s.saveInfo || null;
+    if (s.layers) state.layers = copyMap(s.layers);
+    if (s.flipX != null) state.flipX = !!s.flipX;
+    if (s.flipZ != null) state.flipZ = !!s.flipZ;
+    state.importStamp = (state.importStamp || 0) + 1;
+    if (global.RWSite) global.RWSite.terrainDirty();
     state.selection = {};
     state.floorSelection = {};
     reindex(); render(); emit('change');
@@ -357,7 +376,8 @@
   /** 把一个建筑按记录重新塞回画布（撤销删除时用，uid 保持不变） */
   function insertBuilding(rec) {
     var b = { uid: rec.uid, defId: rec.defId, x: rec.x, z: rec.z, rot: rec.rot || 0,
-              color: rec.color || null, stuff: rec.stuff === undefined ? null : rec.stuff };
+              color: rec.color || null, stuff: rec.stuff === undefined ? null : rec.stuff,
+              bedMode: rec.bedMode || null };
     if (rec.locked) b.locked = true;
     if (rec.src) b.src = rec.src;
     if (rec.planned) b.planned = true;
@@ -377,7 +397,8 @@
   /** 建筑记录的一份拷贝（放进 delta 后就不会被后续操作改到） */
   function recOf(b, idx) {
     var o = { uid: b.uid, defId: b.defId, x: b.x, z: b.z, rot: b.rot || 0,
-              color: b.color || null, stuff: b.stuff === undefined ? null : b.stuff };
+              color: b.color || null, stuff: b.stuff === undefined ? null : b.stuff,
+              bedMode: b.bedMode || null };
     if (b.locked) o.locked = true;
     if (b.src) o.src = b.src;
     if (b.planned) o.planned = true;
@@ -397,9 +418,13 @@
     if (!d) return;
     if (d.all) { restoreState(dir > 0 ? d.all.to : d.all.from); return; }
     var fwd = dir > 0;
-    // 先删后加：撤销时「加回来」的正是当时被删掉的那些（uid 不变）
+    // 先删后加：撤销时「加回来」的正是当时被删掉的那些（uid 不变）。
+    // bDel 的 idx 是删除时算的，多个建筑一起删时 idx 会重复/前移；
+    // 所以撤销要倒序插回，才能恢复原来的相对顺序。
     (fwd ? (d.bDel || []) : (d.bAdd || [])).forEach(function (b) { removeBuilding(b.uid, true); });
-    (fwd ? (d.bAdd || []) : (d.bDel || [])).forEach(function (b) { insertBuilding(b); });
+    var addList = fwd ? (d.bAdd || []) : (d.bDel || []);
+    if (fwd) addList.forEach(function (b) { insertBuilding(b); });
+    else for (var ai = addList.length - 1; ai >= 0; ai--) insertBuilding(addList[ai]);
     (d.bMod || []).forEach(function (m) {
       var b = findBuilding(m.uid);
       if (!b) return;
@@ -421,14 +446,8 @@
       if (v === null || v === undefined) delete state.plannedFloors[m.k];
       else state.plannedFloors[m.k] = v;
     });
-    // 房间用途 / 目标温度
-    if (!state.roomRole) state.roomRole = {};
+    // 目标温度（房间角色是按内容推导的，不再保存）
     if (!state.roomTemp) state.roomTemp = {};
-    (d.rMod || []).forEach(function (m) {
-      var v = fwd ? m.to : m.from;
-      if (v === null || v === undefined) delete state.roomRole[m.k];
-      else state.roomRole[m.k] = v;
-    });
     (d.rtMod || []).forEach(function (m) {
       var v = fwd ? m.to : m.from;
       if (v === null || v === undefined) delete state.roomTemp[m.k];
@@ -451,8 +470,8 @@
     if (!deltaEmpty(d)) {
       state.history.push(d);
       if (state.history.length > 200) state.history.shift();
+      state.future.length = 0;
     }
-    state.future.length = 0;
     emit('history');
   }
   function undo() {
@@ -521,7 +540,7 @@
     var before = snapshotState();
     if (force) {
       state.buildings = []; state.floors = {}; state.plannedFloors = {}; state.lockedFloors = {};
-      state.roomRole = {}; state.roomTemp = {};
+      state.roomTemp = {};
     } else {
       state.buildings = state.buildings.filter(function (b) { return b.locked; });
       var keep = {};
@@ -531,8 +550,8 @@
       var lf = {};
       Object.keys(keep).forEach(function (k) { lf[k] = true; });
       state.lockedFloors = lf;
-      // 房间都没了，指定自然也没了
-      state.roomRole = {}; state.roomTemp = {};
+      // 清空是显式重置：目标温度也一起清掉（锁定底图上的房间会回到默认 21°C）
+      state.roomTemp = {};
     }
     state.selection = {}; state.floorSelection = {};
     pushHistory({ all: { from: before, to: snapshotState() } });
@@ -611,24 +630,42 @@
 
   function copySelection() {
     var sel = selectedBuildings();
-    if (!sel.length) return null;
-    var minX = Infinity, minZ = Infinity;
-    sel.forEach(function (b) { minX = Math.min(minX, b.x); minZ = Math.min(minZ, b.z); });
-    var items = sel.map(function (b) {
-      return { defId: b.defId, dx: b.x - minX, dz: b.z - minZ, rot: b.rot, color: b.color, stuff: b.stuff };
+    var flKeys = Object.keys(state.floorSelection || {}).filter(function (k) { return !!state.floors[k]; });
+    if (!sel.length && !flKeys.length) return null;
+
+    var minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity;
+    sel.forEach(function (b) {
+      var fp = footprint(defOf(b), b.rot);
+      minX = Math.min(minX, b.x); minZ = Math.min(minZ, b.z);
+      maxX = Math.max(maxX, b.x + fp[0] - 1); maxZ = Math.max(maxZ, b.z + fp[1] - 1);
     });
-    var flo = [];
-    Object.keys(state.floors).forEach(function (k) {
+    flKeys.forEach(function (k) {
       var p = k.split(','), fx = +p[0], fz = +p[1];
-      if (fx >= minX && fz >= minZ) {
-        var inside = sel.some(function (b) {
-          var fp = footprint(defOf(b), b.rot);
-          return fx >= b.x && fx < b.x + fp[0] && fz >= b.z && fz < b.z + fp[1];
-        });
-        if (inside) flo.push({ dx: fx - minX, dz: fz - minZ, id: state.floors[k] });
-      }
+      minX = Math.min(minX, fx); minZ = Math.min(minZ, fz);
+      maxX = Math.max(maxX, fx); maxZ = Math.max(maxZ, fz);
     });
-    return { items: items, floors: flo, w: 0, h: 0 };
+
+    var items = sel.map(function (b) {
+      return { defId: b.defId, dx: b.x - minX, dz: b.z - minZ, rot: b.rot, color: b.color,
+               stuff: b.stuff, bedMode: b.bedMode || null };
+    });
+
+    // 框选时 floorSelection 里就是用户选中的地板；只选建筑时（Ctrl+C / 点选）
+    // 则以选中建筑的包围盒为准，把房间内部的地板也带上。
+    var flo = [];
+    if (flKeys.length) {
+      flKeys.forEach(function (k) {
+        var p = k.split(','), fx = +p[0], fz = +p[1];
+        flo.push({ dx: fx - minX, dz: fz - minZ, id: state.floors[k] });
+      });
+    } else {
+      Object.keys(state.floors).forEach(function (k) {
+        var p = k.split(','), fx = +p[0], fz = +p[1];
+        if (fx < minX || fz < minZ || fx > maxX || fz > maxZ) return;
+        flo.push({ dx: fx - minX, dz: fz - minZ, id: state.floors[k] });
+      });
+    }
+    return { items: items, floors: flo, w: maxX - minX + 1, h: maxZ - minZ + 1 };
   }
 
   function pasteAt(clip, ox, oz) {
@@ -636,7 +673,11 @@
     var made = [];
     clip.items.forEach(function (it) {
       var r = addBuilding(it.defId, ox + it.dx, oz + it.dz, it.rot, { stuff: it.stuff });
-      if (r.ok) { r.b.color = it.color; made.push(r.b.uid); d.bAdd.push(recOf(r.b)); }
+      if (r.ok) {
+        r.b.color = it.color;
+        r.b.bedMode = it.bedMode || null;
+        made.push(r.b.uid); d.bAdd.push(recOf(r.b));
+      }
     });
     clip.floors.forEach(function (f) {
       var k = key(ox + f.dx, oz + f.dz);
@@ -1824,6 +1865,29 @@
     render(); emit('change');
     return n;
   }
+
+  /** 改选中床的「普通 / 医疗 / 囚犯」开关（对应游戏里床的 Inspector 选项） */
+  function setSelectionBedMode(mode) {
+    var sel = selectedBuildings().filter(function (b) {
+      var d = defOf(b);
+      return d && d.bed && d.bed.human !== false;
+    });
+    if (!sel.length) return 0;
+    var to = (mode === 'medical' || mode === 'prison') ? mode : null;
+    var d = newDelta();
+    var n = 0;
+    sel.forEach(function (b) {
+      if (b.locked) return;
+      var was = b.bedMode || null;
+      if (was === to) return;
+      d.bMod.push(modOf(b, { bedMode: was }, { bedMode: to }));
+      if (to) b.bedMode = to; else delete b.bedMode;
+      n++;
+    });
+    if (n) pushHistory(d);
+    render(); emit('change');
+    return n;
+  }
   function setTool(t) {
     state.tool = t;
     if (t === 'select' || t === 'pan') state.brush = null;
@@ -1866,11 +1930,13 @@
   }
   function packLayer(L) {
     if (!L || !L.cells) return null;
-    return { w: L.w, h: L.h, defs: L.defs || {}, rle: rleEncode(L.cells) };
+    var o = { w: L.w, h: L.h, defs: L.defs || {}, rle: rleEncode(L.cells) };
+    if (L.kind) o.kind = L.kind;
+    return o;
   }
   function unpackLayer(P) {
     if (!P || !P.rle) return null;
-    return { w: P.w, h: P.h, defs: P.defs || {}, cells: rleDecode(P.rle, P.w * P.h) };
+    return { w: P.w, h: P.h, defs: P.defs || {}, kind: P.kind || null, cells: rleDecode(P.rle, P.w * P.h) };
   }
 
   function loadProject(data) {
@@ -1878,7 +1944,7 @@
     state.rows = data.rows || 250;
     state.buildings = (data.buildings || []).map(function (b) {
       var o = { uid: state.nextUid++, defId: b.defId, x: b.x, z: b.z, rot: b.rot || 0,
-                color: b.color || null, stuff: b.stuff || null };
+                color: b.color || null, stuff: b.stuff || null, bedMode: b.bedMode || null };
       if (b.locked) o.locked = true;
       if (b.src) o.src = b.src;
       if (b.planned) o.planned = true;
@@ -1887,13 +1953,13 @@
     state.floors = data.floors || {};
     state.plannedFloors = data.plannedFloors || {};
     state.lockedFloors = data.lockedFloors || {};
-    state.roomRole = data.roomRole || {};
     state.roomTemp = data.roomTemp || {};
     if (data.ambientTemp != null) state.ambientTemp = data.ambientTemp;
     state.lastStuff = data.lastStuff || {};
     state.mapName = data.name || '未命名布局';
     state.terrain = unpackLayer(data.terrain);
     state.rocks = unpackLayer(data.rocks);
+    state.roofs = unpackLayer(data.roofs);
     state.home = unpackLayer(data.home);
     state.terrainReady = !!state.terrain;
     state.importStamp = (state.importStamp || 0) + 1;
@@ -1919,7 +1985,8 @@
       format: 'rw-planner', version: 1, name: state.mapName,
       cols: state.cols, rows: state.rows,
       buildings: state.buildings.map(function (b) {
-        var o = { defId: b.defId, x: b.x, z: b.z, rot: b.rot, color: b.color, stuff: b.stuff };
+        var o = { defId: b.defId, x: b.x, z: b.z, rot: b.rot, color: b.color, stuff: b.stuff,
+                  bedMode: b.bedMode || null };
         if (b.locked) o.locked = true;
         if (b.src) o.src = b.src;
         if (b.planned) o.planned = true;
@@ -1927,10 +1994,11 @@
       }),
       floors: state.floors, plannedFloors: state.plannedFloors,
       lockedFloors: state.lockedFloors,
-      roomRole: state.roomRole, roomTemp: state.roomTemp,
+      roomTemp: state.roomTemp,
       ambientTemp: state.ambientTemp,
       lastStuff: state.lastStuff,
-      terrain: packLayer(state.terrain), rocks: packLayer(state.rocks), home: packLayer(state.home),
+      terrain: packLayer(state.terrain), rocks: packLayer(state.rocks), roofs: packLayer(state.roofs),
+      home: packLayer(state.home),
       saveInfo: state.saveInfo, respectTerrain: state.respectTerrain, strictTerrain: state.strictTerrain,
       useHomeStock: state.useHomeStock,
       flipZ: state.flipZ !== false, flipX: !!state.flipX
@@ -1942,7 +2010,9 @@
     var d = newDelta();
     state.cols = Math.max(4, Math.min(400, cols | 0));
     state.rows = Math.max(4, Math.min(400, rows | 0));
-    d.grid = { from: before, to: { cols: state.cols, rows: state.rows } };
+    if (state.cols !== before.cols || state.rows !== before.rows) {
+      d.grid = { from: before, to: { cols: state.cols, rows: state.rows } };
+    }
     // 裁掉越界建筑
     var clipIdx = {};
     state.buildings.forEach(function (b, i) { clipIdx[b.uid] = i; });
@@ -1961,7 +2031,16 @@
         if (state.lockedFloors) delete state.lockedFloors[k];
       }
     });
-    if (!quiet) pushHistory(d);
+    if (state.roomTemp) {
+      Object.keys(state.roomTemp).forEach(function (k) {
+        var p = k.split(',');
+        if (+p[0] >= state.cols || +p[1] >= state.rows) {
+          d.rtMod.push({ k: k, from: state.roomTemp[k], to: null });
+          delete state.roomTemp[k];
+        }
+      });
+    }
+    if (!quiet && !deltaEmpty(d)) pushHistory(d);
     reindex(); fitView(); emit('change');
   }
 
@@ -2094,6 +2173,7 @@
     rleEncode: rleEncode, rleDecode: rleDecode,
     stuffsFor: stuffsFor, stuffById: stuffById, defaultStuff: defaultStuff,
     setBrushStuff: setBrushStuff, setSelectionStuff: setSelectionStuff,
+    setSelectionBedMode: setSelectionBedMode,
     doorRotAt: doorRotAt,
     rotateSelection: rotateSelection, startMoveSelection: startMoveSelection,
     copySelection: copySelection, pasteAt: pasteAt, setBrush: setBrush, setTool: setTool,

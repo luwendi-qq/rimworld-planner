@@ -43,8 +43,10 @@ python tools/extract_defs.py "/path" --out js/buildings.generated.js
 它扫描 `Data/` 和各 DLC 目录（Royalty / Ideology / Biotech / Anomaly / Odyssey）下的
 `Defs/**/*.xml`，处理 `ParentName` 继承，提取：
 
-- 占地尺寸、电力（耗电 / 发电 / 储电）、美观值
-- 能不能换材质、通行性、是否持顶、建造分类、所属 DLC
+- 占地尺寸、电力（耗电 / 发电 / 储电）、美观值、耐久（hp）、占格率（fill）
+- 能不能换材质、通行性、是否持顶、建造分类、所属 DLC、是否在建筑师菜单里（menu）
+- 房间角色推导字段：`bed`（人床 / 医疗 / 最大体型）、`workRole`、`surfaceEat`、
+  `storage`、`sarcophagus`、`throne`、`altar` 等
 
 产物 `js/buildings.generated.js` 会被 `index.html` 自动加载，
 **和内置的参考值合并**（精确值覆盖参考值，你没装的 DLC 的条目保留参考值并标 `?`）。

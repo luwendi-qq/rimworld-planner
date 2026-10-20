@@ -34,24 +34,43 @@ test('数据：分类都在已知的分类表里', () => {
   }
 });
 
-test('数据：玩家造不出来的东西要标 noBuild 并单独归类', () => {
-  const nb = ids.filter((id) => D.byId[id].noBuild);
-  assert.ok(nb.length > 0, '应该能识别出一些不可建造的条目');
-  for (const id of nb) {
-    assert.strictEqual(D.byId[id].cat, 'special', id + ' 应该归到 special');
-  }
-  // 船、轨道、剧情道具这些一定要在里面
-  for (const id of ['Ship_Reactor', 'Ship_Beam', 'GravshipHull', 'PassengerShuttle', 'TransportPod', 'OrbitalScanner']) {
+test('数据：玩家能造的东西不能被误标成「造不出来」', () => {
+  // 这些在游戏里都有 designationCategory（建筑师菜单里能造），
+  // 之前的正则把 Ship/Gravship/TransportPod/Orbital 一刀切，全部误判了。
+  for (const id of ['Ship_Reactor', 'Ship_Beam', 'TransportPod', 'OrbitalTradeBeacon',
+    'GravshipHull', 'GravAnchor', 'PassengerShuttle', 'PilotConsole']) {
     assert.ok(D.byId[id], id + ' 应该存在于库里');
-    assert.strictEqual(D.byId[id].noBuild, 1, id + ' 应该标记为不可建造');
+    assert.strictEqual(D.byId[id].menu, 1, id + ' 应该标成建筑师菜单里能造');
+    assert.ok(!D.byId[id].noBuild, id + ' 不该被标成不可建造');
   }
 });
 
-test('数据：常见的墙体家具不能被误判成不可建造', () => {
-  for (const id of ['wall', 'door', 'bed', 'table_2x2', 'solar_generator', 'cooler', 'wind_turbine', 'mini_turret']) {
-    assert.ok(D.byId[id], id + ' 应该存在');
-    assert.ok(!D.byId[id].noBuild, id + ' 不该被标成不可建造');
+test('数据：不再有「特殊（造不出来）」这个假分类', () => {
+  const cats = D.CATEGORIES.map((c) => c.id);
+  assert.ok(cats.indexOf('special') < 0, 'special 分类应该已经删掉');
+  for (const id of ids) {
+    assert.notStrictEqual(D.byId[id].cat, 'special', id + ' 还在 special 分类里');
   }
+});
+
+test('数据：房间角色推导需要的字段要提取出来', () => {
+  const bed = D.byId['bed'];
+  assert.ok(bed.bed, '普通床要有 bed 字段');
+  assert.strictEqual(bed.bed.human, true);
+  assert.strictEqual(bed.bed.medical, false);
+
+  const hospital = D.byId['hospital_bed'];
+  assert.strictEqual(hospital.bed.medical, true, '医疗床要标 medical');
+
+  const animal = D.byId['animal_bed'];
+  assert.strictEqual(animal.bed.human, false, '动物床不能算人床');
+
+  assert.strictEqual(D.byId['stove_electric'].workRole, 'Kitchen');
+  assert.strictEqual(D.byId['electric_smithy'].workRole, 'Workshop');
+  assert.strictEqual(D.byId['research_bench'].workRole, 'Laboratory');
+  assert.strictEqual(D.byId['table_2x2'].surfaceEat, 1);
+  assert.strictEqual(D.byId['shelf'].storage, 1);
+  assert.strictEqual(D.byId['sarcophagus'].sarcophagus, 1);
 });
 
 test('数据：分类别再是一个大杂烩', () => {
@@ -81,9 +100,9 @@ test('数据：主要建筑都要有造价或工时，估算面板才准', () =>
 
 test('数据：图标别再一堆通用方块', () => {
   const generic = ids.filter((id) => D.byId[id].art === 'generic');
-  // 只剩下造不出来的东西（飞船件）用通用图标是可以的
-  const bad = generic.filter((id) => !D.byId[id].noBuild);
-  assert.ok(bad.length <= 5, '还有 ' + bad.length + ' 条可建造的东西是通用图标：' + bad.join(' '));
+  // 工作台做出来的 / 任务奖励的（menu=0）用通用图标可以接受
+  const bad = generic.filter((id) => D.byId[id].menu !== 0);
+  assert.ok(bad.length <= 40, '还有 ' + bad.length + ' 条建筑师菜单里的东西是通用图标：' + bad.slice(0, 20).join(' '));
 });
 
 test('数据：游戏里能建的地形都要在地板表里', () => {

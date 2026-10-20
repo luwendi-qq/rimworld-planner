@@ -87,6 +87,9 @@ robocopy "C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Data\Core\Langu
 - `<statBases>` 里的 `Beauty` / `MaxHitPoints`（耐久）/ `WorkToBuild`（工时）
 - `<costList>` / `<costStuffCount>`（造价）、`<researchPrerequisites>`（科技前置）、
   `<constructionSkillPrerequisite>`（建造技能）、`<terrainAffordanceNeeded>`（地基要求）
+- `<surfaceType>Eat`（餐桌）、`<building>` 里的 `workTableRoomRole`（厨房/工坊/实验室）、
+  `bed_humanlike` / `bed_defaultMedical` / `bed_maxBodySize`（卧室/病房/育儿室）、
+  `Building_Storage` / `Building_Sarcophagus` / `Building_Throne`（储藏室/陵墓/王座厅）
 - `stuffCategories`（可换材质的分类）、`designationCategory`（**在不在建筑师菜单里**）、
   `specialDisplayRadius`（作用范围）、所属 DLC
 
