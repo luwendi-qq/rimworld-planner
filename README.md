@@ -8,7 +8,7 @@
 ![依赖](https://img.shields.io/badge/依赖-无%20·%20纯前端-orange.svg)
 ![平台](https://img.shields.io/badge/平台-Chrome%20%7C%20Edge%20%7C%20Firefox-brightgreen.svg)
 
-![规划器主界面](docs/images/hero.png)
+![规划器主界面](docs/images/hero.webp)
 
 ---
 
@@ -88,7 +88,7 @@ git pull
 
 ### 布局校验：电力 / 房间 / 建筑清单
 
-![电力网络校验](docs/images/power.png)
+![电力网络校验](docs/images/power.webp)
 
 点右侧「运行校验」后，会列出每张电网的发电 / 耗电 / 储电与缺口（这张图里 #1 网是 2000W / 1280W，平衡），
 以及每个房间的面积、空间评分、门数与制冷器够不够；下面还有建筑清单统计。
@@ -96,7 +96,7 @@ git pull
 
 ### 存档分析：地形 / 玩家区域 / 小人 / 科技 / 库存 / 工期
 
-![存档分析](docs/images/save-analysis.png)
+![存档分析](docs/images/save-analysis.webp)
 
 读取 `.rws` 后，右侧会多出「存档情报」和「工作量估算」两块，导入面板里还有底图锁定选项：
 
@@ -118,9 +118,9 @@ git pull
 同一个区域，上面是游戏原版贴图，下面是拿掉 `img/` 后的矢量图兜底。
 **形状、占地、朝向完全一致**，只是没有游戏美术：
 
-![原版贴图](docs/images/textures-on.png)
+![原版贴图](docs/images/textures-on.webp)
 
-![矢量图兜底](docs/images/textures-off.png)
+![矢量图兜底](docs/images/textures-off.webp)
 
 ## 把布局导回游戏
 

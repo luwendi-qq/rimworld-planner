@@ -8,7 +8,7 @@
 
 [中文说明](README.md) · [Documentation](docs/) (Chinese)
 
-![Planner UI](docs/images/hero.png)
+![Planner UI](docs/images/hero.webp)
 
 ---
 
@@ -83,7 +83,7 @@ Full manual → [docs/usage.md](docs/usage.md) (Chinese)
 
 ### Layout check: power network
 
-![Power network](docs/images/power.png)
+![Power network](docs/images/power.webp)
 
 Turn on the **电力网 (power grid)** layer to see the wiring: **thick yellow lines are conduit trunks, thin lines are devices joining the grid**.
 The 运行校验 (Run checks) button also reports each grid's generation / draw / storage balance, plus every room's area, space rating, door count and cooler coverage.
@@ -93,9 +93,9 @@ The 运行校验 (Run checks) button also reports each grid's generation / draw 
 Same area: the top image uses the game's vanilla textures, the bottom one is the vector fallback you get without `img/`.
 **Shapes, footprints and rotations are identical** — only the game art is missing:
 
-![Vanilla textures](docs/images/textures-on.png)
+![Vanilla textures](docs/images/textures-on.webp)
 
-![Vector fallback](docs/images/textures-off.png)
+![Vector fallback](docs/images/textures-off.webp)
 
 ## Getting the blueprint into the game
 
