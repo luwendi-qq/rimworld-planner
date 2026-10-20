@@ -70,7 +70,9 @@
       aff: (t && t.aff) || null,
       work: (t && (t.work != null)) ? t.work : (f.work || 0),
       cost: (t && t.cost) || f.cost || null,
-      research: (t && t.research) || f.research || null
+      research: (t && t.research) || f.research || null,
+      skillReq: f.skillReq || 0,
+      dlc: f.dlc || (t && t.dlc) || null
     };
   }
 

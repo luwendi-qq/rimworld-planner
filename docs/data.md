@@ -2,7 +2,7 @@
 
 [← 返回 README](../README.md)
 
-内置数据库（99 条常用建筑）是**人工整理的参考值**：格子尺寸基本可靠，但少数条目方向/数值可能随版本变化。
+内置数据库（99 条常用建筑 + 22 条地板）是**人工整理的参考值**：格子尺寸基本可靠，但少数条目方向/数值可能随版本变化。
 跑过提取（网页导入或 `tools/extract_defs.py`）之后，凡是能从游戏里对上的条目都会标为「精确」，**界面上不再显示 `?`**；
 只有对不上的老条目（例如 1.7 已移除的混凝土护栏）才继续标 `?` 提醒你核对。电力数值同样是参考值。
 
@@ -84,6 +84,16 @@ robocopy "C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Data\Core\Langu
 - 继承链（`ParentName` / `Name`，含抽象父类）
 - `<size>`、`passability`、`holdsRoof`、`fillPercent`
 - `<comps>` 里的 `CompProperties_Power` / `PowerPlant` / `Battery` / `Door`
-- `<statBases><Beauty>`、`stuffCategories`、`designationCategory`、所属 DLC
+- `<statBases>` 里的 `Beauty` / `MaxHitPoints`（耐久）/ `WorkToBuild`（工时）
+- `<costList>` / `<costStuffCount>`（造价）、`<researchPrerequisites>`（科技前置）、
+  `<constructionSkillPrerequisite>`（建造技能）、`<terrainAffordanceNeeded>`（地基要求）
+- `stuffCategories`（可换材质的分类）、`designationCategory`（**在不在建筑师菜单里**）、
+  `specialDisplayRadius`（作用范围）、所属 DLC
+
+提取出来的每条建筑会带这些字段，物品栏的悬停提示里就能看到造价 / 工时 / 科技 / 技能 / 耐久。
+
+> 装了全部 6 个 DLC 的 1.7 实测：游戏建筑师菜单里的东西 **一条不缺**（260 条），
+> 其中只有 5 条不在菜单里（三个雕塑 + 万用电池 + 雕像，都是"做出来的"）。
+> 可建造的地形（桥 / 重型桥 / 活铁板 / 逆重亚结构等）也在地板层里。
 
 > 脚本只读取你本机的数值定义，输出的是尺寸/电力表格，**不包含也不分发任何游戏美术资源**。

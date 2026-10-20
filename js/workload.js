@@ -139,6 +139,7 @@
       var it = items['f:' + fid];
       it.n++; it.name = meta.name; it.kind = 'floor';
       it.work = meta.work || 0;
+      if (meta.skillReq) it.skillReq = Math.max(it.skillReq || 0, meta.skillReq);
       for (var c in cost) { it.cost[c] = (it.cost[c] || 0) + cost[c]; materials[c] = (materials[c] || 0) + cost[c]; }
       (meta.research || []).forEach(function (r) { it.research[r] = true; });
       it.cells.push([+p[0], +p[1]]);

@@ -69,7 +69,11 @@
     { id: 'sterile', name: '无菌地板', color: '#c9d4dc', art: 'tile', def: 'SterileTile', aff: 'Heavy', cost: { Steel: 1, ComponentIndustrial: 1 }, work: 400 },
     { id: 'carpet', name: '地毯', color: '#7a4a52', art: 'carpet', def: 'Carpet_Mindbend', aff: 'Heavy', cost: { Cloth: 7 }, work: 100 },
     { id: 'paved', name: '铺装砖', color: '#7d7367', art: 'tile', def: 'PavedTile', aff: 'Heavy', cost: { Steel: 2 }, work: 300 },
-    { id: 'bridge', name: '桥', color: '#6c4e37', art: 'bridge', def: 'Bridge', aff: 'Bridgeable', cost: { WoodLog: 10 }, work: 300 },
+    { id: 'bridge', name: '桥', color: '#6c4e37', art: 'bridge', def: 'Bridge', aff: 'Bridgeable', cost: { WoodLog: 12 }, work: 1500 },
+    // 以下三条按游戏 1.7 的 TerrainDef 补齐（Odyssey / Biotech）
+    { id: 'heavyBridge', name: '重型桥', color: '#808080', art: 'bridge', def: 'HeavyBridge', aff: 'Bridgeable', cost: { Steel: 14 }, work: 2500, research: ['HeavyBridges'], dlc: 'Odyssey' },
+    { id: 'bioferritePlate', name: '活铁板', color: '#645050', art: 'tile', def: 'BioferritePlate', aff: 'Heavy', cost: { Bioferrite: 4 }, work: 800, skillReq: 3, research: ['BioferriteShaping'], dlc: 'Biotech' },
+    { id: 'substructure', name: '逆重亚结构', color: '#6a6f74', art: 'tile', def: 'Substructure', aff: 'Heavy', cost: { GravlitePanel: 1, Steel: 4 }, work: 600, dlc: 'Odyssey' },
     { id: 'water', name: '水面', color: '#2f5a7a', art: 'water', def: 'WaterShallow', aff: null }
   ];
 

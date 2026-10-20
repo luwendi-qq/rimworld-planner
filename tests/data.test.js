@@ -86,6 +86,29 @@ test('数据：图标别再一堆通用方块', () => {
   assert.ok(bad.length <= 5, '还有 ' + bad.length + ' 条可建造的东西是通用图标：' + bad.join(' '));
 });
 
+test('数据：游戏里能建的地形都要在地板表里', () => {
+  // 这三条按 RimWorld 1.7 的 TerrainDef 补齐（数值来自游戏 defs）
+  const heavyBridge = D.floorsById['heavyBridge'];
+  assert.ok(heavyBridge, '应该有重型桥');
+  assert.strictEqual(heavyBridge.def, 'HeavyBridge');
+  assert.strictEqual(heavyBridge.aff, 'Bridgeable', '重型桥和普通桥一样要求 Bridgeable');
+  assert.deepStrictEqual(H.plain(heavyBridge.cost), { Steel: 14 });
+  assert.strictEqual(heavyBridge.work, 2500);
+  assert.deepStrictEqual(H.plain(heavyBridge.research), ['HeavyBridges']);
+
+  const plate = D.floorsById['bioferritePlate'];
+  assert.ok(plate, '应该有活铁板');
+  assert.strictEqual(plate.def, 'BioferritePlate');
+  assert.deepStrictEqual(H.plain(plate.cost), { Bioferrite: 4 });
+  assert.strictEqual(plate.work, 800);
+
+  const sub = D.floorsById['substructure'];
+  assert.ok(sub, '应该有逆重亚结构');
+  assert.strictEqual(sub.def, 'Substructure');
+  assert.deepStrictEqual(H.plain(sub.cost), { GravlitePanel: 1, Steel: 4 });
+  assert.strictEqual(sub.work, 600);
+});
+
 test('数据：材料名表能查到建造材料', () => {
   assert.ok(D.ITEM_NAMES, '应该有材料中文名表');
   for (const k of ['Steel', 'WoodLog', 'BlocksSandstone', 'Gold', 'Plasteel', 'ComponentIndustrial']) {
