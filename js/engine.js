@@ -38,6 +38,7 @@
     powerInfo: null,
     // 与游戏视角一致：游戏里 +z 是北（屏幕上方），本编辑器 z 向下，导入/导出时翻转 Z
     flipZ: true,
+    flipX: false,
     planColor: 'Structure_White',
     mapName: '未命名布局',
     // ---- 存档带出来的地图信息 ----
@@ -1582,6 +1583,9 @@
     }
     if (data.respectTerrain != null) state.respectTerrain = !!data.respectTerrain;
     if (data.strictTerrain != null) state.strictTerrain = !!data.strictTerrain;
+    // 翻转设置要一起存：否则「翻转 X 轴」导入的存档，重新打开工程后导出的蓝图会左右镜像
+    if (data.flipZ != null) state.flipZ = !!data.flipZ;
+    if (data.flipX != null) state.flipX = !!data.flipX;
     if (global.RWSite) global.RWSite.terrainDirty();
     state.selection = {};
     state.history = []; state.future = [];
@@ -1604,7 +1608,8 @@
       lastStuff: state.lastStuff,
       terrain: packLayer(state.terrain), rocks: packLayer(state.rocks), home: packLayer(state.home),
       saveInfo: state.saveInfo, respectTerrain: state.respectTerrain, strictTerrain: state.strictTerrain,
-      useHomeStock: state.useHomeStock
+      useHomeStock: state.useHomeStock,
+      flipZ: state.flipZ !== false, flipX: !!state.flipX
     };
   }
 

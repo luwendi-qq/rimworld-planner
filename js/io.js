@@ -650,6 +650,11 @@
     var flipZ = opts.flipZ !== false;   // 默认开
     var flipX = !!opts.flipX;
 
+    // 翻转设置要写回状态：导出蓝图时用的是 state.flipX / state.flipZ，
+    // 如果这里不写回，「翻转 X 轴」导入的存档导出来会左右镜像。
+    RW.state.flipZ = flipZ;
+    RW.state.flipX = flipX;
+
     // 先备份一次撤销点，再清空画布：导入是「替换当前内容」而不是叠加上去
     RW.pushHistory();
     if (!opts.keepExisting) {

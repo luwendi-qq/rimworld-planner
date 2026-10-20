@@ -164,6 +164,12 @@ Rebuild the single-file version after changing source:
 python tools/build_single.py
 ```
 
+Run the tests (pure-logic assertions, Node's built-in test runner, no third-party deps):
+
+```bash
+node --test        # or: npm test
+```
+
 Code layout and each file's job → [docs/architecture.md](docs/architecture.md) (Chinese)
 
 ## Credits & licensing

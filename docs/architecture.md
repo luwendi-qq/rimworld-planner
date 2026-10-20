@@ -31,6 +31,13 @@ rimworld-planner/
     ├── extract_defs.py         从本地游戏目录生成精确尺寸表（命令行路线，可选）
     ├── extract_textures.py     从本地游戏目录提取原版贴图（命令行路线，可选）
     └── build_single.py         打包单文件版
+└── tests/                      纯逻辑断言测试（node 自带测试运行器，零依赖）
+    ├── harness.js              在 Node 里加载浏览器端脚本的沙箱
+    ├── geometry.test.js        占地 / 朝向 / 坐标换算
+    ├── blueprint.test.js       蓝图 XML 结构与内容
+    ├── checks.test.js          冲突 / 电力 / 房间 / 可达性
+    ├── site.test.js            地形 / 山体 / 可建造性
+    └── workload.test.js        材料 / 科技 / 工期估算
 ```
 
 > `js/buildings.generated.js` 和 `js/sprites.js` 都是 `tools/` 里脚本的产物。
@@ -79,3 +86,25 @@ python3 tools/build_single.py --out ~/rimworld-planner.single.html
 > 仓库里带了 [GitHub Actions](.github/workflows/)，每次改到源码就会自动重跑
 > `build_single.py` 并把新的单文件版提交回来，所以 `rimworld-planner.single.html` 永远和源码同步。
 > 你本地改完源码想立刻生效，自己跑一次上面的命令即可。
+
+## 测试
+
+浏览器端脚本是纯前端 IIFE，没有模块系统，所以测试用一个 `node:vm` 沙箱把它们加载起来
+（`tests/harness.js` 补了几个最小 DOM 存根），然后对纯逻辑做断言：
+
+```bash
+node --test        # 或 npm test
+```
+
+覆盖的是最容易出「游戏里摆歪了」这类隐性 bug 的地方：
+
+| 文件 | 覆盖内容 |
+| --- | --- |
+| `tests/geometry.test.js` | `footprint()` 旋转占地、`anchorOffset()` 锚点偏移、flipX/flipZ 坐标翻转、存档 → 编辑器 → 蓝图的往返一致性 |
+| `tests/blueprint.test.js` | 蓝图 XML 骨架、`ThingDef`/`TerrainDef`/`Stuff`/`Position`/`Rotation` 字段、「只导出新增」 |
+| `tests/checks.test.js` | 占地冲突、电力组网与缺口、房间识别与可达性、作用范围遮挡 |
+| `tests/site.test.js` | `terrainAffordance` 可建造性、山体需先开采 |
+| `tests/workload.test.js` | 材料缺口、科技前置、技能门槛、「能建/有条件/建不了」结论 |
+
+> 改 `anchorOffset()` 之前请先看 [import-export.md 的「坐标与朝向」](import-export.md#坐标与朝向)，
+> 那套偏移在真实存档的 764 个建筑上验证过「冲突 0 格」。

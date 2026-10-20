@@ -432,14 +432,18 @@
       roomIdx++;
       var area = r.cells.length;
       var blocked = 0, coolers = 0, heaters = 0, beds = 0, ancient = false;
+      // 设备按「个数」统计：床是 1×2 的，会占两格，不能按格子算成两张床
+      var counted = {};
       r.cells.forEach(function (c) {
         var list = cellMap[key(c[0], c[1])] || [];
         list.forEach(function (b) {
           var def = Data.byId[b.defId]; if (!def) return;
           if (blocksWalk(def)) blocked++;
-          if (def.id === 'cooler' || def.id === 'passive_cooler') coolers++;
-          if (def.id === 'heater') heaters++;
-          if (has(def, 'bed')) beds++;
+          var once = !counted[b.uid];
+          if (once) counted[b.uid] = true;
+          if (once && (def.id === 'cooler' || def.id === 'passive_cooler')) coolers++;
+          if (once && def.id === 'heater') heaters++;
+          if (once && has(def, 'bed')) beds++;
           if (isAncient(def)) ancient = true;
         });
       });

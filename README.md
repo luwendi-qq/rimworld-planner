@@ -192,6 +192,12 @@ git pull
 python tools/build_single.py
 ```
 
+跑测试（纯逻辑断言，node 自带测试运行器，零第三方依赖）：
+
+```bash
+node --test        # 或 npm test
+```
+
 代码结构和各文件职责 → [docs/architecture.md](docs/architecture.md)
 
 ## 文档
