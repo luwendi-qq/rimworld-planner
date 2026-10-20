@@ -587,6 +587,25 @@
   }
   function safeName(s) { return String(s).replace(/[\\/:*?"<>|]/g, '_').slice(0, 60) || 'layout'; }
 
+  /** 导出 PNG。scope: view=当前视图 / all=全部内容 */
+  function doExportPng(scope) {
+    var name = safeName(currentName()) + '.png';
+    var r;
+    try {
+      r = RW.exportPNG({
+        scope: scope || 'view',
+        filename: name,
+        onDone: function (fn, w, h) { toast('已导出图片「' + fn + '」（' + w + '×' + h + ' 像素）'); },
+        onError: function (e) { toast('导出图片失败：' + (e && e.message ? e.message : e), true); }
+      });
+    } catch (e) {
+      toast('导出图片失败：' + (e && e.message ? e.message : e), true);
+      return;
+    }
+    if (r) toast('正在导出图片…');
+  }
+  function doExportPngAll() { doExportPng('all'); }
+
   function openText(title, text, onApply, hint) {
     $('ioTitle').textContent = title;
     $('ioHint').textContent = hint || '';
@@ -1192,6 +1211,8 @@
     $('btnExportBp').onclick = doExportBlueprint;
     $('btnExportBpDir').onclick = exportBlueprintToFolder;
     $('btnExportJson').onclick = doExportJson;
+    if ($('btnExportPng')) $('btnExportPng').onclick = doExportPng;
+    if ($('btnExportPngAll')) $('btnExportPngAll').onclick = doExportPngAll;
 
     // 锁定存档原有建筑
     if ($('btnLockSel')) $('btnLockSel').onclick = function () {

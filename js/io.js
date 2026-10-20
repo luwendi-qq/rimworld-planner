@@ -655,8 +655,8 @@
     RW.state.flipZ = flipZ;
     RW.state.flipX = flipX;
 
-    // 先备份一次撤销点，再清空画布：导入是「替换当前内容」而不是叠加上去
-    RW.pushHistory();
+    // 导入是「替换当前内容」而不是叠加上去 —— 记一份整体快照，撤销时整张还原
+    var before = RW.snapshotState();
     if (!opts.keepExisting) {
       RW.state.buildings = [];
       RW.state.floors = {};
@@ -734,6 +734,7 @@
     }
     if (RW.terrainDirty) RW.terrainDirty();
 
+    RW.pushHistory({ all: { from: before, to: RW.snapshotState() } });
     RW.reindex(); RW.emit('change'); RW.fitContent();
     return {
       floors: floorCount,

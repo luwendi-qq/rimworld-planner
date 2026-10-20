@@ -16,7 +16,6 @@
     floors: {},          // "x,z" -> floorId
     plannedFloors: {},   // "x,z" -> 1=规划中(蓝图) 2=规划中但被禁用
     lockedFloors: {},    // "x,z" -> true（存档原有地板，导出时排除）
-    areas: {},           // "x,z" -> areaId（区域规划层，仅本工具）
     nextUid: 1,
     selection: {},       // uid -> true（建筑）
     floorSelection: {},  // "x,z" -> true（地板，框选后可整片删）
@@ -248,54 +247,198 @@
   function placeBatch(cells, defId, rot, opts) {
     opts = opts || {};
     var def = Data.byId[defId];
-    if (!def) return { placed: 0, skipped: cells.length, failed: cells.length };
-    var placed = 0, failed = 0, blocked = 0;
+    if (!def) return { placed: 0, skipped: cells.length, failed: cells.length, added: [] };
+    var placed = 0, failed = 0, blocked = 0, added = [];
     cells.forEach(function (c) {
       var res = placeBuilding(def.id, c[0], c[1], rot, opts);
-      if (res.ok) placed++;
+      if (res.ok) { placed++; added.push(res.b); }
       else if (res.victims) blocked++;
       else failed++;
     });
-    return { placed: placed, replaced: 0, failed: failed, blocked: blocked };
+    return { placed: placed, replaced: 0, failed: failed, blocked: blocked, added: added };
   }
 
-  // ---------------------------------------------------------------- 历史
-  function snapshot() {
-    return JSON.stringify({
-      cols: state.cols, rows: state.rows,
-      buildings: state.buildings,
-      floors: state.floors, plannedFloors: state.plannedFloors,
-      lockedFloors: state.lockedFloors,
-      nextUid: state.nextUid
+  // ---------------------------------------------------------------- 历史（增量式）
+  /**
+   * 一次编辑记成一条 delta：只存「这次改了什么」的前后值，
+   * 撤销就是把 to 换回 from，重做再换回去。
+   *
+   * 早先这里存的是整张图的全量快照（JSON 字符串 × 120 份）：
+   * 250×250 的基地铺满地板后光历史就能吃掉几十上百 MB，
+   * 而且每落一笔都要把整张图序列化一次，手感很卡。
+   * 改成增量后，撤销栈的体积是 O(改动量)，和地图多大无关。
+   *
+   * delta 的字段：
+   *   bAdd  这次新增的建筑（forward 方向）
+   *   bDel  这次删除的建筑
+   *   bMod  属性变化 {uid, from:{...}, to:{...}}
+   *   fMod  地板变化   {k, from:floorId|null, to:floorId|null}
+   *   lfMod 锁定地板变化 {k, from:bool, to:bool}
+   *   pfMod 规划层变化 {k, from:num|null, to:num|null}
+   *   grid  地图尺寸变化 {from:{cols,rows}, to:{cols,rows}}
+   *   all   整体替换（清空 / 导入存档）{from:快照, to:快照}
+   */
+  function newDelta() {
+    return { bAdd: [], bDel: [], bMod: [], fMod: [], lfMod: [], pfMod: [], grid: null, all: null };
+  }
+  function deltaEmpty(d) {
+    if (!d) return true;
+    if (d.all) return false;
+    return !(d.bAdd.length || d.bDel.length || d.bMod.length || d.fMod.length ||
+             d.lfMod.length || d.pfMod.length || d.grid);
+  }
+  function copyMap(m) {
+    var o = {};
+    if (!m) return o;
+    Object.keys(m).forEach(function (k) { o[k] = m[k]; });
+    return o;
+  }
+  /** 整张图的结构化快照（只给「清空 / 导入存档」这种整体替换用） */
+  function snapshotState() {
+    return {
+      cols: state.cols, rows: state.rows, nextUid: state.nextUid,
+      buildings: state.buildings.map(function (b) {
+        var o = { uid: b.uid, defId: b.defId, x: b.x, z: b.z, rot: b.rot || 0,
+                  color: b.color || null, stuff: b.stuff === undefined ? null : b.stuff };
+        if (b.locked) o.locked = true;
+        if (b.src) o.src = b.src;
+        if (b.planned) o.planned = true;
+        return o;
+      }),
+      floors: copyMap(state.floors),
+      lockedFloors: copyMap(state.lockedFloors),
+      plannedFloors: copyMap(state.plannedFloors)
+    };
+  }
+  function restoreState(s) {
+    state.cols = s.cols; state.rows = s.rows; state.nextUid = s.nextUid;
+    state.buildings = s.buildings.map(function (b) {
+      var o = { uid: b.uid, defId: b.defId, x: b.x, z: b.z, rot: b.rot || 0,
+                color: b.color || null, stuff: b.stuff === undefined ? null : b.stuff };
+      if (b.locked) o.locked = true;
+      if (b.src) o.src = b.src;
+      if (b.planned) o.planned = true;
+      return o;
+    });
+    state.floors = copyMap(s.floors);
+    state.lockedFloors = copyMap(s.lockedFloors);
+    state.plannedFloors = copyMap(s.plannedFloors);
+    state.selection = {};
+    state.floorSelection = {};
+    reindex(); render(); emit('change');
+  }
+  function findBuilding(uid) {
+    for (var i = 0; i < state.buildings.length; i++) {
+      if (state.buildings[i].uid === uid) return state.buildings[i];
+    }
+    return null;
+  }
+  function indexOfBuilding(uid) {
+    for (var i = 0; i < state.buildings.length; i++) {
+      if (state.buildings[i].uid === uid) return i;
+    }
+    return -1;
+  }
+  /** 把一个建筑按记录重新塞回画布（撤销删除时用，uid 保持不变） */
+  function insertBuilding(rec) {
+    var b = { uid: rec.uid, defId: rec.defId, x: rec.x, z: rec.z, rot: rec.rot || 0,
+              color: rec.color || null, stuff: rec.stuff === undefined ? null : rec.stuff };
+    if (rec.locked) b.locked = true;
+    if (rec.src) b.src = rec.src;
+    if (rec.planned) b.planned = true;
+    if (typeof rec.idx === 'number' && rec.idx >= 0 && rec.idx <= state.buildings.length) {
+      state.buildings.splice(rec.idx, 0, b);     // 放回原来的位置，保持顺序
+    } else {
+      state.buildings.push(b);
+    }
+    indexAdd(b);
+    if (b.uid >= state.nextUid) state.nextUid = b.uid + 1;
+    return b;
+  }
+  /** 往 delta 里记一条建筑属性变化 */
+  function modOf(b, from, to) {
+    return { uid: b.uid, from: from, to: to };
+  }
+  /** 建筑记录的一份拷贝（放进 delta 后就不会被后续操作改到） */
+  function recOf(b, idx) {
+    var o = { uid: b.uid, defId: b.defId, x: b.x, z: b.z, rot: b.rot || 0,
+              color: b.color || null, stuff: b.stuff === undefined ? null : b.stuff };
+    if (b.locked) o.locked = true;
+    if (b.src) o.src = b.src;
+    if (b.planned) o.planned = true;
+    if (typeof idx === 'number') o.idx = idx;   // 原来的位置（撤销删除时放回原处）
+    return o;
+  }
+  function setBuildingFields(b, fields) {
+    Object.keys(fields).forEach(function (k) {
+      var v = fields[k];
+      if (k === 'locked') { if (v) b.locked = true; else delete b.locked; }
+      else if (v === null) delete b[k];
+      else b[k] = v;
     });
   }
-  function pushHistory() {
-    state.history.push(snapshot());
-    if (state.history.length > 120) state.history.shift();
+  /** 应用一条 delta。dir: 1=重做，-1=撤销 */
+  function applyDelta(d, dir) {
+    if (!d) return;
+    if (d.all) { restoreState(dir > 0 ? d.all.to : d.all.from); return; }
+    var fwd = dir > 0;
+    // 先删后加：撤销时「加回来」的正是当时被删掉的那些（uid 不变）
+    (fwd ? d.bDel : d.bAdd).forEach(function (b) { removeBuilding(b.uid, true); });
+    (fwd ? d.bAdd : d.bDel).forEach(function (b) { insertBuilding(b); });
+    (d.bMod || []).forEach(function (m) {
+      var b = findBuilding(m.uid);
+      if (!b) return;
+      setBuildingFields(b, fwd ? m.to : m.from);
+    });
+    (d.fMod || []).forEach(function (m) {
+      var v = fwd ? m.to : m.from;
+      if (v === null || v === undefined) delete state.floors[m.k];
+      else state.floors[m.k] = v;
+    });
+    (d.lfMod || []).forEach(function (m) {
+      if (!state.lockedFloors) state.lockedFloors = {};
+      if (fwd ? m.to : m.from) state.lockedFloors[m.k] = true;
+      else delete state.lockedFloors[m.k];
+    });
+    (d.pfMod || []).forEach(function (m) {
+      if (!state.plannedFloors) state.plannedFloors = {};
+      var v = fwd ? m.to : m.from;
+      if (v === null || v === undefined) delete state.plannedFloors[m.k];
+      else state.plannedFloors[m.k] = v;
+    });
+    if (d.grid) {
+      var g = fwd ? d.grid.to : d.grid.from;
+      state.cols = g.cols; state.rows = g.rows;
+      state.buildings = state.buildings.filter(function (b) {
+        var def = defOf(b); if (!def) return false;
+        var fp = footprint(def, b.rot);
+        return b.x + fp[0] <= state.cols && b.z + fp[1] <= state.rows;
+      });
+    }
+    state.selection = {};
+    state.floorSelection = {};
+    reindex(); render(); emit('change');
+  }
+  function pushHistory(d) {
+    if (!deltaEmpty(d)) {
+      state.history.push(d);
+      if (state.history.length > 200) state.history.shift();
+    }
     state.future.length = 0;
     emit('history');
   }
-  function restore(json) {
-    var s = JSON.parse(json);
-    state.cols = s.cols; state.rows = s.rows;
-    state.buildings = s.buildings;
-    state.floors = s.floors || {};
-    state.plannedFloors = s.plannedFloors || {};
-    state.lockedFloors = s.lockedFloors || {};
-    state.nextUid = s.nextUid;
-    state.selection = {};
-    reindex(); render(); emit('change');
-  }
   function undo() {
     if (!state.history.length) return;
-    state.future.push(snapshot());
-    restore(state.history.pop());
+    var d = state.history.pop();
+    applyDelta(d, -1);
+    state.future.push(d);
     emit('history');
   }
   function redo() {
     if (!state.future.length) return;
-    state.history.push(snapshot());
-    restore(state.future.pop());
+    var d = state.future.pop();
+    applyDelta(d, 1);
+    state.history.push(d);
     emit('history');
   }
 
@@ -322,12 +465,22 @@
     return false;
   }
 
-  function removeAt(x, z, force) {
+  /** 删掉一格上的东西。传 d（delta）时会顺便记下删了什么，方便撤销。 */
+  function removeAt(x, z, force, d) {
     var list = buildingsAt(x, z).slice();
     var removed = false;
-    list.forEach(function (b) { if (removeBuilding(b.uid, force)) removed = true; });
+    list.forEach(function (b) {
+      var bi = indexOfBuilding(b.uid);
+      if (!removeBuilding(b.uid, force)) return;
+      removed = true;
+      if (d) d.bDel.push(recOf(b, bi));
+    });
     var k = key(x, z);
     if (state.floors[k] && (force || !(state.lockedFloors && state.lockedFloors[k]))) {
+      if (d) {
+        d.fMod.push({ k: k, from: state.floors[k], to: null });
+        if (state.lockedFloors && state.lockedFloors[k]) d.lfMod.push({ k: k, from: true, to: false });
+      }
       delete state.floors[k];
       if (state.lockedFloors) delete state.lockedFloors[k];
       removed = true; reindex();
@@ -337,7 +490,7 @@
 
   /** 清空：默认保留存档原有的锁定建筑（底图），force=true 才全部清掉 */
   function clearAll(force) {
-    pushHistory();
+    var before = snapshotState();
     if (force) {
       state.buildings = []; state.floors = {}; state.plannedFloors = {}; state.lockedFloors = {};
     } else {
@@ -351,6 +504,7 @@
       state.lockedFloors = lf;
     }
     state.selection = {}; state.floorSelection = {};
+    pushHistory({ all: { from: before, to: snapshotState() } });
     reindex(); render(); emit('change');
   }
 
@@ -380,21 +534,25 @@
     var sel = Object.keys(state.selection).map(Number);
     var fl = selectedFloors();
     if (!sel.length && !fl.length) return;
-    pushHistory();
+    var d = newDelta();
     var removed = 0, blocked = 0;
     if (sel.length) {
+      var idxMap = {};
+      state.buildings.forEach(function (b, i) { idxMap[b.uid] = i; });
       state.buildings = state.buildings.filter(function (b) {
         if (!state.selection[b.uid]) return true;
         if (b.locked) { blocked++; return true; }   // 存档原有建筑不删
+        d.bDel.push(recOf(b, idxMap[b.uid]));
         removed++; return false;
       });
     }
     fl.forEach(function (f) {
       if (state.lockedFloors && state.lockedFloors[f.key]) { blocked++; return; }
+      d.fMod.push({ k: f.key, from: state.floors[f.key], to: null });
       delete state.floors[f.key]; removed++;
     });
     state.selection = {}; state.floorSelection = {};
-    if (!removed) state.history.pop();
+    if (removed) pushHistory(d);
     reindex(); render(); emit('change');
     return { removed: removed, blocked: blocked };
   }
@@ -402,7 +560,7 @@
   function rotateSelection() {
     var sel = selectedBuildings();
     if (!sel.length) { state.rotation = (state.rotation + 90) % 360; emit('change'); render(); return; }
-    pushHistory();
+    var d = newDelta();
     var moved = 0;
     sel.forEach(function (b) {
       var def = defOf(b);
@@ -410,8 +568,12 @@
       if (b.locked) return;                          // 存档原有建筑不动
       var nr = (b.rot + 90) % 360;
       var chk = canPlace(b.defId, b.x, b.z, nr, b.uid, b.stuff);
-      if (chk.ok) { b.rot = nr; moved++; }
+      if (chk.ok) {
+        d.bMod.push(modOf(b, { rot: b.rot }, { rot: nr }));
+        b.rot = nr; moved++;
+      }
     });
+    if (moved) pushHistory(d);
     reindex(); render(); emit('change');
     return moved;
   }
@@ -439,13 +601,18 @@
   }
 
   function pasteAt(clip, ox, oz) {
-    pushHistory();
+    var d = newDelta();
     var made = [];
     clip.items.forEach(function (it) {
       var r = addBuilding(it.defId, ox + it.dx, oz + it.dz, it.rot, { stuff: it.stuff });
-      if (r.ok) { r.b.color = it.color; made.push(r.b.uid); }
+      if (r.ok) { r.b.color = it.color; made.push(r.b.uid); d.bAdd.push(recOf(r.b)); }
     });
-    clip.floors.forEach(function (f) { state.floors[key(ox + f.dx, oz + f.dz)] = f.id; });
+    clip.floors.forEach(function (f) {
+      var k = key(ox + f.dx, oz + f.dz);
+      d.fMod.push({ k: k, from: state.floors[k] === undefined ? null : state.floors[k], to: f.id });
+      state.floors[k] = f.id;
+    });
+    pushHistory(d);
     reindex(); render(); emit('change');
     return made;
   }
@@ -1161,6 +1328,105 @@
   // ---------------------------------------------------------------- 交互
   var panning = null;
 
+  // ---------------------------------------------------------------- 导出 PNG
+  /**
+   * 把当前布局画到一张离屏画布上（导出图片用）。
+   * scope: 'view' 当前视图 / 'all' 全部内容（自动算包围盒）/ 'map' 整张地图
+   * 导出时不吃掉悬停高亮、框选、笔刷预览这些交互提示。
+   * 返回 { canvas, w, h }。
+   */
+  function renderToCanvas(opts) {
+    opts = opts || {};
+    var scope = opts.scope || 'view';
+    var pad = opts.padding == null ? 1 : opts.padding;
+    var MAXPX = opts.maxPixels || 8000;
+
+    // ---- 算要画哪一块 ----
+    var minX = 0, minZ = 0, maxX = state.cols, maxZ = state.rows;
+    if (scope === 'all') {
+      var has = false;
+      minX = minZ = Infinity; maxX = maxZ = -Infinity;
+      state.buildings.forEach(function (b) {
+        var def = defOf(b); if (!def) return;
+        var fp = footprint(def, b.rot);
+        minX = Math.min(minX, b.x); minZ = Math.min(minZ, b.z);
+        maxX = Math.max(maxX, b.x + fp[0]); maxZ = Math.max(maxZ, b.z + fp[1]);
+        has = true;
+      });
+      Object.keys(state.floors).forEach(function (k) {
+        var p = k.split(',');
+        minX = Math.min(minX, +p[0]); minZ = Math.min(minZ, +p[1]);
+        maxX = Math.max(maxX, +p[0] + 1); maxZ = Math.max(maxZ, +p[1] + 1);
+        has = true;
+      });
+      if (!has) { minX = 0; minZ = 0; maxX = state.cols; maxZ = state.rows; }
+      minX = Math.max(0, minX - pad); minZ = Math.max(0, minZ - pad);
+      maxX = Math.min(state.cols, maxX + pad); maxZ = Math.min(state.rows, maxZ + pad);
+    } else if (scope === 'view') {
+      var v = visibleRange();
+      minX = v.x0; minZ = v.z0; maxX = v.x1; maxZ = v.z1;
+    }
+    var gw = Math.max(1, maxX - minX), gh = Math.max(1, maxZ - minZ);
+
+    // ---- 每格多少像素 ----
+    var cell = opts.cell || 0;
+    if (!cell) cell = Math.max(6, Math.min(32, Math.floor(MAXPX / Math.max(gw, gh))));
+    if (gw * cell > MAXPX) cell = Math.max(1, Math.floor(MAXPX / gw));
+    if (gh * cell > MAXPX) cell = Math.max(1, Math.floor(MAXPX / gh));
+
+    var out = global.document.createElement('canvas');
+    out.width = Math.max(1, Math.round(gw * cell));
+    out.height = Math.max(1, Math.round(gh * cell));
+    var octx = out.getContext('2d');
+
+    // ---- 借用现有的绘制流程，临时把画布/相机换掉 ----
+    var oldCtx = ctx, oldW = cssW, oldH = cssH, oldDpr = dpr;
+    var oldCam = state.cam, oldHover = state.hover, oldMarquee = state.marquee;
+    var oldDrag = state.drag, oldPaste = state.paste, oldSel = state.selection;
+    var oldFloorSel = state.floorSelection, oldBrush = state.brush;
+    ctx = octx; cssW = out.width; cssH = out.height; dpr = 1;
+    state.cam = { ox: -minX * cell, oy: -minZ * cell, cell: cell };
+    state.hover = null; state.marquee = null; state.drag = null;
+    state.paste = null; state.brush = null;
+    state.selection = {}; state.floorSelection = {};
+    try {
+      render();
+    } finally {
+      ctx = oldCtx; cssW = oldW; cssH = oldH; dpr = oldDpr;
+      state.cam = oldCam; state.hover = oldHover; state.marquee = oldMarquee;
+      state.drag = oldDrag; state.paste = oldPaste; state.selection = oldSel;
+      state.floorSelection = oldFloorSel; state.brush = oldBrush;
+      render();
+    }
+    return { canvas: out, w: out.width, h: out.height };
+  }
+
+  /** 导出 PNG。opts: { scope, cell, filename } */
+  function exportPNG(opts) {
+    opts = opts || {};
+    var r = renderToCanvas(opts);
+    var name = (opts.filename || state.mapName || 'layout') + '.png';
+    var done = false;
+    try {
+      r.canvas.toBlob(function (blob) {
+        if (!blob) return;
+        var url = URL.createObjectURL(blob);
+        var a = global.document.createElement('a');
+        a.href = url; a.download = name;
+        global.document.body.appendChild(a); a.click();
+        setTimeout(function () {
+          global.document.body.removeChild(a); URL.revokeObjectURL(url);
+        }, 0);
+        done = true;
+        if (opts.onDone) opts.onDone(name, r.w, r.h);
+      }, 'image/png');
+    } catch (e) {
+      if (opts.onError) opts.onError(e);
+      return null;
+    }
+    return r;
+  }
+
   function attach(canvas) {
     cv = canvas; ctx = cv.getContext('2d');
 
@@ -1181,22 +1447,25 @@
         var c0 = cellAt(sx, sy);
         var here = buildingsAt(c0.x, c0.z);
         var hitSel = here.filter(function (b) { return state.selection[b.uid]; });
-        pushHistory();
+        var d = newDelta();
         var removed = 0;
         if (hitSel.length && Object.keys(state.selection).length > 1) {
           // 右键点在已选中的东西上 → 删掉整批选中（锁定的存档建筑不动）
           var sel = Object.keys(state.selection);
+          var idxMap = {};
+          state.buildings.forEach(function (b, i) { idxMap[b.uid] = i; });
           state.buildings = state.buildings.filter(function (b) {
             if (!state.selection[b.uid]) return true;
             if (b.locked) return true;
+            d.bDel.push(recOf(b, idxMap[b.uid]));
             removed++; return false;
           });
           state.selection = {};
           reindex();
         } else {
-          if (removeAt(c0.x, c0.z)) removed = 1;
+          if (removeAt(c0.x, c0.z, false, d)) removed = 1;
         }
-        if (!removed) state.history.pop();
+        pushHistory(d);
         render(); emit('change');
         return;
       }
@@ -1315,7 +1584,20 @@
         state.marquee = null;
         emit('change'); render();
       }
-      if (state.drag && state.drag.move) { reindex(); emit('change'); render(); }
+      if (state.drag && state.drag.move) {
+        var mv = state.drag.move;
+        var dm = newDelta();
+        for (var muid in mv.orig) {
+          var mb = findBuilding(+muid);
+          if (!mb) continue;
+          var o = mv.orig[muid];
+          if (mb.x !== o.x || mb.z !== o.z) {
+            dm.bMod.push(modOf(mb, { x: o.x, z: o.z }, { x: mb.x, z: mb.z }));
+          }
+        }
+        pushHistory(dm);
+        reindex(); emit('change'); render();
+      }
       state.drag = null;
     });
 
@@ -1409,19 +1691,26 @@
 
   /** 把一批格子按当前笔刷落下去 */
   function commitCells(cells) {
-    pushHistory();
+    var d = newDelta();
     var changed = 0, replaced = 0, blocked = 0, reasons = {};
     if (state.tool === 'erase') {
-      cells.forEach(function (c) { if (removeAt(c[0], c[1])) changed++; });
+      cells.forEach(function (c) { if (removeAt(c[0], c[1], false, d)) changed++; });
     } else if (state.brush && state.brush.kind === 'floor') {
       cells.forEach(function (c) {
         var k = key(c[0], c[1]);
         var chk = (state.respectTerrain && global.RWSite)
           ? global.RWSite.checkFloor(state.brush.id, c[0], c[1]) : { ok: true };
         if (!chk.ok && state.strictTerrain) { blocked++; reasons[chk.why] = (reasons[chk.why] || 0) + 1; return; }
+        var newFloor = state.brush.id === 'none' ? null : state.brush.id;
+        var oldFloor = state.floors[k] === undefined ? null : state.floors[k];
+        if (oldFloor !== newFloor) d.fMod.push({ k: k, from: oldFloor, to: newFloor });
         if (state.brush.id === 'none') delete state.floors[k];
         else state.floors[k] = state.brush.id;
-        if (state.lockedFloors) delete state.lockedFloors[k];   // 手动铺过就不再算存档原有
+        // 手动铺过就不再算存档原有
+        if (state.lockedFloors && state.lockedFloors[k]) {
+          d.lfMod.push({ k: k, from: true, to: false });
+          delete state.lockedFloors[k];
+        }
         changed++;
       });
     } else if (state.brush && state.brush.kind === 'building') {
@@ -1429,10 +1718,11 @@
       if (def) {
         var out = placeBatch(cells, def.id, state.rotation, { color: def._color, stuff: state.brush.stuff });
         changed = out.placed; replaced = out.replaced; blocked = out.blocked;
+        out.added.forEach(function (b) { d.bAdd.push(recOf(b)); });
       }
     }
-    if (!changed && !replaced) state.history.pop();
-    else emit('change');
+    pushHistory(d);
+    emit('change');
     reindex();
     render();
     return { changed: changed, replaced: replaced, blocked: blocked, reasons: reasons };
@@ -1493,14 +1783,16 @@
   function setSelectionStuff(stuff) {
     var sel = selectedBuildings();
     if (!sel.length) return 0;
-    pushHistory();
     var n = 0;
+    var d = newDelta();
     sel.forEach(function (b) {
       var def = defOf(b);
       if (!def || !def.stuffCats || !def.stuffCats.length) return;
       if (b.locked) return;    // 存档原有建筑不改材质
+      d.bMod.push(modOf(b, { stuff: b.stuff === undefined ? null : b.stuff }, { stuff: stuff }));
       b.stuff = stuff; n++;
     });
+    if (n) pushHistory(d);
     if (state.brush && state.brush.kind === 'building') setStuffOf(state.brush.id, stuff);
     render(); emit('change');
     return n;
@@ -1519,7 +1811,7 @@
     if (!sel.length) return;
     var orig = {};
     sel.forEach(function (b) { orig[b.uid] = { x: b.x, z: b.z }; });
-    pushHistory();
+    // 移动的历史在松手时才记（那时候才知道最终位置）
     var minX = Math.min.apply(null, sel.map(function (b) { return b.x; }));
     var minZ = Math.min.apply(null, sel.map(function (b) { return b.z; }));
     state.drag = { move: { from: { x: minX, z: minZ }, orig: orig, lastDx: 0, lastDz: 0 } };
@@ -1614,21 +1906,30 @@
   }
 
   function setGrid(cols, rows, quiet) {
-    if (!quiet) pushHistory();
+    var before = { cols: state.cols, rows: state.rows };
+    var d = newDelta();
     state.cols = Math.max(4, Math.min(400, cols | 0));
     state.rows = Math.max(4, Math.min(400, rows | 0));
+    d.grid = { from: before, to: { cols: state.cols, rows: state.rows } };
     // 裁掉越界建筑
+    var clipIdx = {};
+    state.buildings.forEach(function (b, i) { clipIdx[b.uid] = i; });
     state.buildings = state.buildings.filter(function (b) {
       var def = defOf(b); var fp = footprint(def, b.rot);
-      return b.x + fp[0] <= state.cols && b.z + fp[1] <= state.rows;
+      if (b.x + fp[0] <= state.cols && b.z + fp[1] <= state.rows) return true;
+      d.bDel.push(recOf(b, clipIdx[b.uid]));
+      return false;
     });
     Object.keys(state.floors).forEach(function (k) {
       var p = k.split(',');
       if (+p[0] >= state.cols || +p[1] >= state.rows) {
+        d.fMod.push({ k: k, from: state.floors[k], to: null });
+        if (state.lockedFloors && state.lockedFloors[k]) d.lfMod.push({ k: k, from: true, to: false });
         delete state.floors[k];
         if (state.lockedFloors) delete state.lockedFloors[k];
       }
     });
+    if (!quiet) pushHistory(d);
     reindex(); fitView(); emit('change');
   }
 
@@ -1637,25 +1938,46 @@
   function setSelectionLocked(on) {
     var sel = selectedBuildings();
     if (!sel.length) return 0;
-    pushHistory();
-    sel.forEach(function (b) { if (on) b.locked = true; else delete b.locked; });
+    var d = newDelta();
+    sel.forEach(function (b) {
+      var was = !!b.locked;
+      if (on) b.locked = true; else delete b.locked;
+      if (was !== !!on) d.bMod.push(modOf(b, { locked: was ? true : null }, { locked: on ? true : null }));
+    });
     if (!on) {
       // 解锁后同时也解除地板锁定（同一批底图一起解锁更顺手）
       var fl = Object.keys(state.floorSelection || {});
-      fl.forEach(function (k) { if (state.lockedFloors) delete state.lockedFloors[k]; });
+      fl.forEach(function (k) {
+        if (!state.lockedFloors || !state.lockedFloors[k]) return;
+        d.lfMod.push({ k: k, from: true, to: false });
+        delete state.lockedFloors[k];
+      });
     }
+    pushHistory(d);
     render(); emit('change');
     return sel.length;
   }
   function setAllLocked(on) {
-    pushHistory();
+    var d = newDelta();
     state.buildings.forEach(function (b) {
-      if (b.src === 'save' || b.locked || on) { if (on) b.locked = true; else delete b.locked; }
+      if (!(b.src === 'save' || b.locked || on)) return;
+      var was = !!b.locked;
+      if (on) b.locked = true; else delete b.locked;
+      if (was !== !!on) d.bMod.push(modOf(b, { locked: was ? true : null }, { locked: on ? true : null }));
     });
-    if (!on) state.lockedFloors = {};
-    else {
-      Object.keys(state.floors).forEach(function (k) { state.lockedFloors[k] = true; });
+    if (!on) {
+      Object.keys(state.lockedFloors || {}).forEach(function (k) {
+        d.lfMod.push({ k: k, from: true, to: false });
+      });
+      state.lockedFloors = {};
+    } else {
+      Object.keys(state.floors).forEach(function (k) {
+        var was = !!(state.lockedFloors && state.lockedFloors[k]);
+        if (!was) d.lfMod.push({ k: k, from: false, to: true });
+        state.lockedFloors[k] = true;
+      });
     }
+    pushHistory(d);
     render(); emit('change');
   }
   function lockedCount() {
@@ -1671,6 +1993,7 @@
     attach: attach, resize: resize, render: render, fitView: fitView, fitContent: fitContent,
     homeView: homeView,
     zoomAt: zoomAt, anchorOffset: anchorOffset,
+    renderToCanvas: renderToCanvas, exportPNG: exportPNG,
     cellInfo: function (x, z) {
       if (!inBounds(x, z)) return null;
       var Site = global.RWSite;
@@ -1743,6 +2066,7 @@
     rotateSelection: rotateSelection, startMoveSelection: startMoveSelection,
     copySelection: copySelection, pasteAt: pasteAt, setBrush: setBrush, setTool: setTool,
     pushHistory: pushHistory, undo: undo, redo: redo,
+    snapshotState: snapshotState, restoreState: restoreState,
     loadProject: loadProject, exportProject: exportProject, setGrid: setGrid,
     terrainDirty: function () { if (global.RWSite) global.RWSite.terrainDirty(); else state.importStamp++; },
     COLORS: COLORS

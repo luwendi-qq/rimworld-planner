@@ -47,6 +47,8 @@
         <button id="btnExportJson" class="cmd" title="保存工程文件，可以再次打开继续改 (Ctrl+S)">保存工程</button>
         <button id="btnExportBpDir" class="primary" title="真蓝图：会消耗材料、小人会去建。选一次游戏的 Blueprints 文件夹，以后一键写入（需要 Blueprints 模组）">存入 Blueprints</button>
         <button id="btnExportBp" title="真蓝图 .xml（需要 Blueprints 模组）">导出蓝图</button>
+        <button id="btnExportPng" class="ghost" title="把当前看到的画面导出成 PNG 图片（分享 / 存档用）">视图 PNG</button>
+        <button id="btnExportPngAll" class="ghost" title="把整个布局（自动算包围盒）导出成 PNG 图片">整图 PNG</button>
         <button id="btnHelp" class="ghost" title="使用说明 / 存档路径">? 帮助</button>
       </div>
     </header>
@@ -305,7 +307,8 @@
           <li><b>材质</b>：在左边<b>长按左键</b>（或右键）建筑即可选材质（木材 / 石材 / 金属 / 纤维 / 皮革…）；
             已经放好的可以选中后在右下角改。</li>
         </ul>
-        <p>拖动时画布正中会显示宽 × 高和格子数。放在已有东西上会替换它。
+        <p>拖动时画布正中会显示宽 × 高和格子数。已经画过的地方再放东西会被挡下来（提示先删掉那一格），
+          不会默默覆盖你的规划；电缆可以埋在墙下，制冷机 / 壁灯可以贴在墙上。
           风机风区、制冷机冷热端、太阳灯照射圈这类<b>作用范围</b>，摆放时就能看到。
           想下次接着改，点「<b>保存工程</b>」存成 <code>.rwplan.json</code> 即可。</p>
 

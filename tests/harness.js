@@ -75,7 +75,7 @@ function makeCanvas() {
     style: {},
     getContext: function () { return c._ctx || (c._ctx = makeCtx()); },
     toDataURL: function () { return 'data:,'; },
-    toBlob: function (cb) { if (cb) cb(null); },
+    toBlob: function (cb) { if (cb) cb({ __fakeBlob: true, size: 1, type: 'image/png' }); },
     addEventListener: function () {},
     removeEventListener: function () {},
     getBoundingClientRect: function () {

@@ -68,11 +68,12 @@ Or click **Code → Download ZIP** on the repo page and overwrite your old folde
 | Feature | Notes |
 | --- | --- |
 | **Smart draw modes** | Walls/fences/sandbags → **rectangle outline**; doors/furniture/benches → **single cell**; floors → **fill**. Matches the game, no manual switching |
-| **In-place replace** | Click a "door" on a drawn wall and that tile becomes a door; drawing a cooler onto a wall gives you "wall + cooler" |
+| **Never silently overwrites** | Drawing onto an existing building is blocked ("delete that tile first") instead of quietly replacing your plan; conduits can still go under walls and coolers / wall lamps can share a tile with a wall |
 | **Auto-connecting conduits** | Conduits draw connections toward their neighbours; a lone tile becomes a junction box |
 | **Per-item materials** | 53 stuffs (wood/stone/metal/fabric/leather), long-press to pick, remembered per building — and imported from your save |
 | **Layout checks** | Power network via the game's 6-tile connection rule; room flood-fill with the game's space-rating thresholds; outdoor reachability via BFS |
-| **Standard editing** | Marquee select, multi-select, drag to move, copy/paste, delete, undo/redo |
+| **Export image** | "View PNG" exports what you see, "Full PNG" auto-fits the whole layout — handy for sharing |
+| **Standard editing** | Marquee select, multi-select, drag to move, copy/paste, delete, undo/redo (incremental, 200 steps, no memory blow-up on big bases) |
 | **Search** | By Chinese name, English name, or def id |
 
 Full manual → [docs/usage.md](docs/usage.md) (Chinese)
