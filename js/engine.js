@@ -1362,41 +1362,31 @@
   // ---------------------------------------------------------------- 导出 PNG
   /**
    * 把当前布局画到一张离屏画布上（导出图片用）。
-   * scope: 'view' 当前视图 / 'all' 全部内容（自动算包围盒）/ 'map' 整张地图
+   * 只导出「全部内容」：所有建筑和地板的包围盒，四周留一点白。
    * 导出时不吃掉悬停高亮、框选、笔刷预览这些交互提示。
-   * 返回 { canvas, w, h }。
+   * 画布上什么都没有时返回 null。
    */
   function renderToCanvas(opts) {
     opts = opts || {};
-    var scope = opts.scope || 'view';
     var pad = opts.padding == null ? 1 : opts.padding;
     var MAXPX = opts.maxPixels || 8000;
 
-    // ---- 算要画哪一块 ----
-    var minX = 0, minZ = 0, maxX = state.cols, maxZ = state.rows;
-    if (scope === 'all') {
-      var has = false;
-      minX = minZ = Infinity; maxX = maxZ = -Infinity;
-      state.buildings.forEach(function (b) {
-        var def = defOf(b); if (!def) return;
-        var fp = footprint(def, b.rot);
-        minX = Math.min(minX, b.x); minZ = Math.min(minZ, b.z);
-        maxX = Math.max(maxX, b.x + fp[0]); maxZ = Math.max(maxZ, b.z + fp[1]);
-        has = true;
-      });
-      Object.keys(state.floors).forEach(function (k) {
-        var p = k.split(',');
-        minX = Math.min(minX, +p[0]); minZ = Math.min(minZ, +p[1]);
-        maxX = Math.max(maxX, +p[0] + 1); maxZ = Math.max(maxZ, +p[1] + 1);
-        has = true;
-      });
-      if (!has) { minX = 0; minZ = 0; maxX = state.cols; maxZ = state.rows; }
-      minX = Math.max(0, minX - pad); minZ = Math.max(0, minZ - pad);
-      maxX = Math.min(state.cols, maxX + pad); maxZ = Math.min(state.rows, maxZ + pad);
-    } else if (scope === 'view') {
-      var v = visibleRange();
-      minX = v.x0; minZ = v.z0; maxX = v.x1; maxZ = v.z1;
-    }
+    // ---- 算内容的包围盒 ----
+    var minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity;
+    state.buildings.forEach(function (b) {
+      var def = defOf(b); if (!def) return;
+      var fp = footprint(def, b.rot);
+      minX = Math.min(minX, b.x); minZ = Math.min(minZ, b.z);
+      maxX = Math.max(maxX, b.x + fp[0]); maxZ = Math.max(maxZ, b.z + fp[1]);
+    });
+    Object.keys(state.floors).forEach(function (k) {
+      var p = k.split(',');
+      minX = Math.min(minX, +p[0]); minZ = Math.min(minZ, +p[1]);
+      maxX = Math.max(maxX, +p[0] + 1); maxZ = Math.max(maxZ, +p[1] + 1);
+    });
+    if (!isFinite(minX)) return null;      // 画布上什么都没有
+    minX = Math.max(0, minX - pad); minZ = Math.max(0, minZ - pad);
+    maxX = Math.min(state.cols, maxX + pad); maxZ = Math.min(state.rows, maxZ + pad);
     var gw = Math.max(1, maxX - minX), gh = Math.max(1, maxZ - minZ);
 
     // ---- 每格多少像素 ----
@@ -1432,12 +1422,12 @@
     return { canvas: out, w: out.width, h: out.height };
   }
 
-  /** 导出 PNG。opts: { scope, cell, filename } */
+  /** 导出 PNG（全部内容）。opts: { cell, filename } */
   function exportPNG(opts) {
     opts = opts || {};
     var r = renderToCanvas(opts);
+    if (!r) return null;
     var name = (opts.filename || state.mapName || 'layout') + '.png';
-    var done = false;
     try {
       r.canvas.toBlob(function (blob) {
         if (!blob) return;
@@ -1448,7 +1438,6 @@
         setTimeout(function () {
           global.document.body.removeChild(a); URL.revokeObjectURL(url);
         }, 0);
-        done = true;
         if (opts.onDone) opts.onDone(name, r.w, r.h);
       }, 'image/png');
     } catch (e) {

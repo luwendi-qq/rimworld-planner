@@ -528,7 +528,7 @@ kbd {
 .pitem b { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
 
 </style>
-<!-- 单文件构建：2026-10-20 11:56  内联模块：js/data.js, js/zh-names.js, js/buildings.generated.js, js/sprites.js, js/vendor/fzstd.js, js/gamezip.js, js/gamedefs.js, js/gameimport.js, js/icons.js, js/engine.js, js/site.js, js/rooms.js, js/checks.js, js/workload.js, js/exporters.js, js/io.js, js/main.js -->
+<!-- 单文件构建：2026-10-20 12:10  内联模块：js/data.js, js/zh-names.js, js/buildings.generated.js, js/sprites.js, js/vendor/fzstd.js, js/gamezip.js, js/gamedefs.js, js/gameimport.js, js/icons.js, js/engine.js, js/site.js, js/rooms.js, js/checks.js, js/workload.js, js/exporters.js, js/io.js, js/main.js -->
 </head>
 
 <body>
@@ -570,8 +570,7 @@ kbd {
         <button id="btnExportJson" class="cmd" title="保存工程文件，可以再次打开继续改 (Ctrl+S)">保存工程</button>
         <button id="btnExportBpDir" class="primary" title="真蓝图：会消耗材料、小人会去建。选一次游戏的 Blueprints 文件夹，以后一键写入（需要 Blueprints 模组）">存入 Blueprints</button>
         <button id="btnExportBp" title="真蓝图 .xml（需要 Blueprints 模组）">导出蓝图</button>
-        <button id="btnExportPng" class="ghost" title="把当前看到的画面导出成 PNG 图片（分享 / 存档用）">视图 PNG</button>
-        <button id="btnExportPngAll" class="ghost" title="把整个布局（自动算包围盒）导出成 PNG 图片">整图 PNG</button>
+        <button id="btnExportPng" class="ghost" title="把整个布局导出成 PNG 图片（分享 / 存档用）">导出图片</button>
         <button id="btnHelp" class="ghost" title="使用说明 / 存档路径">? 帮助</button>
       </div>
     </header>
@@ -5823,41 +5822,31 @@ kbd {
   // ---------------------------------------------------------------- 导出 PNG
   /**
    * 把当前布局画到一张离屏画布上（导出图片用）。
-   * scope: 'view' 当前视图 / 'all' 全部内容（自动算包围盒）/ 'map' 整张地图
+   * 只导出「全部内容」：所有建筑和地板的包围盒，四周留一点白。
    * 导出时不吃掉悬停高亮、框选、笔刷预览这些交互提示。
-   * 返回 { canvas, w, h }。
+   * 画布上什么都没有时返回 null。
    */
   function renderToCanvas(opts) {
     opts = opts || {};
-    var scope = opts.scope || 'view';
     var pad = opts.padding == null ? 1 : opts.padding;
     var MAXPX = opts.maxPixels || 8000;
 
-    // ---- 算要画哪一块 ----
-    var minX = 0, minZ = 0, maxX = state.cols, maxZ = state.rows;
-    if (scope === 'all') {
-      var has = false;
-      minX = minZ = Infinity; maxX = maxZ = -Infinity;
-      state.buildings.forEach(function (b) {
-        var def = defOf(b); if (!def) return;
-        var fp = footprint(def, b.rot);
-        minX = Math.min(minX, b.x); minZ = Math.min(minZ, b.z);
-        maxX = Math.max(maxX, b.x + fp[0]); maxZ = Math.max(maxZ, b.z + fp[1]);
-        has = true;
-      });
-      Object.keys(state.floors).forEach(function (k) {
-        var p = k.split(',');
-        minX = Math.min(minX, +p[0]); minZ = Math.min(minZ, +p[1]);
-        maxX = Math.max(maxX, +p[0] + 1); maxZ = Math.max(maxZ, +p[1] + 1);
-        has = true;
-      });
-      if (!has) { minX = 0; minZ = 0; maxX = state.cols; maxZ = state.rows; }
-      minX = Math.max(0, minX - pad); minZ = Math.max(0, minZ - pad);
-      maxX = Math.min(state.cols, maxX + pad); maxZ = Math.min(state.rows, maxZ + pad);
-    } else if (scope === 'view') {
-      var v = visibleRange();
-      minX = v.x0; minZ = v.z0; maxX = v.x1; maxZ = v.z1;
-    }
+    // ---- 算内容的包围盒 ----
+    var minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity;
+    state.buildings.forEach(function (b) {
+      var def = defOf(b); if (!def) return;
+      var fp = footprint(def, b.rot);
+      minX = Math.min(minX, b.x); minZ = Math.min(minZ, b.z);
+      maxX = Math.max(maxX, b.x + fp[0]); maxZ = Math.max(maxZ, b.z + fp[1]);
+    });
+    Object.keys(state.floors).forEach(function (k) {
+      var p = k.split(',');
+      minX = Math.min(minX, +p[0]); minZ = Math.min(minZ, +p[1]);
+      maxX = Math.max(maxX, +p[0] + 1); maxZ = Math.max(maxZ, +p[1] + 1);
+    });
+    if (!isFinite(minX)) return null;      // 画布上什么都没有
+    minX = Math.max(0, minX - pad); minZ = Math.max(0, minZ - pad);
+    maxX = Math.min(state.cols, maxX + pad); maxZ = Math.min(state.rows, maxZ + pad);
     var gw = Math.max(1, maxX - minX), gh = Math.max(1, maxZ - minZ);
 
     // ---- 每格多少像素 ----
@@ -5893,12 +5882,12 @@ kbd {
     return { canvas: out, w: out.width, h: out.height };
   }
 
-  /** 导出 PNG。opts: { scope, cell, filename } */
+  /** 导出 PNG（全部内容）。opts: { cell, filename } */
   function exportPNG(opts) {
     opts = opts || {};
     var r = renderToCanvas(opts);
+    if (!r) return null;
     var name = (opts.filename || state.mapName || 'layout') + '.png';
-    var done = false;
     try {
       r.canvas.toBlob(function (blob) {
         if (!blob) return;
@@ -5909,7 +5898,6 @@ kbd {
         setTimeout(function () {
           global.document.body.removeChild(a); URL.revokeObjectURL(url);
         }, 0);
-        done = true;
         if (opts.onDone) opts.onDone(name, r.w, r.h);
       }, 'image/png');
     } catch (e) {
@@ -9732,13 +9720,12 @@ kbd {
   }
   function safeName(s) { return String(s).replace(/[\\/:*?"<>|]/g, '_').slice(0, 60) || 'layout'; }
 
-  /** 导出 PNG。scope: view=当前视图 / all=全部内容 */
-  function doExportPng(scope) {
+  /** 导出 PNG（整个布局）。 */
+  function doExportPng() {
     var name = safeName(currentName()) + '.png';
     var r;
     try {
       r = RW.exportPNG({
-        scope: scope || 'view',
         filename: name,
         onDone: function (fn, w, h) { toast('已导出图片「' + fn + '」（' + w + '×' + h + ' 像素）'); },
         onError: function (e) { toast('导出图片失败：' + (e && e.message ? e.message : e), true); }
@@ -9747,9 +9734,8 @@ kbd {
       toast('导出图片失败：' + (e && e.message ? e.message : e), true);
       return;
     }
-    if (r) toast('正在导出图片…');
+    if (!r) { toast('画布上还没有东西可以导出'); return; }
   }
-  function doExportPngAll() { doExportPng('all'); }
 
   function openText(title, text, onApply, hint) {
     $('ioTitle').textContent = title;
@@ -10394,7 +10380,6 @@ kbd {
     $('btnExportBpDir').onclick = exportBlueprintToFolder;
     $('btnExportJson').onclick = doExportJson;
     if ($('btnExportPng')) $('btnExportPng').onclick = doExportPng;
-    if ($('btnExportPngAll')) $('btnExportPngAll').onclick = doExportPngAll;
 
     // 锁定存档原有建筑
     if ($('btnLockSel')) $('btnLockSel').onclick = function () {
