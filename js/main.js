@@ -1535,7 +1535,10 @@
     // 自动更新
     RW.on('change', function () {
       updateInspector();
-      if (state.layers.power || state.layers.rooms) runCheck();
+      // 电力 / 房间图层开着就重跑校验；
+      // 已经列出了房间时也要重跑 —— 否则撤销之后房间列表还是旧的
+      var rl = $('roomList');
+      if (state.layers.power || state.layers.rooms || (rl && rl.children.length)) runCheck();
     });
     // 收藏 / 最近使用记到本机（做个防抖，别每次改动都写一遍 localStorage）
     (function () {
