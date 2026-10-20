@@ -72,6 +72,7 @@ Or click **Code → Download ZIP** on the repo page and overwrite your old folde
 | **Auto-connecting conduits** | Conduits draw connections toward their neighbours; a lone tile becomes a junction box |
 | **Per-item materials** | 53 stuffs (wood/stone/metal/fabric/leather), long-press to pick, remembered per building — and imported from your save |
 | **Room roles** | Tag a room as bedroom / kitchen / workshop / cold storage / freezer; checks then verify the room has what it needs and how many coolers its target temperature calls for |
+| **Template library** | Save a selection as a named template (standard bedroom, dining room…) and stamp it out with one click instead of drawing it dozens of times |
 | **Layout checks** | Power network via the game's 6-tile connection rule; room flood-fill with the game's space-rating thresholds; outdoor reachability via BFS |
 | **Export image** | "View PNG" exports what you see, "Full PNG" auto-fits the whole layout — handy for sharing |
 | **Standard editing** | Marquee select, multi-select, drag to move, copy/paste, delete, undo/redo (incremental, 200 steps, no memory blow-up on big bases) |
