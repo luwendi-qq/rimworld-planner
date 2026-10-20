@@ -93,7 +93,7 @@
       Object.keys(def.cost).forEach(function (k) {
         var n = def.cost[k];
         if (!n) return;
-        cost.push((Data.ITEM_NAMES && Data.ITEM_NAMES[k] ? Data.ITEM_NAMES[k] : k) + '×' + n);
+        cost.push((Data.itemName ? Data.itemName(k) : k) + '×' + n);
       });
     }
     if (def.costStuff) {

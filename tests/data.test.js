@@ -92,6 +92,17 @@ test('数据：英文科技名不能覆盖已有中文名', () => {
   delete D.researches()['__TestTech'];
 });
 
+test('数据：浮窗里的原材料 / 地形兜底中文名', () => {
+  assert.strictEqual(D.itemName('Component'), '零部件');
+  assert.strictEqual(D.itemName('Leather'), '皮革');
+  assert.strictEqual(D.itemName('Meat_Human'), '人肉');
+  assert.strictEqual(D.itemName('VoidmetalMass'), '虚空金属块');
+  assert.strictEqual(D.itemName('ComponentIndustrial'), '零部件');
+  assert.strictEqual(D.terrain('Carpet_Mindbend').name, '迷幻地毯');
+  D.mergeItemNames({ ComponentIndustrial: 'ComponentIndustrial' });
+  assert.strictEqual(D.itemName('ComponentIndustrial'), '零部件', '英文导入名不能覆盖中文名');
+});
+
 test('数据：主要建筑都要有造价或工时，估算面板才准', () => {
   // 这些是玩家天天要造的，不该缺数据
   const important = ['wall', 'door', 'bed', 'table_2x2', 'cooler', 'heater', 'solar_generator',

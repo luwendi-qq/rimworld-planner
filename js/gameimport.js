@@ -299,7 +299,7 @@
     global.RWData.mergeTerrains(parsed.terrain ? Object.keys(parsed.terrain).map(function (k) { return parsed.terrain[k]; }) : null);
     global.RWData.mergeRocks(parsed.rocks);
     global.RWData.mergeResearches(parsed.researches);
-    if (parsed.items) global.RWData.ITEM_NAMES = parsed.items;
+    if (parsed.items) global.RWData.mergeItemNames(parsed.items);
 
     // ---- 贴图 ----
     var db = await idbOpen();
@@ -611,7 +611,7 @@
       if (terrains) global.RWData.mergeTerrains(terrains);
       if (rocks) global.RWData.mergeRocks(rocks);
       if (researches) global.RWData.mergeResearches(researches);
-      if (items) global.RWData.ITEM_NAMES = items;
+      if (items) global.RWData.mergeItemNames(items);
       if (repaired) info.repaired = repaired;
       db.close();
       return { info: info, manifest: manifest, merged: merged };

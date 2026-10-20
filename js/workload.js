@@ -56,6 +56,7 @@
   }
 
   function materialName(def) {
+    if (Data.itemName) return Data.itemName(def);
     if (Data.ITEM_NAMES && Data.ITEM_NAMES[def]) return Data.ITEM_NAMES[def];
     var s = Data.stuffById ? Data.stuffById(def) : null;
     return s ? s.name : def;

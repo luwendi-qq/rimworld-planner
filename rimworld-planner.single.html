@@ -529,7 +529,7 @@ kbd {
 .pitem b { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
 
 </style>
-<!-- 单文件构建：2026-10-20 12:40 UTC  内联模块：js/data.js, js/zh-names.js, js/buildings.generated.js, js/vendor/fzstd.js, js/gamezip.js, js/gamedefs.js, js/gameimport.js, js/icons.js, js/engine.js, js/site.js, js/rooms.js, js/checks.js, js/workload.js, js/exporters.js, js/io.js, js/main.js -->
+<!-- 单文件构建：2026-10-20 22:08  内联模块：js/data.js, js/zh-names.js, js/buildings.generated.js, js/vendor/fzstd.js, js/gamezip.js, js/gamedefs.js, js/gameimport.js, js/icons.js, js/engine.js, js/site.js, js/rooms.js, js/checks.js, js/workload.js, js/exporters.js, js/io.js, js/main.js -->
 </head>
 
 <body>
@@ -1490,6 +1490,53 @@ kbd {
     return terrains;
   }
 
+  /** 官方语言包没有覆盖、但在浮窗/造价里会出现的少量名字 */
+  var FALLBACK_ITEM_NAMES = {
+    Component: '零部件',
+    Leather: '皮革',
+    Meat_Human: '人肉',
+    VoidmetalMass: '虚空金属块'
+  };
+  var FALLBACK_TERRAIN_NAMES = {
+    Carpet_Mindbend: '迷幻地毯'
+  };
+  function itemName(k) {
+    if (!k) return '';
+    var names = global.RWData.ITEM_NAMES || {};
+    var v = names[k];
+    var cjk = global.RWData.hasCJK;
+    if (v && (!cjk || cjk(v))) return v;
+    if (FALLBACK_ITEM_NAMES[k]) return FALLBACK_ITEM_NAMES[k];
+    // 没被官方语言包覆盖的常见前缀（含少量 mod 物品）做保守兜底
+    if (/^Component(Spacer|Advanced)/i.test(k)) return '高级零部件';
+    if (/^Component/i.test(k)) return '零部件';
+    if (/^Leather/i.test(k)) return '皮革';
+    if (/^Meat_Human/i.test(k)) return '人肉';
+    if (/^Meat_/i.test(k)) return '肉';
+    var s = global.RWData.stuffById ? global.RWData.stuffById(k) : null;
+    if (s && s.name) return s.name;
+    return v || k;
+  }
+  /** 合并物品名：网页导入 / 旧缓存里的英文名不要覆盖已有中文名 */
+  function mergeItemNames(list) {
+    if (!list) return 0;
+    var names = global.RWData.ITEM_NAMES || {};
+    var cjk = global.RWData.hasCJK;
+    var n = 0;
+    Object.keys(list).forEach(function (k) {
+      var v = list[k];
+      if (!v) return;
+      var old = names[k];
+      if (cjk && !cjk(v)) {
+        if (old && cjk(old)) { n++; return; }
+        if (FALLBACK_ITEM_NAMES[k]) { names[k] = FALLBACK_ITEM_NAMES[k]; n++; return; }
+      }
+      names[k] = v; n++;
+    });
+    global.RWData.ITEM_NAMES = names;
+    return n;
+  }
+
   /** 从游戏 defs 合并地形表（gamedefs.js 解析出来的 terrain 对象） */
   function mergeTerrains(list) {
     if (!list) return 0;
@@ -1497,9 +1544,13 @@ kbd {
     list.forEach(function (t) {
       if (!t || !t.def) return;
       var old = terrains[t.def] || {};
+      var nm = t.name || old.name || t.def;
+      if (FALLBACK_TERRAIN_NAMES[t.def] && (!global.RWData.hasCJK || !global.RWData.hasCJK(nm))) {
+        nm = FALLBACK_TERRAIN_NAMES[t.def];
+      }
       terrains[t.def] = {
         def: t.def,
-        name: t.name || old.name || t.def,
+        name: nm,
         color: t.color || old.color || '#777',
         aff: t.aff || old.aff || [],
         need: t.need || old.need || null,
@@ -1565,6 +1616,8 @@ kbd {
     terrains: function () { return terrains; },
     terrain: function (def) { return terrains[def] || null; },
     terrainName: terrainName,
+    itemName: itemName,
+    mergeItemNames: mergeItemNames,
     terrainAff: terrainAff,
     terrainByHash: function (h) { return terrainByHash[h] || null; },
     mergeTerrains: mergeTerrains,
@@ -3080,7 +3133,7 @@ kbd {
     global.RWData.mergeTerrains(parsed.terrain ? Object.keys(parsed.terrain).map(function (k) { return parsed.terrain[k]; }) : null);
     global.RWData.mergeRocks(parsed.rocks);
     global.RWData.mergeResearches(parsed.researches);
-    if (parsed.items) global.RWData.ITEM_NAMES = parsed.items;
+    if (parsed.items) global.RWData.mergeItemNames(parsed.items);
 
     // ---- 贴图 ----
     var db = await idbOpen();
@@ -3392,7 +3445,7 @@ kbd {
       if (terrains) global.RWData.mergeTerrains(terrains);
       if (rocks) global.RWData.mergeRocks(rocks);
       if (researches) global.RWData.mergeResearches(researches);
-      if (items) global.RWData.ITEM_NAMES = items;
+      if (items) global.RWData.mergeItemNames(items);
       if (repaired) info.repaired = repaired;
       db.close();
       return { info: info, manifest: manifest, merged: merged };
@@ -8079,6 +8132,7 @@ kbd {
   }
 
   function materialName(def) {
+    if (Data.itemName) return Data.itemName(def);
     if (Data.ITEM_NAMES && Data.ITEM_NAMES[def]) return Data.ITEM_NAMES[def];
     var s = Data.stuffById ? Data.stuffById(def) : null;
     return s ? s.name : def;
@@ -9397,7 +9451,7 @@ kbd {
       Object.keys(def.cost).forEach(function (k) {
         var n = def.cost[k];
         if (!n) return;
-        cost.push((Data.ITEM_NAMES && Data.ITEM_NAMES[k] ? Data.ITEM_NAMES[k] : k) + '×' + n);
+        cost.push((Data.itemName ? Data.itemName(k) : k) + '×' + n);
       });
     }
     if (def.costStuff) {

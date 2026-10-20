@@ -94,6 +94,8 @@ robocopy "C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Data\Core\Langu
   `specialDisplayRadius`（作用范围）、所属 DLC
 
 提取出来的每条建筑会带这些字段，物品栏的悬停提示里就能看到造价 / 工时 / 科技 / 技能 / 耐久。
+官方语言包没覆盖的少量物品名（例如 `Meat_Human` / `VoidmetalMass`）和地形名（`Carpet_Mindbend`）
+在代码里有中文兜底，不会直接显示英文 defName。
 
 > 装了全部 6 个 DLC 的 1.7 实测：游戏建筑师菜单里的东西 **一条不缺**（260 条），
 > 其中只有 5 条不在菜单里（三个雕塑 + 万用电池 + 雕像，都是"做出来的"）。

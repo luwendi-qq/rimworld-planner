@@ -544,6 +544,53 @@
     return terrains;
   }
 
+  /** 官方语言包没有覆盖、但在浮窗/造价里会出现的少量名字 */
+  var FALLBACK_ITEM_NAMES = {
+    Component: '零部件',
+    Leather: '皮革',
+    Meat_Human: '人肉',
+    VoidmetalMass: '虚空金属块'
+  };
+  var FALLBACK_TERRAIN_NAMES = {
+    Carpet_Mindbend: '迷幻地毯'
+  };
+  function itemName(k) {
+    if (!k) return '';
+    var names = global.RWData.ITEM_NAMES || {};
+    var v = names[k];
+    var cjk = global.RWData.hasCJK;
+    if (v && (!cjk || cjk(v))) return v;
+    if (FALLBACK_ITEM_NAMES[k]) return FALLBACK_ITEM_NAMES[k];
+    // 没被官方语言包覆盖的常见前缀（含少量 mod 物品）做保守兜底
+    if (/^Component(Spacer|Advanced)/i.test(k)) return '高级零部件';
+    if (/^Component/i.test(k)) return '零部件';
+    if (/^Leather/i.test(k)) return '皮革';
+    if (/^Meat_Human/i.test(k)) return '人肉';
+    if (/^Meat_/i.test(k)) return '肉';
+    var s = global.RWData.stuffById ? global.RWData.stuffById(k) : null;
+    if (s && s.name) return s.name;
+    return v || k;
+  }
+  /** 合并物品名：网页导入 / 旧缓存里的英文名不要覆盖已有中文名 */
+  function mergeItemNames(list) {
+    if (!list) return 0;
+    var names = global.RWData.ITEM_NAMES || {};
+    var cjk = global.RWData.hasCJK;
+    var n = 0;
+    Object.keys(list).forEach(function (k) {
+      var v = list[k];
+      if (!v) return;
+      var old = names[k];
+      if (cjk && !cjk(v)) {
+        if (old && cjk(old)) { n++; return; }
+        if (FALLBACK_ITEM_NAMES[k]) { names[k] = FALLBACK_ITEM_NAMES[k]; n++; return; }
+      }
+      names[k] = v; n++;
+    });
+    global.RWData.ITEM_NAMES = names;
+    return n;
+  }
+
   /** 从游戏 defs 合并地形表（gamedefs.js 解析出来的 terrain 对象） */
   function mergeTerrains(list) {
     if (!list) return 0;
@@ -551,9 +598,13 @@
     list.forEach(function (t) {
       if (!t || !t.def) return;
       var old = terrains[t.def] || {};
+      var nm = t.name || old.name || t.def;
+      if (FALLBACK_TERRAIN_NAMES[t.def] && (!global.RWData.hasCJK || !global.RWData.hasCJK(nm))) {
+        nm = FALLBACK_TERRAIN_NAMES[t.def];
+      }
       terrains[t.def] = {
         def: t.def,
-        name: t.name || old.name || t.def,
+        name: nm,
         color: t.color || old.color || '#777',
         aff: t.aff || old.aff || [],
         need: t.need || old.need || null,
@@ -619,6 +670,8 @@
     terrains: function () { return terrains; },
     terrain: function (def) { return terrains[def] || null; },
     terrainName: terrainName,
+    itemName: itemName,
+    mergeItemNames: mergeItemNames,
     terrainAff: terrainAff,
     terrainByHash: function (h) { return terrainByHash[h] || null; },
     mergeTerrains: mergeTerrains,
