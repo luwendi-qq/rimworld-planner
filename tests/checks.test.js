@@ -210,6 +210,36 @@ test('房间：床会被统计进房间（用来判断要不要制冷）', () =>
   assert.strictEqual(rep.rooms[0].beds, 1);
 });
 
+test('房间：玩家区域外的封闭区域算地图预制，不算玩家房间', () => {
+  H.resetMap(30, 30);
+  buildRoom(5, 5, true);
+  const s = RW.state;
+  s.home = { w: 30, h: 30, cells: new Uint16Array(30 * 30), count: 1 };
+  s.home.cells[25 * 30 + 25] = 1;   // 玩家区域只在远处
+  // 模拟存档导入的锁定建筑（远古遗迹）
+  s.buildings.forEach(function (b) { b.locked = true; b.src = 'save'; });
+  let rep = Checks.analyse(s);
+  assert.strictEqual(rep.rooms[0].prefab, true);
+  assert.strictEqual(rep.rooms[0].role, 'prefab');
+  assert.strictEqual(rep.prefabs, 1);
+
+  // 把房间圈进玩家区域，就应该重新当房间处理
+  for (let x = 5; x < 12; x++) for (let z = 5; z < 12; z++) s.home.cells[z * 30 + x] = 1;
+  rep = Checks.analyse(s);
+  assert.strictEqual(rep.rooms[0].prefab, false);
+  assert.notStrictEqual(rep.rooms[0].role, 'prefab');
+});
+
+test('房间：玩家自己画在区域外的规划仍算房间', () => {
+  H.resetMap(30, 30);
+  buildRoom(5, 5, true);
+  const s = RW.state;
+  s.home = { w: 30, h: 30, cells: new Uint16Array(30 * 30), count: 1 };
+  s.home.cells[25 * 30 + 25] = 1;
+  const rep = Checks.analyse(s);
+  assert.strictEqual(rep.rooms[0].prefab, false, '未锁定的新规划不该被当成预制');
+});
+
 test('房间：超过 5184 格会被提示（游戏里不算室内）', () => {
   H.resetMap(200, 200);
   // 围一个 80×80 的房间

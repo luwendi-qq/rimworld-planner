@@ -85,6 +85,13 @@ test('数据：分类别再是一个大杂烩', () => {
   }
 });
 
+test('数据：英文科技名不能覆盖已有中文名', () => {
+  D.mergeResearches([{ def: '__TestTech', name: '测试科技', cost: 100, prereq: [] }]);
+  D.mergeResearches([{ def: '__TestTech', name: 'TestTech', cost: 100, prereq: [] }]);
+  assert.strictEqual(D.research('__TestTech').name, '测试科技');
+  delete D.researches()['__TestTech'];
+});
+
 test('数据：主要建筑都要有造价或工时，估算面板才准', () => {
   // 这些是玩家天天要造的，不该缺数据
   const important = ['wall', 'door', 'bed', 'table_2x2', 'cooler', 'heater', 'solar_generator',

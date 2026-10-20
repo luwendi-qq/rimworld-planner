@@ -1093,16 +1093,16 @@
     if (state.layers.rooms && state.roomInfo && state.roomInfo.length) {
       state.roomInfo.forEach(function (r, i) {
         var hue = (i * 47) % 360;
-        ctx.fillStyle = 'hsla(' + hue + ',70%,55%,0.14)';
+        ctx.fillStyle = r.prefab ? 'rgba(150,150,150,0.10)' : 'hsla(' + hue + ',70%,55%,0.14)';
         r.cells.forEach(function (c) { ctx.fillRect(c[0], c[1], 1, 1); });
         // 标签：在屏幕上是 12px（所以格子坐标里要除以 cell）
         if (state.cam.cell > 11) {
           var cx = r.cells.reduce(function (a, c) { return a + c[0]; }, 0) / r.cells.length + 0.5;
           var cz = r.cells.reduce(function (a, c) { return a + c[1]; }, 0) / r.cells.length + 0.5;
-          ctx.fillStyle = 'hsla(' + hue + ',85%,80%,0.95)';
+          ctx.fillStyle = r.prefab ? 'rgba(210,210,210,0.9)' : 'hsla(' + hue + ',85%,80%,0.95)';
           ctx.font = (11 / state.cam.cell) + 'px sans-serif';
           ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-          ctx.fillText(r.area + '格', cx, cz);
+          ctx.fillText(r.prefab ? '预制' : (r.area + '格'), cx, cz);
         }
       });
     }
@@ -1315,7 +1315,9 @@
     if (!state.marquee) return;
     var a = state.marquee.a, b = state.marquee.b;
     var x = Math.min(a.x, b.x), z = Math.min(a.z, b.z);
-    var w = Math.abs(b.x - a.x), h = Math.abs(b.z - a.z);
+    // 框选是按「格子」算的：起点和终点两格都要包含进去，所以宽高 +1。
+    // 少这个 +1，反向拖（右下→左上 / 右上→左下）时会看起来和鼠标差一格。
+    var w = Math.abs(b.x - a.x) + 1, h = Math.abs(b.z - a.z) + 1;
     ctx.fillStyle = COLORS.marquee;
     ctx.fillRect(x, z, w, h);
     ctx.strokeStyle = COLORS.select; ctx.lineWidth = 1 / state.cam.cell;

@@ -597,7 +597,13 @@
 
     // 房间
     var rb = $('roomList');
-    rb.innerHTML = lastReport.rooms.length ? lastReport.rooms.map(function (r, i) {
+    var roomRows = [];
+    (lastReport.rooms || []).forEach(function (r, i) {
+      if (!r.prefab) roomRows.push({ r: r, i: i });
+    });
+    var prefabN = (lastReport.rooms || []).length - roomRows.length;
+    rb.innerHTML = (roomRows.length ? roomRows.map(function (row, n) {
+      var r = row.r, i = row.i;
       var tempRow = '<label class="roomTemp" title="本工具的规划参数，不是游戏里的房间属性">目标 <input type="number" ' +
         'class="roomTempIn" data-idx="' + i + '" value="' + r.temp + '" min="-60" max="60" step="1"> °C</label>';
       var tempInfo = '';
@@ -607,13 +613,15 @@
         tempInfo = ' · 需加热 ' + r.heaters + '/' + r.tempNeed.need;
       }
       return '<div class="rrow roomBox" data-idx="' + i + '">' +
-        '<div class="roomJump" data-idx="' + i + '" title="点击定位到这个房间"><b>房间 #' + (i + 1) + '</b> ' +
+        '<div class="roomJump" data-idx="' + i + '" title="点击定位到这个房间"><b>房间 #' + (n + 1) + '</b> ' +
         r.area + ' 格 · 空间 ' + r.space + '（' + r.spaceText + '）· 门 ' + r.doors +
         tempInfo + ' ' + (r.reachable ? '' : '<span class="bad">不通</span>') + '</div>' +
         '<div class="roomRoleRow"><span class="roomRoleName" title="按房间里的内容自动判定：' +
         esc(r.roleWhy || r.roleName) + '">角色：<b>' + esc(r.roleName) + '</b></span>' + tempRow + '</div>' +
         '</div>';
-    }).join('') : '<div class="muted">没有封闭的房间</div>';
+    }).join('') : '<div class="muted">没有封闭的玩家房间</div>') +
+      (prefabN ? '<div class="muted" style="font-size:11.5px;margin-top:4px">另有 ' + prefabN +
+        ' 个地图预制建筑 / 遗迹（玩家区域外，未计入房间）</div>' : '');
     Array.prototype.forEach.call(rb.querySelectorAll('.roomJump'), function (el) {
       el.onclick = function () {
         var r = lastReport.rooms[+el.dataset.idx];
@@ -775,9 +783,17 @@
       el.onclick = function () {
         var t = (state.templates || [])[+el.parentNode.dataset.i];
         if (!t || !t.clip) return;
-        var hx = state.hover ? state.hover.x : 0, hz = state.hover ? state.hover.z : 0;
-        RW.pasteAt(t.clip, hx, hz);
-        toast('已贴上模板「' + t.name + '」');
+        // 点模板 = 进入「粘贴」状态，再在画布上点一下决定位置。
+        // 不能直接 pasteAt(state.hover)：鼠标移到右侧面板时 hover 已经变成 null，
+        // 会贴到 (0,0)（通常还在屏幕外），看起来就像「点了没反应」。
+        state.paste = t.clip;
+        state.paste.at = {
+          x: state.hover ? state.hover.x : Math.floor(state.cols / 2),
+          z: state.hover ? state.hover.z : Math.floor(state.rows / 2)
+        };
+        RW.setTool('place');
+        RW.render(); RW.emit('change');
+        toast('已选择模板「' + t.name + '」，点击画布放置（右键取消）');
       };
     });
     Array.prototype.forEach.call(box.querySelectorAll('.tplDel'), function (el) {
@@ -926,9 +942,10 @@
         if (info && info.cost > 0 ? v >= info.cost - 0.001 : (v > 0 && k !== res.current)) done++;
         else if (v > 0) prog++;
       });
+      var curInfo = res.current ? defs[res.current] : null;
       html += '<div class="si-block"><b>科技</b>：已完成 ' + done + ' 项' +
-        (res.current ? ' · 研究中 <b>' + esc(res.current) + '</b>' +
-          (defs[res.current] ? ' (' + Math.round((res.progress[res.current] || 0)) + '/' + defs[res.current].cost + ')' : '') : '') +
+        (res.current ? ' · 研究中 <b>' + esc(curInfo ? curInfo.name : res.current) + '</b>' +
+          (curInfo ? ' (' + Math.round((res.progress[res.current] || 0)) + '/' + curInfo.cost + ')' : '') : '') +
         (Object.keys(defs).length ? '' : ' <span class="muted">（导入游戏资源可显示中文名与前置）</span>') + '</div>';
     }
     // 库存

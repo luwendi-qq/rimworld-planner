@@ -513,9 +513,11 @@
       var dn = textOf(el, 'defName');
       if (!dn || seenRes[dn]) return;
       seenRes[dn] = 1;
+      // 语言包里没有这个科技时，优先用内置生成数据里的中文名，避免覆盖成英文 label
+      var old = global.RWData && global.RWData.research ? global.RWData.research(dn) : null;
       researches.push({
         def: dn,
-        name: lang[dn] || zhNameOf(dn, textOf(el, 'label')),
+        name: lang[dn] || (old && old.name) || zhNameOf(dn, textOf(el, 'label')),
         cost: num(textOf(el, 'baseCost'), 0),
         prereq: listText(el, 'prerequisites'),
         techLevel: textOf(el, 'techLevel') || '',
@@ -532,13 +534,14 @@
 
   /** 从一份 DefInjected XML 里收集 label（官方语言包解包后的形式） */
   function collectLangXml(xml, out) {
-    var m = xml.match(/<([A-Za-z0-9_]+)\.(label|labelNoun)>([^<]+)</g);
+    var m = xml.match(/<([A-Za-z0-9_.]+)\.(label|labelNoun)>([^<]+)</g);
     if (!m) return 0;
     var n = 0;
     m.forEach(function (s) {
-      var mm = /<([A-Za-z0-9_]+)\.(label|labelNoun)>([^<]+)</.exec(s);
+      var mm = /<([A-Za-z0-9_.]+)\.(label|labelNoun)>([^<]+)</.exec(s);
       if (!mm) return;
-      var key = mm[1], kind = mm[2], val = mm[3].trim();
+      // 兼容 <Wall.label> 和 <ThingDef.Wall.label> / <ResearchProjectDef.ShipBasics.label>
+      var key = mm[1].split('.').pop(), kind = mm[2], val = mm[3].trim();
       if (kind === 'label') { out[key] = val; n++; }
       else if (!out[key]) { out[key] = val; n++; }
     });
@@ -561,12 +564,12 @@
         var lower = name.toLowerCase();
         if (/definjected\/(thingdef|stuffcategorydef|terraindef|researchprojectdef)\/.*\.xml$/.test(lower)) {
           var xml = dec.decode(u8.subarray(dataStart, dataStart + size));
-          var m = xml.match(/<([A-Za-z0-9_]+)\.(label|labelNoun)>([^<]+)</g);
+          var m = xml.match(/<([A-Za-z0-9_.]+)\.(label|labelNoun)>([^<]+)</g);
           if (m) {
             m.forEach(function (s) {
-              var mm = /<([A-Za-z0-9_]+)\.(label|labelNoun)>([^<]+)</.exec(s);
+              var mm = /<([A-Za-z0-9_.]+)\.(label|labelNoun)>([^<]+)</.exec(s);
               if (!mm) return;
-              var key = mm[1], kind = mm[2], val = mm[3].trim();
+              var key = mm[1].split('.').pop(), kind = mm[2], val = mm[3].trim();
               if (kind === 'label') out[key] = val;
               else if (!out[key]) out[key] = val;
             });

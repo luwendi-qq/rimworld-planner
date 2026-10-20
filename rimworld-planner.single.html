@@ -529,7 +529,7 @@ kbd {
 .pitem b { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
 
 </style>
-<!-- 单文件构建：2026-10-20 19:47  内联模块：js/data.js, js/zh-names.js, js/buildings.generated.js, js/vendor/fzstd.js, js/gamezip.js, js/gamedefs.js, js/gameimport.js, js/icons.js, js/engine.js, js/site.js, js/rooms.js, js/checks.js, js/workload.js, js/exporters.js, js/io.js, js/main.js -->
+<!-- 单文件构建：2026-10-20 12:39 UTC  内联模块：js/data.js, js/zh-names.js, js/buildings.generated.js, js/vendor/fzstd.js, js/gamezip.js, js/gamedefs.js, js/gameimport.js, js/icons.js, js/engine.js, js/site.js, js/rooms.js, js/checks.js, js/workload.js, js/exporters.js, js/io.js, js/main.js -->
 </head>
 
 <body>
@@ -730,7 +730,7 @@ kbd {
       <div class="panel">
         <h3>模板</h3>
         <div class="muted" style="font-size:11.5px">
-          把一块选区存成模板，之后一键贴出来 —— 同一个标准卧室不用画几十遍。
+          把一块选区存成模板，之后点模板名 → 再点画布放置 —— 同一个标准卧室不用画几十遍。
         </div>
         <div style="display:flex;gap:4px;margin-top:6px">
           <input id="tplName" type="text" placeholder="模板名（如 标准卧室）" style="flex:1">
@@ -777,9 +777,9 @@ kbd {
             材质逐物品：<b>长按左键</b>（或右键）左边任意建筑即可选材质。
           </div>
           <div class="group" style="margin-top:6px">
-            <label title="导出蓝图时写进 &lt;Category&gt;，游戏里按分类找蓝图">
-              蓝图分类
-              <input id="bpCategory" type="text" value="布局" style="width:90px">
+            <label title="Blueprints 模组会把蓝图显示成「分类/名称」，并在建筑师菜单里按分类排序；留空则用默认「布局」。这是模组自带的 Category 字段，不是游戏原版功能。">
+              蓝图分类（Blueprints）
+              <input id="bpCategory" type="text" value="布局" style="width:110px">
             </label>
           </div>
         </div>
@@ -875,7 +875,7 @@ kbd {
             游戏里没有「手填房间用途」这回事。床可以在右下角切成普通 / 医疗 / 囚犯。
             每个房间还可以单独设目标温度，用来估算要几台制冷机 —— 面板顶上的<b>环境温度</b>也可以改。</li>
           <li><b>模板</b>：框选一块区域 → 右侧「模板」面板起个名字 → 「存为模板」；
-            之后点一下模板名就贴到鼠标位置。同一个标准卧室不用画几十遍。</li>
+            之后点一下模板名，再点画布就贴在那里（右键取消）。同一个标准卧室不用画几十遍。</li>
           <li><b>收藏 / 最近</b>：物品栏最前面两个页签。点物品上的 ☆ 收藏，常用的放这里。</li>
           <li><b>悬停</b>：鼠标停在物品上能看到造价、工时、科技前置、建造技能、耐久。</li>
         </ul>
@@ -1579,7 +1579,22 @@ kbd {
       var n = 0;
       list.forEach(function (r) {
         if (!r || !r.def) return;
-        researches[r.def] = r; n++;
+        var old = researches[r.def];
+        var name = r.name;
+        // 网页导入的游戏资源 / IndexedDB 旧缓存里，科技名可能只有英文。
+        // 已经存在的中文名（内置生成数据）优先保留，别被 "ShipBasics" 这种英文覆盖。
+        if ((!name || (global.RWData.hasCJK && !global.RWData.hasCJK(name))) && old && old.name) {
+          name = old.name;
+        }
+        if ((!name || (global.RWData.hasCJK && !global.RWData.hasCJK(name))) && global.RWData.zhName) {
+          var zh = global.RWData.zhName(r.def);
+          if (zh) name = zh;
+        }
+        var rec = {};
+        Object.keys(r).forEach(function (k) { rec[k] = r[k]; });
+        rec.name = name || r.def;
+        researches[r.def] = rec;
+        n++;
       });
       return n;
     },
@@ -2687,9 +2702,11 @@ kbd {
       var dn = textOf(el, 'defName');
       if (!dn || seenRes[dn]) return;
       seenRes[dn] = 1;
+      // 语言包里没有这个科技时，优先用内置生成数据里的中文名，避免覆盖成英文 label
+      var old = global.RWData && global.RWData.research ? global.RWData.research(dn) : null;
       researches.push({
         def: dn,
-        name: lang[dn] || zhNameOf(dn, textOf(el, 'label')),
+        name: lang[dn] || (old && old.name) || zhNameOf(dn, textOf(el, 'label')),
         cost: num(textOf(el, 'baseCost'), 0),
         prereq: listText(el, 'prerequisites'),
         techLevel: textOf(el, 'techLevel') || '',
@@ -2706,13 +2723,14 @@ kbd {
 
   /** 从一份 DefInjected XML 里收集 label（官方语言包解包后的形式） */
   function collectLangXml(xml, out) {
-    var m = xml.match(/<([A-Za-z0-9_]+)\.(label|labelNoun)>([^<]+)</g);
+    var m = xml.match(/<([A-Za-z0-9_.]+)\.(label|labelNoun)>([^<]+)</g);
     if (!m) return 0;
     var n = 0;
     m.forEach(function (s) {
-      var mm = /<([A-Za-z0-9_]+)\.(label|labelNoun)>([^<]+)</.exec(s);
+      var mm = /<([A-Za-z0-9_.]+)\.(label|labelNoun)>([^<]+)</.exec(s);
       if (!mm) return;
-      var key = mm[1], kind = mm[2], val = mm[3].trim();
+      // 兼容 <Wall.label> 和 <ThingDef.Wall.label> / <ResearchProjectDef.ShipBasics.label>
+      var key = mm[1].split('.').pop(), kind = mm[2], val = mm[3].trim();
       if (kind === 'label') { out[key] = val; n++; }
       else if (!out[key]) { out[key] = val; n++; }
     });
@@ -2735,12 +2753,12 @@ kbd {
         var lower = name.toLowerCase();
         if (/definjected\/(thingdef|stuffcategorydef|terraindef|researchprojectdef)\/.*\.xml$/.test(lower)) {
           var xml = dec.decode(u8.subarray(dataStart, dataStart + size));
-          var m = xml.match(/<([A-Za-z0-9_]+)\.(label|labelNoun)>([^<]+)</g);
+          var m = xml.match(/<([A-Za-z0-9_.]+)\.(label|labelNoun)>([^<]+)</g);
           if (m) {
             m.forEach(function (s) {
-              var mm = /<([A-Za-z0-9_]+)\.(label|labelNoun)>([^<]+)</.exec(s);
+              var mm = /<([A-Za-z0-9_.]+)\.(label|labelNoun)>([^<]+)</.exec(s);
               if (!mm) return;
-              var key = mm[1], kind = mm[2], val = mm[3].trim();
+              var key = mm[1].split('.').pop(), kind = mm[2], val = mm[3].trim();
               if (kind === 'label') out[key] = val;
               else if (!out[key]) out[key] = val;
             });
@@ -5639,16 +5657,16 @@ kbd {
     if (state.layers.rooms && state.roomInfo && state.roomInfo.length) {
       state.roomInfo.forEach(function (r, i) {
         var hue = (i * 47) % 360;
-        ctx.fillStyle = 'hsla(' + hue + ',70%,55%,0.14)';
+        ctx.fillStyle = r.prefab ? 'rgba(150,150,150,0.10)' : 'hsla(' + hue + ',70%,55%,0.14)';
         r.cells.forEach(function (c) { ctx.fillRect(c[0], c[1], 1, 1); });
         // 标签：在屏幕上是 12px（所以格子坐标里要除以 cell）
         if (state.cam.cell > 11) {
           var cx = r.cells.reduce(function (a, c) { return a + c[0]; }, 0) / r.cells.length + 0.5;
           var cz = r.cells.reduce(function (a, c) { return a + c[1]; }, 0) / r.cells.length + 0.5;
-          ctx.fillStyle = 'hsla(' + hue + ',85%,80%,0.95)';
+          ctx.fillStyle = r.prefab ? 'rgba(210,210,210,0.9)' : 'hsla(' + hue + ',85%,80%,0.95)';
           ctx.font = (11 / state.cam.cell) + 'px sans-serif';
           ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-          ctx.fillText(r.area + '格', cx, cz);
+          ctx.fillText(r.prefab ? '预制' : (r.area + '格'), cx, cz);
         }
       });
     }
@@ -5861,7 +5879,9 @@ kbd {
     if (!state.marquee) return;
     var a = state.marquee.a, b = state.marquee.b;
     var x = Math.min(a.x, b.x), z = Math.min(a.z, b.z);
-    var w = Math.abs(b.x - a.x), h = Math.abs(b.z - a.z);
+    // 框选是按「格子」算的：起点和终点两格都要包含进去，所以宽高 +1。
+    // 少这个 +1，反向拖（右下→左上 / 右上→左下）时会看起来和鼠标差一格。
+    var w = Math.abs(b.x - a.x) + 1, h = Math.abs(b.z - a.z) + 1;
     ctx.fillStyle = COLORS.marquee;
     ctx.fillRect(x, z, w, h);
     ctx.strokeStyle = COLORS.select; ctx.lineWidth = 1 / state.cam.cell;
@@ -7528,6 +7548,7 @@ kbd {
     var rooms = analyseRooms(state, cellMap);
     state.roomInfo = rooms.rooms;
     rooms.rooms.forEach(function (r, idx) {
+      if (r.prefab) return;   // 玩家区域外的地图预制建筑（远古遗迹等）不算玩家房间
       if (r.doors === 0) {
         // 天然岩洞 / 远古遗迹本来就没门，玩家忘了开门也可能。属于提示，不是错误。
         issues.push({
@@ -7551,7 +7572,20 @@ kbd {
     // ---------- 5. 房间角色（自动推导）+ 温控 ----------
     var Rooms = global.RWRooms;
     var ambient = state.ambientTemp == null ? 21 : state.ambientTemp;
+    var prefabCount = 0;
     rooms.rooms.forEach(function (r, idx) {
+      if (r.prefab) {
+        r.role = 'prefab';
+        r.roleName = '地图预制';
+        r.roleWhy = '玩家区域外（地图自带建筑 / 遗迹）';
+        r.roleDef = null;
+        r.ambient = ambient;
+        r.temp = null;
+        r.tempNeed = { kind: 'none', need: 0, delta: 0 };
+        r.cooling = 0; r.heating = 0; r.coolingOld = 0;
+        prefabCount++;
+        return;
+      }
       var ro = Rooms
         ? Rooms.deriveRole(r)
         : { role: 'room', name: '房间', def: null, why: '' };
@@ -7595,12 +7629,14 @@ kbd {
     // 判断不依赖朝向；有存档屋顶数据时，没屋顶的院子算室外（和游戏一致）。
     (function () {
       var rgOf = {};
+      var prefabIds = {};
+      rooms.rooms.forEach(function (r) { if (r.prefab) prefabIds[r.id] = 1; });
       rooms.regions.forEach(function (rg) {
         rg.cells.forEach(function (c) { rgOf[key(c[0], c[1])] = rg; });
       });
       function indoorSide(cell) {
         var rg = rgOf[key(cell[0], cell[1])] || null;
-        if (!rg) return null;
+        if (!rg || prefabIds[rg.id]) return null;
         if (state.roofs && state.roofs.cells && global.RWSite && global.RWSite.roofAt) {
           // 有屋顶数据：没屋顶的格子按室外算（院子 / 露天平台）
           return global.RWSite.roofAt(cell[0], cell[1]) > 0 ? rg : null;
@@ -7643,6 +7679,7 @@ kbd {
     state.powerInfo = power;
     return {
       issues: issues, rooms: rooms.rooms, power: power,
+      prefabs: prefabCount,
       outdoorArea: rooms.outdoorArea,
       stats: stats(state)
     };
@@ -7880,6 +7917,9 @@ kbd {
     }
 
     // 组装房间
+    // 导入存档时，玩家区域（Area_Home）之外的地图自带建筑（远古遗迹、废弃营地等）
+    // 在游戏里也是 Room，但不是玩家基地的房间。这里标成 prefab，不算房间角色 / 温控 / 校验。
+    var home = (state.home && state.home.cells && state.home.count !== 0) ? state.home : null;
     var rooms = [];
     var roomIdx = 0;
     regions.forEach(function (r) {
@@ -7890,7 +7930,10 @@ kbd {
       // 设备按「个数」统计：床是 1×2 的，会占两格，不能按格子算成两张床
       var counted = {};
       var things = [];
+      var homeCells = 0;
       r.cells.forEach(function (c) {
+        if (home && c[0] >= 0 && c[1] >= 0 && c[0] < home.w && c[1] < home.h &&
+            home.cells[c[1] * home.w + c[0]]) homeCells++;
         var list = cellMap[key(c[0], c[1])] || [];
         list.forEach(function (b) {
           var def = Data.byId[b.defId]; if (!def) return;
@@ -7906,6 +7949,19 @@ kbd {
           if (isAncient(def)) ancient = true;
         });
       });
+      // 玩家自己画的建筑（未锁定 / 非存档导入）→ 即使不在 Area_Home 里也算规划房间。
+      // 这样「导入存档后想在基地外扩建」不会被误标成预制。
+      var playerBuilt = things.some(function (b) { return !b.locked && b.src !== 'save'; });
+      if (!playerBuilt) {
+        for (var ci = 0; ci < r.cells.length && !playerBuilt; ci++) {
+          var cc = r.cells[ci];
+          var nb = [[cc[0] + 1, cc[1]], [cc[0] - 1, cc[1]], [cc[0], cc[1] + 1], [cc[0], cc[1] - 1]];
+          for (var ni = 0; ni < nb.length && !playerBuilt; ni++) {
+            var list2 = cellMap[key(nb[ni][0], nb[ni][1])];
+            if (list2 && list2.some(function (b) { return !b.locked && b.src !== 'save'; })) playerBuilt = true;
+          }
+        }
+      }
       // 贴在房间边界上的制冷器/加热器也算
       coolers += countWallUnits(cellMap, r.cells, ['cooler', 'passive_cooler']);
       heaters += countWallUnits(cellMap, r.cells, ['heater']);
@@ -7915,6 +7971,7 @@ kbd {
         doors: regionDoors[r.id] ? regionDoors[r.id].doors.length : 0,
         space: Math.round(space * 10) / 10, spaceText: spaceRating(space),
         reachable: !!reach[r.id], outdoor: false,
+        homeCells: homeCells, prefab: !!home && homeCells === 0 && !playerBuilt,
         blocked: blocked, coolers: coolers, heaters: heaters, beds: beds, ancient: ancient
       });
     });
@@ -9844,7 +9901,13 @@ kbd {
 
     // 房间
     var rb = $('roomList');
-    rb.innerHTML = lastReport.rooms.length ? lastReport.rooms.map(function (r, i) {
+    var roomRows = [];
+    (lastReport.rooms || []).forEach(function (r, i) {
+      if (!r.prefab) roomRows.push({ r: r, i: i });
+    });
+    var prefabN = (lastReport.rooms || []).length - roomRows.length;
+    rb.innerHTML = (roomRows.length ? roomRows.map(function (row, n) {
+      var r = row.r, i = row.i;
       var tempRow = '<label class="roomTemp" title="本工具的规划参数，不是游戏里的房间属性">目标 <input type="number" ' +
         'class="roomTempIn" data-idx="' + i + '" value="' + r.temp + '" min="-60" max="60" step="1"> °C</label>';
       var tempInfo = '';
@@ -9854,13 +9917,15 @@ kbd {
         tempInfo = ' · 需加热 ' + r.heaters + '/' + r.tempNeed.need;
       }
       return '<div class="rrow roomBox" data-idx="' + i + '">' +
-        '<div class="roomJump" data-idx="' + i + '" title="点击定位到这个房间"><b>房间 #' + (i + 1) + '</b> ' +
+        '<div class="roomJump" data-idx="' + i + '" title="点击定位到这个房间"><b>房间 #' + (n + 1) + '</b> ' +
         r.area + ' 格 · 空间 ' + r.space + '（' + r.spaceText + '）· 门 ' + r.doors +
         tempInfo + ' ' + (r.reachable ? '' : '<span class="bad">不通</span>') + '</div>' +
         '<div class="roomRoleRow"><span class="roomRoleName" title="按房间里的内容自动判定：' +
         esc(r.roleWhy || r.roleName) + '">角色：<b>' + esc(r.roleName) + '</b></span>' + tempRow + '</div>' +
         '</div>';
-    }).join('') : '<div class="muted">没有封闭的房间</div>';
+    }).join('') : '<div class="muted">没有封闭的玩家房间</div>') +
+      (prefabN ? '<div class="muted" style="font-size:11.5px;margin-top:4px">另有 ' + prefabN +
+        ' 个地图预制建筑 / 遗迹（玩家区域外，未计入房间）</div>' : '');
     Array.prototype.forEach.call(rb.querySelectorAll('.roomJump'), function (el) {
       el.onclick = function () {
         var r = lastReport.rooms[+el.dataset.idx];
@@ -10022,9 +10087,17 @@ kbd {
       el.onclick = function () {
         var t = (state.templates || [])[+el.parentNode.dataset.i];
         if (!t || !t.clip) return;
-        var hx = state.hover ? state.hover.x : 0, hz = state.hover ? state.hover.z : 0;
-        RW.pasteAt(t.clip, hx, hz);
-        toast('已贴上模板「' + t.name + '」');
+        // 点模板 = 进入「粘贴」状态，再在画布上点一下决定位置。
+        // 不能直接 pasteAt(state.hover)：鼠标移到右侧面板时 hover 已经变成 null，
+        // 会贴到 (0,0)（通常还在屏幕外），看起来就像「点了没反应」。
+        state.paste = t.clip;
+        state.paste.at = {
+          x: state.hover ? state.hover.x : Math.floor(state.cols / 2),
+          z: state.hover ? state.hover.z : Math.floor(state.rows / 2)
+        };
+        RW.setTool('place');
+        RW.render(); RW.emit('change');
+        toast('已选择模板「' + t.name + '」，点击画布放置（右键取消）');
       };
     });
     Array.prototype.forEach.call(box.querySelectorAll('.tplDel'), function (el) {
@@ -10173,9 +10246,10 @@ kbd {
         if (info && info.cost > 0 ? v >= info.cost - 0.001 : (v > 0 && k !== res.current)) done++;
         else if (v > 0) prog++;
       });
+      var curInfo = res.current ? defs[res.current] : null;
       html += '<div class="si-block"><b>科技</b>：已完成 ' + done + ' 项' +
-        (res.current ? ' · 研究中 <b>' + esc(res.current) + '</b>' +
-          (defs[res.current] ? ' (' + Math.round((res.progress[res.current] || 0)) + '/' + defs[res.current].cost + ')' : '') : '') +
+        (res.current ? ' · 研究中 <b>' + esc(curInfo ? curInfo.name : res.current) + '</b>' +
+          (curInfo ? ' (' + Math.round((res.progress[res.current] || 0)) + '/' + curInfo.cost + ')' : '') : '') +
         (Object.keys(defs).length ? '' : ' <span class="muted">（导入游戏资源可显示中文名与前置）</span>') + '</div>';
     }
     // 库存

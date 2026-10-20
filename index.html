@@ -206,7 +206,7 @@
       <div class="panel">
         <h3>模板</h3>
         <div class="muted" style="font-size:11.5px">
-          把一块选区存成模板，之后一键贴出来 —— 同一个标准卧室不用画几十遍。
+          把一块选区存成模板，之后点模板名 → 再点画布放置 —— 同一个标准卧室不用画几十遍。
         </div>
         <div style="display:flex;gap:4px;margin-top:6px">
           <input id="tplName" type="text" placeholder="模板名（如 标准卧室）" style="flex:1">
@@ -253,9 +253,9 @@
             材质逐物品：<b>长按左键</b>（或右键）左边任意建筑即可选材质。
           </div>
           <div class="group" style="margin-top:6px">
-            <label title="导出蓝图时写进 &lt;Category&gt;，游戏里按分类找蓝图">
-              蓝图分类
-              <input id="bpCategory" type="text" value="布局" style="width:90px">
+            <label title="Blueprints 模组会把蓝图显示成「分类/名称」，并在建筑师菜单里按分类排序；留空则用默认「布局」。这是模组自带的 Category 字段，不是游戏原版功能。">
+              蓝图分类（Blueprints）
+              <input id="bpCategory" type="text" value="布局" style="width:110px">
             </label>
           </div>
         </div>
@@ -351,7 +351,7 @@
             游戏里没有「手填房间用途」这回事。床可以在右下角切成普通 / 医疗 / 囚犯。
             每个房间还可以单独设目标温度，用来估算要几台制冷机 —— 面板顶上的<b>环境温度</b>也可以改。</li>
           <li><b>模板</b>：框选一块区域 → 右侧「模板」面板起个名字 → 「存为模板」；
-            之后点一下模板名就贴到鼠标位置。同一个标准卧室不用画几十遍。</li>
+            之后点一下模板名，再点画布就贴在那里（右键取消）。同一个标准卧室不用画几十遍。</li>
           <li><b>收藏 / 最近</b>：物品栏最前面两个页签。点物品上的 ☆ 收藏，常用的放这里。</li>
           <li><b>悬停</b>：鼠标停在物品上能看到造价、工时、科技前置、建造技能、耐久。</li>
         </ul>

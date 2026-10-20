@@ -181,6 +181,7 @@
     var rooms = analyseRooms(state, cellMap);
     state.roomInfo = rooms.rooms;
     rooms.rooms.forEach(function (r, idx) {
+      if (r.prefab) return;   // 玩家区域外的地图预制建筑（远古遗迹等）不算玩家房间
       if (r.doors === 0) {
         // 天然岩洞 / 远古遗迹本来就没门，玩家忘了开门也可能。属于提示，不是错误。
         issues.push({
@@ -204,7 +205,20 @@
     // ---------- 5. 房间角色（自动推导）+ 温控 ----------
     var Rooms = global.RWRooms;
     var ambient = state.ambientTemp == null ? 21 : state.ambientTemp;
+    var prefabCount = 0;
     rooms.rooms.forEach(function (r, idx) {
+      if (r.prefab) {
+        r.role = 'prefab';
+        r.roleName = '地图预制';
+        r.roleWhy = '玩家区域外（地图自带建筑 / 遗迹）';
+        r.roleDef = null;
+        r.ambient = ambient;
+        r.temp = null;
+        r.tempNeed = { kind: 'none', need: 0, delta: 0 };
+        r.cooling = 0; r.heating = 0; r.coolingOld = 0;
+        prefabCount++;
+        return;
+      }
       var ro = Rooms
         ? Rooms.deriveRole(r)
         : { role: 'room', name: '房间', def: null, why: '' };
@@ -248,12 +262,14 @@
     // 判断不依赖朝向；有存档屋顶数据时，没屋顶的院子算室外（和游戏一致）。
     (function () {
       var rgOf = {};
+      var prefabIds = {};
+      rooms.rooms.forEach(function (r) { if (r.prefab) prefabIds[r.id] = 1; });
       rooms.regions.forEach(function (rg) {
         rg.cells.forEach(function (c) { rgOf[key(c[0], c[1])] = rg; });
       });
       function indoorSide(cell) {
         var rg = rgOf[key(cell[0], cell[1])] || null;
-        if (!rg) return null;
+        if (!rg || prefabIds[rg.id]) return null;
         if (state.roofs && state.roofs.cells && global.RWSite && global.RWSite.roofAt) {
           // 有屋顶数据：没屋顶的格子按室外算（院子 / 露天平台）
           return global.RWSite.roofAt(cell[0], cell[1]) > 0 ? rg : null;
@@ -296,6 +312,7 @@
     state.powerInfo = power;
     return {
       issues: issues, rooms: rooms.rooms, power: power,
+      prefabs: prefabCount,
       outdoorArea: rooms.outdoorArea,
       stats: stats(state)
     };
@@ -533,6 +550,9 @@
     }
 
     // 组装房间
+    // 导入存档时，玩家区域（Area_Home）之外的地图自带建筑（远古遗迹、废弃营地等）
+    // 在游戏里也是 Room，但不是玩家基地的房间。这里标成 prefab，不算房间角色 / 温控 / 校验。
+    var home = (state.home && state.home.cells && state.home.count !== 0) ? state.home : null;
     var rooms = [];
     var roomIdx = 0;
     regions.forEach(function (r) {
@@ -543,7 +563,10 @@
       // 设备按「个数」统计：床是 1×2 的，会占两格，不能按格子算成两张床
       var counted = {};
       var things = [];
+      var homeCells = 0;
       r.cells.forEach(function (c) {
+        if (home && c[0] >= 0 && c[1] >= 0 && c[0] < home.w && c[1] < home.h &&
+            home.cells[c[1] * home.w + c[0]]) homeCells++;
         var list = cellMap[key(c[0], c[1])] || [];
         list.forEach(function (b) {
           var def = Data.byId[b.defId]; if (!def) return;
@@ -559,6 +582,19 @@
           if (isAncient(def)) ancient = true;
         });
       });
+      // 玩家自己画的建筑（未锁定 / 非存档导入）→ 即使不在 Area_Home 里也算规划房间。
+      // 这样「导入存档后想在基地外扩建」不会被误标成预制。
+      var playerBuilt = things.some(function (b) { return !b.locked && b.src !== 'save'; });
+      if (!playerBuilt) {
+        for (var ci = 0; ci < r.cells.length && !playerBuilt; ci++) {
+          var cc = r.cells[ci];
+          var nb = [[cc[0] + 1, cc[1]], [cc[0] - 1, cc[1]], [cc[0], cc[1] + 1], [cc[0], cc[1] - 1]];
+          for (var ni = 0; ni < nb.length && !playerBuilt; ni++) {
+            var list2 = cellMap[key(nb[ni][0], nb[ni][1])];
+            if (list2 && list2.some(function (b) { return !b.locked && b.src !== 'save'; })) playerBuilt = true;
+          }
+        }
+      }
       // 贴在房间边界上的制冷器/加热器也算
       coolers += countWallUnits(cellMap, r.cells, ['cooler', 'passive_cooler']);
       heaters += countWallUnits(cellMap, r.cells, ['heater']);
@@ -568,6 +604,7 @@
         doors: regionDoors[r.id] ? regionDoors[r.id].doors.length : 0,
         space: Math.round(space * 10) / 10, spaceText: spaceRating(space),
         reachable: !!reach[r.id], outdoor: false,
+        homeCells: homeCells, prefab: !!home && homeCells === 0 && !playerBuilt,
         blocked: blocked, coolers: coolers, heaters: heaters, beds: beds, ancient: ancient
       });
     });

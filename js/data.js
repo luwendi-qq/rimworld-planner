@@ -633,7 +633,22 @@
       var n = 0;
       list.forEach(function (r) {
         if (!r || !r.def) return;
-        researches[r.def] = r; n++;
+        var old = researches[r.def];
+        var name = r.name;
+        // 网页导入的游戏资源 / IndexedDB 旧缓存里，科技名可能只有英文。
+        // 已经存在的中文名（内置生成数据）优先保留，别被 "ShipBasics" 这种英文覆盖。
+        if ((!name || (global.RWData.hasCJK && !global.RWData.hasCJK(name))) && old && old.name) {
+          name = old.name;
+        }
+        if ((!name || (global.RWData.hasCJK && !global.RWData.hasCJK(name))) && global.RWData.zhName) {
+          var zh = global.RWData.zhName(r.def);
+          if (zh) name = zh;
+        }
+        var rec = {};
+        Object.keys(r).forEach(function (k) { rec[k] = r[k]; });
+        rec.name = name || r.def;
+        researches[r.def] = rec;
+        n++;
       });
       return n;
     },

@@ -24,7 +24,7 @@ A browser-based **layout planner for RimWorld bases**. Place buildings on the re
 - **Terrain-aware checks** — marsh only has the Light affordance (walls need Heavy), water needs a bridge first, mountain rock must be mined
 - **Workload estimate** — combines colonist skills, research prerequisites and stockpile to tell you whether a blueprint is feasible, how much material it needs and roughly how many in-game days it takes
 - **Lock the backdrop** — save-imported buildings are locked by default (no accidental edits) and excluded from the blueprint export, so you only ship your new plan
-- **Template library** — stop drawing the same standard bedroom forty times: save it once, stamp it out with one click
+- **Template library** — stop drawing the same standard bedroom forty times: save it once, then pick it and click the canvas to place it
 - **Player home area** — reads `Area_Home` and draws it in green; stockpile counts default to the player area (switchable to whole-map)
 - **Click room to locate** — clicking a room in the room list jumps the view to it
 - **Auto-save** — your layout is saved to the browser as you work and restored on the next open
@@ -76,7 +76,7 @@ Or click **Code → Download ZIP** on the repo page and overwrite your old folde
 | **Per-item materials** | 53 stuffs (wood/stone/metal/fabric/leather), long-press to pick, remembered per building — and imported from your save |
 | **Room roles** | Derived from the room's contents using the game's `RoomRoleWorker` rules (bed / stove / workbench / table / shelf…). Beds can be toggled normal / medical / prisoner in the inspector |
 | **Temperature estimate** | Set a target temperature per room (planner-only); coolers/heaters are estimated with `ceil(area × ΔT ÷ 630)` |
-| **Template library** | Save a selection as a named template (standard bedroom, dining room…) and stamp it out with one click instead of drawing it dozens of times |
+| **Template library** | Save a selection as a named template (standard bedroom, dining room…), then pick it and click the canvas to place it instead of drawing it dozens of times |
 | **Layout checks** | Power network via the game's 6-tile connection rule; room flood-fill with the game's space-rating thresholds; outdoor reachability via BFS |
 | **Export image** | "Export image" saves the whole layout (auto-fitted to its bounding box) as a PNG — handy for sharing |
 | **Standard editing** | Marquee select, multi-select, drag to move, copy/paste, delete, undo/redo (incremental, 200 steps, no memory blow-up on big bases) |
