@@ -286,6 +286,56 @@
    * 少一个 tags 就会让 render() 每帧抛异常、整个画布不刷新，所以必须兜住。
    */
   /**
+   * 手绘图标映射。
+   * 提取脚本只能从 defName 猜图标，猜不出来的就留成「通用方块」——
+   * 物品栏里几十个东西长得一模一样。这里按 defName 指定一个像样的手绘图标
+   * （js/icons.js 里那几十个），让它们至少能分辨出来。
+   */
+  var ART_MAP = {
+    // 家具 / 摆件
+    Building_KidOutfitStand: 'statue', Building_OutfitStand: 'statue',
+    BabyDecoration: 'pot', ToyBox: 'barrel', Blackboard: 'shelf',
+    HoopstoneRing: 'horseshoes', GameOfUrBoard: 'table',
+    CannibalPlatter: 'table',
+    // 仪式 / 丧葬
+    GibbetCage: 'barrel', EggBox: 'barrel', Reliquary: 'bench2',
+    ChristmasTree: 'statue', Effigy: 'statue', Skullspike: 'statue',
+    Ideogram: 'statue', Pyre: 'brazier', SacrificialFlag: 'torch',
+    Autobong: 'torch', Burnbong: 'torch', Lectern: 'bench',
+    KneelSheet: 'bench', KneelPillow: 'pot', Pew: 'bench',
+    RitualSpot: 'altar', PsychicRitualSpot: 'altar',
+    // 生化 / 科幻
+    WastepackAtomizer: 'bench2', GeneProcessor: 'bench', GeneBank: 'shelf',
+    GeneExtractor: 'bench2', GeneAssembler: 'bench2',
+    LargeChemfuelTank: 'barrel', ChemfuelTank: 'barrel',
+    LargeThruster: 'generator', SmallThruster: 'generator',
+    BurnoutMechlinkBooster: 'analyzer', ToolCabinet: 'shelf',
+    PsychofluidPump: 'dispenser', MoisturePump: 'dispenser',
+    HoldingPlatform: 'bench', StylingStation: 'dresser',
+    SubcoreEncoder: 'scanner', DeathrestAccelerator: 'bench2',
+    OxygenPump: 'dispenser', Electroharvester: 'scanner',
+    BioferriteShaper: 'bench', BioferriteHarvester: 'drill',
+    PollutionPump: 'dispenser', ProximityDetector: 'scanner',
+    LightBall: 'lamp', FrenzyInducer: 'analyzer',
+    VitalsMonitor: 'scanner', ElectricInhibitor: 'analyzer',
+    SleepSuppressor: 'bench2', ShardInhibitor: 'analyzer',
+    MechbandDish: 'scanner', NeuralSupercharger: 'bench2',
+    GlucosoidPump: 'dispenser', HemogenAmplifier: 'bench2',
+    Hemopump: 'dispenser', SerumCentrifuge: 'bench',
+    MechBooster: 'analyzer', SignalJammer: 'scanner',
+    SleepAccelerator: 'bench2', Loudspeaker: 'console', BandNode: 'console',
+    Drum: 'bench',
+    // 墙体 / 雕像板 / 地毯
+    AncientFortifiedWall: 'wall', OrbitalAncientFortifiedWall: 'wall',
+    GrayWall: 'wall',
+    TotemicSlab_Medium: 'statue', TotemicSlab_Broad: 'statue',
+    SpikecoreFloorStar_Medium: 'statue', SpikecoreFloorStar_Broad: 'statue',
+    AnimalistSlab_Medium: 'statue', AnimalistSlab_Broad: 'statue',
+    MorbidSlab_Medium: 'statue', MorbidSlab_Broad: 'statue',
+    RusticRug_Medium: 'pot', RusticRug_Broad: 'pot'
+  };
+
+  /**
    * 玩家在游戏里造不出来的东西：飞船件、轨道设施、剧情给的运输舱。
    * 留着它们是为了「读存档时能认出来」，但不该出现在物品栏里让人去摆。
    * 按 defName 判定，所以内置库和游戏提取的数据一视同仁。
@@ -314,6 +364,11 @@
       if (!b.cat) b.cat = 'misc';
       if (!b.art) b.art = 'generic';
       if (!b.name) b.name = b.en || b.id || '?';
+      // 猜不出专属图标的手绘映射（别让一堆东西都长成通用方块）
+      if (b.art === 'generic') {
+        var am = ART_MAP[b.def || b.id];
+        if (am) b.art = am;
+      }
       var key = normDef(b.def || b.id || b.en || '');
       // 造不出来的东西：单独归一类，物品栏默认不显示
       if (NOT_BUILDABLE.test(b.def || b.id || '')) {

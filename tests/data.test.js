@@ -79,6 +79,13 @@ test('数据：主要建筑都要有造价或工时，估算面板才准', () =>
   }
 });
 
+test('数据：图标别再一堆通用方块', () => {
+  const generic = ids.filter((id) => D.byId[id].art === 'generic');
+  // 只剩下造不出来的东西（飞船件）用通用图标是可以的
+  const bad = generic.filter((id) => !D.byId[id].noBuild);
+  assert.ok(bad.length <= 5, '还有 ' + bad.length + ' 条可建造的东西是通用图标：' + bad.join(' '));
+});
+
 test('数据：材料名表能查到建造材料', () => {
   assert.ok(D.ITEM_NAMES, '应该有材料中文名表');
   for (const k of ['Steel', 'WoodLog', 'BlocksSandstone', 'Gold', 'Plasteel', 'ComponentIndustrial']) {
