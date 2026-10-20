@@ -10,10 +10,12 @@ extract_defs.py —— 从本地 RimWorld 安装目录读取 Defs，生成精确
 
 它会扫描 Data/ 以及各 DLC 目录（Royalty / Ideology / Biotech / Anomaly / Odyssey）下的
 所有 Defs/**/*.xml，解析 ThingDef，处理 ParentName 继承，提取：
-    defName / label / 占地尺寸 / 电力(耗电·发电·储电) / 美观 / 是否可更换材质 /
-    通行性 / 是否持顶 / 建造分类 / 所属 DLC
+    defName / label / 占地尺寸 / 电力(耗电·发电·储电) / 美观 / 耐久 / 占格率 /
+    是否可更换材质 / 通行性 / 是否持顶 / 建造分类 / 所属 DLC /
+    建造所需(工时 / 固定材料 / 材质数量 / 科技前置 / 技能前置 / 地基要求) /
+    是否在游戏「建筑师」菜单里
 
-生成的文件会被 index.html 自动加载，从而覆盖内置的参考数据。
+生成的字段会被 index.html 自动加载，从而覆盖内置的参考数据。
 本脚本只读取你本机的游戏数据文件用于生成尺寸表，不会复制任何美术资源。
 """
 
@@ -863,6 +865,15 @@ def main():
         }
         if round(beauty, 2) != 0:
             entry['beauty'] = round(beauty, 2)
+        # 耐久（statBases/MaxHitPoints）
+        hp = safe_float(merged['statBases'].get('MaxHitPoints'), 0)
+        if hp > 0:
+            entry['hp'] = int(round(hp))
+        # 占格率：<1 表示东西没占满整格（贴墙件、部分家具）
+        if abs(fill - 1.0) > 0.001:
+            entry['fill'] = round(fill, 3)
+        # 是否在游戏「建筑师」菜单里（有 designationCategory 才是玩家能直接造的）
+        entry['menu'] = 1 if design_cat else 0
         if power_use:
             entry['powerUse'] = power_use
         if power_gen:

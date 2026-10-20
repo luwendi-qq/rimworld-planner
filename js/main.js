@@ -66,6 +66,7 @@
       box.appendChild(b);
     });
     Data.CATEGORIES.forEach(function (c) {
+      if (c.id === 'special') return;   // 造不出来的东西不给页签（搜索还能搜到）
       var n = Data.BUILDINGS.filter(function (b) { return b.cat === c.id; }).length;
       var b = document.createElement('button');
       b.className = 'tab' + (c.id === activeCat ? ' on' : '');
@@ -82,6 +83,42 @@
       b.onclick = function () { activeCat = pair[0]; buildTabs(); buildPalette(); };
       $('catTabs').appendChild(b);
     });
+  }
+
+  /** 物品栏 tooltip 里的「造价 / 工时 / 科技 / 技能」 */
+  function buildInfoText(def) {
+    var out = '';
+    // 造价
+    var cost = [];
+    if (def.cost) {
+      Object.keys(def.cost).forEach(function (k) {
+        var n = def.cost[k];
+        if (!n) return;
+        cost.push((Data.ITEM_NAMES && Data.ITEM_NAMES[k] ? Data.ITEM_NAMES[k] : k) + '×' + n);
+      });
+    }
+    if (def.costStuff) {
+      var sid = (state.lastStuff && state.lastStuff[def.id]) || null;
+      var s = (sid && Data.stuffById) ? Data.stuffById(sid) : null;
+      if (!s && Data.stuffsFor) {
+        var list = Data.stuffsFor(def);
+        s = (list && list.length) ? list[0] : null;
+      }
+      cost.push('材质×' + def.costStuff + (s ? '（' + s.name + '）' : ''));
+    }
+    if (cost.length) out += '\n造价 ' + cost.join('、');
+    if (def.work) out += '\n工时 ' + def.work;
+    if (def.research && def.research.length) {
+      var rs = def.research.map(function (r) {
+        var info = Data.research ? Data.research(r) : null;
+        return info ? info.name : r;
+      });
+      out += '\n科技 ' + rs.join('、');
+    }
+    if (def.skillReq) out += '\n建造技能 ' + def.skillReq;
+    if (def.hp) out += '\n耐久 ' + def.hp;
+    if (def.menu === 0) out += '\n不在建筑师菜单里（做出来的 / 剧情给的）';
+    return out;
   }
 
   function buildPalette() {
@@ -129,6 +166,7 @@
       if (def) {
         label.innerHTML = '<b>' + esc(def.name) + '</b><i>' + def.size[0] + '×' + def.size[1] +
           (def.powerGen ? ' ⚡' + def.powerGen : (def.powerUse ? ' ⚡-' + def.powerUse : '')) +
+          (def.noBuild ? ' <em title="游戏里玩家造不出来，只能读存档时认出来">✖</em>' : '') +
           (def.v && !def.exact ? ' <em title="尺寸可能随版本变动，请以游戏内为准">?</em>' : '') + '</i>' +
           '<i class="stuff" data-stuff="' + esc(def.id) + '"></i>';
         var dn = def.def || def.id;
@@ -136,11 +174,13 @@
         el.title = def.name +
           (en && en !== def.name && en.toLowerCase() !== String(dn).toLowerCase() ? '（' + en + '）' : '') +
           (def.dlc ? '　[' + def.dlc + ']' : '') +
+          (def.noBuild ? '\n⚠ 游戏里玩家造不出来（飞船 / 轨道 / 剧情道具），只能读存档时认出来' : '') +
           '\nid: ' + dn +
           '\n占地 ' + def.size[0] + '×' + def.size[1] +
           (def.powerGen ? '\n发电 ' + def.powerGen + 'W' : '') +
           (def.powerUse ? '\n耗电 ' + def.powerUse + 'W' : '') +
           (def.beauty ? '\n美观 ' + def.beauty : '') +
+          buildInfoText(def) +
           (def.stuffCats && def.stuffCats.length ? '\n可换材质：' + stuffCatsText(def) : '') +
           (def.stuffCats && def.stuffCats.length ? '\n（长按左键选材质）' : '');
       } else if (item.floor) {
@@ -163,8 +203,12 @@
         label.appendChild(fav);
       }
       el.onclick = function () {
-        if (item.def) RW.setBrush('building', item.def.id);
-        else RW.setBrush('floor', item.floor.id);
+        if (item.def) {
+          if (item.def.noBuild) {
+            toast('「' + item.def.name + '」在游戏里玩家造不出来（飞船 / 轨道 / 剧情道具），画了也建不了', true);
+          }
+          RW.setBrush('building', item.def.id);
+        } else RW.setBrush('floor', item.floor.id);
         markActive(el);
         updateBrushInfo();
       };

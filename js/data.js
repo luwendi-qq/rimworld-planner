@@ -39,7 +39,12 @@
     { id: 'security', name: '防卫' },
     { id: 'temperature', name: '温度' },
     { id: 'joy', name: '娱乐' },
-    { id: 'misc', name: '杂项' }
+    { id: 'statue', name: '雕像纪念' },
+    { id: 'ritual', name: '仪式祭祀' },
+    { id: 'funeral', name: '丧葬' },
+    { id: 'tech', name: '科幻科技' },
+    { id: 'misc', name: '杂项' },
+    { id: 'special', name: '特殊（造不出来）' }
   ];
 
   // 常用「地板层」贴图（只影响观感，不参与校验）
@@ -280,6 +285,27 @@
    * 规范化：保证每条都有 tags / size / cat / art。
    * 少一个 tags 就会让 render() 每帧抛异常、整个画布不刷新，所以必须兜住。
    */
+  /**
+   * 玩家在游戏里造不出来的东西：飞船件、轨道设施、剧情给的运输舱。
+   * 留着它们是为了「读存档时能认出来」，但不该出现在物品栏里让人去摆。
+   * 按 defName 判定，所以内置库和游戏提取的数据一视同仁。
+   */
+  var NOT_BUILDABLE = /^(Ship|Gravship|GravAnchor|GravFieldExtender|PilotConsole|PassengerShuttle|TransportPod|Orbital)/;
+
+  /**
+   * 分类细化：游戏把很多东西都塞在「Miscellaneous」里，
+   * 这里按性质分开，找东西方便得多。
+   */
+  var CAT_RULES = [
+    { cat: 'statue', re: /^(Sculpture|Statue|Ideogram|Stele|TotemicSlab|SpikecoreFloorStar|RusticRug|AnimalistSlab|MorbidSlab|ChristmasTree)/ },
+    { cat: 'funeral', re: /^(Grave|Sarcophagus|Pyre|Reliquary)/ },
+    { cat: 'ritual', re: /^(Altar|RitualSpot|PsychicRitualSpot|MeditationSpot|MarriageSpot|PartySpot|CannibalPlatter|Effigy|GibbetCage|Skullspike|SacrificialFlag|IncenseShrine|NatureShrine|Autobong|Burnbong|BurnoutMechlinkBooster|Darktorch|Lectern|KneelSheet|KneelPillow|Pew|SanguphageMeetingTorch)/ },
+    { cat: 'tech', re: /(Mech|GeneAssembler|GeneBank|GeneExtractor|GeneProcessor|Biosculpter|GrowthVat|Hemogen|Hemopump|GlucosoidPump|SerumCentrifuge|Subcore|Psychofluid|Bioferrite|VacBarrier|ShardBeacon|ShardInhibitor|VitalsMonitor|Electroharvester|AtmosphericHeater|FrenzyInducer|ProximityDetector|SleepAccelerator|SleepSuppressor|ElectricInhibitor|PollutionPump|Recharger|WastepackAtomizer|OxygenPump|MoisturePump|Thruster|Deathrest|NeuralSupercharger|GravAnchor|GravFieldExtender|GravcorePowerCell|Vanometric)/ },
+    { cat: 'production', re: /(ChemfuelTank|MultiAnalyzer|PodLauncher|ToolCabinet|EggBox|Hopper|Brewery|DeepDrill)/ },
+    { cat: 'security', re: /(Scanner|FirefoamPopper|TrapIED|HunterDroneTrap)/ },
+    { cat: 'joy', re: /(Loudspeaker|LightBall|Drum)/ }
+  ];
+
   function normalizeDefs() {
     for (var n = 0; n < BUILDINGS.length; n++) {
       var b = BUILDINGS[n];
@@ -288,6 +314,17 @@
       if (!b.cat) b.cat = 'misc';
       if (!b.art) b.art = 'generic';
       if (!b.name) b.name = b.en || b.id || '?';
+      var key = normDef(b.def || b.id || b.en || '');
+      // 造不出来的东西：单独归一类，物品栏默认不显示
+      if (NOT_BUILDABLE.test(b.def || b.id || '')) {
+        b.noBuild = 1;
+        b.cat = 'special';
+      } else if (b.cat === 'misc') {
+        // 杂项太杂，按性质再分一分
+        for (var r = 0; r < CAT_RULES.length; r++) {
+          if (CAT_RULES[r].re.test(b.def || b.id || '')) { b.cat = CAT_RULES[r].cat; break; }
+        }
+      }
     }
     nameIndex = null;
   }
