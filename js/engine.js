@@ -16,6 +16,9 @@
     floors: {},          // "x,z" -> floorId
     plannedFloors: {},   // "x,z" -> 1=规划中(蓝图) 2=规划中但被禁用
     lockedFloors: {},    // "x,z" -> true（存档原有地板，导出时排除）
+    roomRole: {},        // "x,z" -> 房间用途 id（卧室/厨房/…），写在房间的每一格上
+    roomTemp: {},        // "x,z" -> 自定义目标温度（只在和用途默认值不同时才写）
+    ambientTemp: 21,     // 环境（室外）温度，°C
     nextUid: 1,
     selection: {},       // uid -> true（建筑）
     floorSelection: {},  // "x,z" -> true（地板，框选后可整片删）
@@ -307,7 +310,10 @@
       }),
       floors: copyMap(state.floors),
       lockedFloors: copyMap(state.lockedFloors),
-      plannedFloors: copyMap(state.plannedFloors)
+      plannedFloors: copyMap(state.plannedFloors),
+      roomRole: copyMap(state.roomRole),
+      roomTemp: copyMap(state.roomTemp),
+      ambientTemp: state.ambientTemp
     };
   }
   function restoreState(s) {
@@ -323,6 +329,9 @@
     state.floors = copyMap(s.floors);
     state.lockedFloors = copyMap(s.lockedFloors);
     state.plannedFloors = copyMap(s.plannedFloors);
+    state.roomRole = copyMap(s.roomRole);
+    state.roomTemp = copyMap(s.roomTemp);
+    if (s.ambientTemp != null) state.ambientTemp = s.ambientTemp;
     state.selection = {};
     state.floorSelection = {};
     reindex(); render(); emit('change');
@@ -1860,6 +1869,9 @@
     state.floors = data.floors || {};
     state.plannedFloors = data.plannedFloors || {};
     state.lockedFloors = data.lockedFloors || {};
+    state.roomRole = data.roomRole || {};
+    state.roomTemp = data.roomTemp || {};
+    if (data.ambientTemp != null) state.ambientTemp = data.ambientTemp;
     state.lastStuff = data.lastStuff || {};
     state.mapName = data.name || '未命名布局';
     state.terrain = unpackLayer(data.terrain);
@@ -1897,6 +1909,8 @@
       }),
       floors: state.floors, plannedFloors: state.plannedFloors,
       lockedFloors: state.lockedFloors,
+      roomRole: state.roomRole, roomTemp: state.roomTemp,
+      ambientTemp: state.ambientTemp,
       lastStuff: state.lastStuff,
       terrain: packLayer(state.terrain), rocks: packLayer(state.rocks), home: packLayer(state.home),
       saveInfo: state.saveInfo, respectTerrain: state.respectTerrain, strictTerrain: state.strictTerrain,

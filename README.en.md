@@ -17,7 +17,7 @@
 A browser-based **layout planner for RimWorld bases**. Place buildings on the real grid footprint, run a pass of layout checks, then export a `.xml` blueprint you can drop back into the game.
 
 - **Correct footprints** — 250×250 grid (configurable), `R` to rotate; multi-cell buildings (beds, tables, fabrication benches) change footprint with rotation
-- **Layout checks** — overlap · power network · room detection & space rating · reachability · temperature estimate
+- **Layout checks** — overlap · power network · room detection & space rating · reachability · room roles & temperature estimate
 - **Export to game** — real Blueprints-mod `.xml`, **including each building's material and rotation**; workers will build it for real
 - **Import your save** — load an existing `.rws` colony as a backdrop and keep planning; it also reads the map **terrain/mountain**, **colonist skills**, **research progress** and **stored materials**
 - **Terrain-aware checks** — marsh only has the Light affordance (walls need Heavy), water needs a bridge first, mountain rock must be mined
@@ -71,6 +71,7 @@ Or click **Code → Download ZIP** on the repo page and overwrite your old folde
 | **Never silently overwrites** | Drawing onto an existing building is blocked ("delete that tile first") instead of quietly replacing your plan; conduits can still go under walls and coolers / wall lamps can share a tile with a wall |
 | **Auto-connecting conduits** | Conduits draw connections toward their neighbours; a lone tile becomes a junction box |
 | **Per-item materials** | 53 stuffs (wood/stone/metal/fabric/leather), long-press to pick, remembered per building — and imported from your save |
+| **Room roles** | Tag a room as bedroom / kitchen / workshop / cold storage / freezer; checks then verify the room has what it needs and how many coolers its target temperature calls for |
 | **Layout checks** | Power network via the game's 6-tile connection rule; room flood-fill with the game's space-rating thresholds; outdoor reachability via BFS |
 | **Export image** | "View PNG" exports what you see, "Full PNG" auto-fits the whole layout — handy for sharing |
 | **Standard editing** | Marquee select, multi-select, drag to move, copy/paste, delete, undo/redo (incremental, 200 steps, no memory blow-up on big bases) |

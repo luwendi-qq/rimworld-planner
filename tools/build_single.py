@@ -35,6 +35,7 @@ SCRIPT_ORDER = [
     'js/icons.js',
     'js/engine.js',
     'js/site.js',                  # 存档地形 / 山体 / 可建造性
+    'js/rooms.js',                # 房间指定（用途 / 目标温度）与温控估算
     'js/checks.js',
     'js/workload.js',              # 可行性 / 工作量估算
     'js/exporters.js',

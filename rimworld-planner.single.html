@@ -259,6 +259,14 @@ label.chk:hover { color: var(--fg); }
 .srow:hover { background: var(--bg3); }
 .rrow.roomJump { cursor: pointer; }
 .rrow.roomJump:hover { background: rgba(255,255,255,.08); }
+/* 房间卡片：上面一行是摘要（可点定位），下面一行是用途选择 */
+.roomBox { display: block; margin-bottom: 4px; }
+.roomBox .roomJump { display: block; padding: 3px 4px; border-radius: 4px; cursor: pointer; }
+.roomBox .roomJump:hover { background: rgba(255,255,255,.08); }
+.roomRoleRow { display: flex; align-items: center; gap: 6px; padding: 0 4px 3px; }
+.roomRoleRow select { flex: 1; min-width: 0; font-size: 12px; padding: 2px 4px; }
+.roomTemp { font-size: 11.5px; color: var(--fg2); display: flex; align-items: center; gap: 3px; white-space: nowrap; }
+.roomTemp input { width: 52px; font-size: 11.5px; padding: 1px 3px; }
 #toolsGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
 #layers, #planOpts { display: flex; flex-wrap: wrap; gap: 8px 12px; font-size: 12px; }
 .swatchRow { display: flex; flex-wrap: wrap; gap: 4px; }
@@ -499,7 +507,7 @@ kbd {
 .pitem b { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
 
 </style>
-<!-- 单文件构建：2026-10-20 10:30  内联模块：js/data.js, js/zh-names.js, js/buildings.generated.js, js/sprites.js, js/vendor/fzstd.js, js/gamezip.js, js/gamedefs.js, js/gameimport.js, js/icons.js, js/engine.js, js/site.js, js/checks.js, js/workload.js, js/exporters.js, js/io.js, js/main.js -->
+<!-- 单文件构建：2026-10-20 10:52  内联模块：js/data.js, js/zh-names.js, js/buildings.generated.js, js/sprites.js, js/vendor/fzstd.js, js/gamezip.js, js/gamedefs.js, js/gameimport.js, js/icons.js, js/engine.js, js/site.js, js/rooms.js, js/checks.js, js/workload.js, js/exporters.js, js/io.js, js/main.js -->
 </head>
 
 <body>
@@ -706,6 +714,12 @@ kbd {
 
       <div class="panel">
         <h3>房间</h3>
+        <div class="group" style="margin-bottom:6px">
+          <label title="室外 / 环境温度。用来算每个房间要几台制冷器或加热器">
+            环境温度 <input type="number" id="ambientTemp" value="21" min="-60" max="60" step="1"
+              style="width:64px"> °C
+          </label>
+        </div>
         <div id="roomList"></div>
       </div>
 
@@ -4415,6 +4429,9 @@ kbd {
     floors: {},          // "x,z" -> floorId
     plannedFloors: {},   // "x,z" -> 1=规划中(蓝图) 2=规划中但被禁用
     lockedFloors: {},    // "x,z" -> true（存档原有地板，导出时排除）
+    roomRole: {},        // "x,z" -> 房间用途 id（卧室/厨房/…），写在房间的每一格上
+    roomTemp: {},        // "x,z" -> 自定义目标温度（只在和用途默认值不同时才写）
+    ambientTemp: 21,     // 环境（室外）温度，°C
     nextUid: 1,
     selection: {},       // uid -> true（建筑）
     floorSelection: {},  // "x,z" -> true（地板，框选后可整片删）
@@ -4706,7 +4723,10 @@ kbd {
       }),
       floors: copyMap(state.floors),
       lockedFloors: copyMap(state.lockedFloors),
-      plannedFloors: copyMap(state.plannedFloors)
+      plannedFloors: copyMap(state.plannedFloors),
+      roomRole: copyMap(state.roomRole),
+      roomTemp: copyMap(state.roomTemp),
+      ambientTemp: state.ambientTemp
     };
   }
   function restoreState(s) {
@@ -4722,6 +4742,9 @@ kbd {
     state.floors = copyMap(s.floors);
     state.lockedFloors = copyMap(s.lockedFloors);
     state.plannedFloors = copyMap(s.plannedFloors);
+    state.roomRole = copyMap(s.roomRole);
+    state.roomTemp = copyMap(s.roomTemp);
+    if (s.ambientTemp != null) state.ambientTemp = s.ambientTemp;
     state.selection = {};
     state.floorSelection = {};
     reindex(); render(); emit('change');
@@ -6259,6 +6282,9 @@ kbd {
     state.floors = data.floors || {};
     state.plannedFloors = data.plannedFloors || {};
     state.lockedFloors = data.lockedFloors || {};
+    state.roomRole = data.roomRole || {};
+    state.roomTemp = data.roomTemp || {};
+    if (data.ambientTemp != null) state.ambientTemp = data.ambientTemp;
     state.lastStuff = data.lastStuff || {};
     state.mapName = data.name || '未命名布局';
     state.terrain = unpackLayer(data.terrain);
@@ -6296,6 +6322,8 @@ kbd {
       }),
       floors: state.floors, plannedFloors: state.plannedFloors,
       lockedFloors: state.lockedFloors,
+      roomRole: state.roomRole, roomTemp: state.roomTemp,
+      ambientTemp: state.ambientTemp,
       lastStuff: state.lastStuff,
       terrain: packLayer(state.terrain), rocks: packLayer(state.rocks), home: packLayer(state.home),
       saveInfo: state.saveInfo, respectTerrain: state.respectTerrain, strictTerrain: state.strictTerrain,
@@ -6784,6 +6812,166 @@ kbd {
 
 </script>
 <script>
+/* ==== js/rooms.js ==== */
+/*
+ * rooms.js —— 房间指定（designation）与温控估算
+ *
+ * RimWorld 里房间不只是「围起来的一块地」：你可以给它指定用途
+ * （卧室 / 厨房 / 工坊 / 冷藏 / 冷冻…），并设定目标温度。
+ * 用途决定了两件事：
+ *   1) 房间里该有什么（卧室要有床、厨房要有炉灶、工坊要有工作台…）
+ *   2) 房间里该有多少台制冷机 / 加热器
+ *
+ * 这里实现的是本工具自己的近似模型（不是游戏内物理的精确复刻）：
+ *   冷（热）量需求 ∝ 面积 × |环境温度 − 目标温度|
+ *   一台制冷机 ≈ 30 格 × 21°C 温差当量；一台加热器 ≈ 25 格 × 21°C
+ *   所以：需要台数 = ceil(面积 × ΔT / (每台的格数 × 21))
+ * 在「常温 21°C → 0°C」这个最常见的情形下，等价于大家常用的
+ * 「一台制冷机管 30 格」经验值。
+ */
+(function (global) {
+  'use strict';
+
+  var Data = global.RWData;
+
+  // ---------------------------------------------------------------- 房间用途
+  /**
+   * need：这一用途要求房间里至少有一件满足条件的建筑。
+   *   tags —— 建筑带这个标签
+   *   defs —— 建筑 id 在这个列表里
+   *   cats —— 建筑分类在这个列表里
+   */
+  var ROLES = [
+    { id: 'none',       name: '普通房间', temp: 21,  need: null,                     desc: '不指定用途' },
+    { id: 'bedroom',    name: '卧室',     temp: 21,  need: { tags: ['bed'] },        desc: '住人，至少要有一张床' },
+    { id: 'barracks',   name: '兵营',     temp: 21,  need: { tags: ['bed'] },        desc: '士兵睡觉的地方' },
+    { id: 'prison',     name: '囚室',     temp: 21,  need: { tags: ['bed'] },        desc: '关俘虏，最好用栅栏门' },
+    { id: 'hospital',   name: '病房',     temp: 21,  need: { defs: ['hospital_bed'] }, desc: '需要病床' },
+    { id: 'kitchen',    name: '厨房',     temp: 21,  need: { defs: ['stove_electric', 'stove_fuel', 'campfire'] }, desc: '需要炉灶' },
+    { id: 'dining',     name: '餐厅',     temp: 21,  need: { tags: ['solid'] },       desc: '要有能坐的桌子' },
+    { id: 'recreation', name: '娱乐室',   temp: 21,  need: { cats: ['joy'] },         desc: '要有娱乐设施' },
+    { id: 'workshop',   name: '工坊',     temp: 21,  need: { cats: ['production'] },  desc: '要有一台工作台' },
+    { id: 'lab',        name: '实验室',   temp: 21,  need: { defs: ['research_bench', 'hi_tech_research_bench'] }, desc: '需要研究台' },
+    { id: 'storage',    name: '储藏室',   temp: 21,  need: null,                     desc: '放东西' },
+    { id: 'cold',       name: '冷藏室',   temp: 4,   need: null,                     desc: '目标 4°C（放食物）' },
+    { id: 'freezer',    name: '冷冻室',   temp: -10, need: null,                     desc: '目标 -10°C（放肉）' }
+  ];
+
+  // 温控当量
+  var COOLER_CELLS = 30;   // 一台制冷机在「温差 21°C」时能压住的格数
+  var HEATER_CELLS = 25;   // 一台加热器的当量格数
+  var REF_DELTA = 21;      // 参考温差（常温 21°C → 0°C）
+
+  function roleById(id) {
+    for (var i = 0; i < ROLES.length; i++) if (ROLES[i].id === id) return ROLES[i];
+    return null;
+  }
+
+  // ---------------------------------------------------------------- 指定
+  /** 房间当前的指定：扫它所有格子，谁被指定过就算谁的 */
+  function roleOf(state, room) {
+    var map = state.roomRole || {};
+    var temps = state.roomTemp || {};
+    var rid = null, temp = null;
+    for (var i = 0; i < room.cells.length; i++) {
+      var k = room.cells[i][0] + ',' + room.cells[i][1];
+      var v = map[k];
+      if (!v) continue;
+      if (!rid) rid = v;
+      if (temps[k] != null) temp = temps[k];
+    }
+    var def = roleById(rid) || ROLES[0];
+    if (temp == null) temp = def.temp;
+    return { role: def.id, name: def.name, temp: temp, def: def };
+  }
+
+  /**
+   * 给房间指定用途。
+   * 写进它的每一格 —— 这样房间之后被拆开时，两半都还保留这个用途（和游戏一致）。
+   */
+  function setRole(state, room, roleId, temp) {
+    if (!state.roomRole) state.roomRole = {};
+    if (!state.roomTemp) state.roomTemp = {};
+    var def = roleById(roleId) || ROLES[0];
+    room.cells.forEach(function (c) {
+      var k = c[0] + ',' + c[1];
+      if (def.id === 'none') {
+        delete state.roomRole[k];
+        delete state.roomTemp[k];
+        return;
+      }
+      state.roomRole[k] = def.id;
+      if (temp != null && temp !== def.temp) state.roomTemp[k] = temp;
+      else delete state.roomTemp[k];
+    });
+    return def;
+  }
+
+  /** 清掉不在任何房间里的残留指定（比如房间被拆散后） */
+  function prune(state, rooms) {
+    if (!state.roomRole) return;
+    var alive = {};
+    rooms.forEach(function (r) {
+      r.cells.forEach(function (c) { alive[c[0] + ',' + c[1]] = true; });
+    });
+    Object.keys(state.roomRole).forEach(function (k) {
+      if (!alive[k]) delete state.roomRole[k];
+    });
+    if (state.roomTemp) {
+      Object.keys(state.roomTemp).forEach(function (k) {
+        if (!alive[k]) delete state.roomTemp[k];
+      });
+    }
+  }
+
+  // ---------------------------------------------------------------- 温控
+  /**
+   * 这个房间要达到目标温度，需要几台制冷机 / 加热器。
+   * 返回 { kind: 'cool'|'heat'|'none', need: 台数, delta: 温差 }
+   */
+  function temperatureNeed(room, ambient, target) {
+    var delta = (ambient == null ? 21 : ambient) - (target == null ? 21 : target);
+    if (delta > 0) {
+      return { kind: 'cool', need: Math.ceil(room.area * delta / (COOLER_CELLS * REF_DELTA)), delta: delta };
+    }
+    if (delta < 0) {
+      return { kind: 'heat', need: Math.ceil(room.area * (-delta) / (HEATER_CELLS * REF_DELTA)), delta: delta };
+    }
+    return { kind: 'none', need: 0, delta: 0 };
+  }
+
+  /** 房间里有没有满足该用途要求的建筑 */
+  function meetsNeed(room, need) {
+    if (!need) return true;
+    for (var i = 0; i < room.things.length; i++) {
+      var def = Data.byId[room.things[i].defId];
+      if (!def) continue;
+      if (need.tags && need.tags.length) {
+        var ok = need.tags.every(function (t) { return def.tags && def.tags.indexOf(t) >= 0; });
+        if (!ok) continue;
+      }
+      if (need.defs && need.defs.length && need.defs.indexOf(def.id) < 0) continue;
+      if (need.cats && need.cats.length && need.cats.indexOf(def.cat) < 0) continue;
+      return true;
+    }
+    return false;
+  }
+
+  global.RWRooms = {
+    ROLES: ROLES,
+    roleById: roleById,
+    roleOf: roleOf,
+    setRole: setRole,
+    prune: prune,
+    temperatureNeed: temperatureNeed,
+    meetsNeed: meetsNeed,
+    COOLER_CELLS: COOLER_CELLS,
+    HEATER_CELLS: HEATER_CELLS
+  };
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
 /* ==== js/checks.js ==== */
 /*
  * checks.js —— 布局可行性校验
@@ -6821,6 +7009,26 @@ kbd {
     if (v < 130) return '相当宽敞';
     if (v < 349.5) return '非常宽敞';
     return '极其宽敞';
+  }
+
+  // 房间用途要求的人话描述
+  var NEED_CN = { bed: '床', solid: '家具' };
+  var NEED_CAT_CN = { production: '工作台', joy: '娱乐设施' };
+  function needText(need) {
+    if (!need) return '必要的东西';
+    var parts = [];
+    if (need.defs && need.defs.length) {
+      parts.push(need.defs.map(function (d) {
+        var def = Data.byId[d]; return def ? def.name : d;
+      }).join(' / '));
+    }
+    if (need.tags && need.tags.length) {
+      parts.push(need.tags.map(function (t) { return NEED_CN[t] || t; }).join(' / '));
+    }
+    if (need.cats && need.cats.length) {
+      parts.push(need.cats.map(function (c) { return NEED_CAT_CN[c] || c; }).join(' / '));
+    }
+    return parts.join('、') || '必要的东西';
   }
 
   function analyse(state) {
@@ -6988,20 +7196,110 @@ kbd {
       }
     });
 
-    // ---------- 5. 温控估算 ----------
+    // ---------- 5. 房间指定 + 温控 ----------
+    var Rooms = global.RWRooms;
+    var ambient = state.ambientTemp == null ? 21 : state.ambientTemp;
     rooms.rooms.forEach(function (r, idx) {
-      r.cooling = Math.max(1, Math.ceil(r.area / 30));
-      r.heating = Math.max(1, Math.ceil(r.area / 30));
-      // 里面什么都没有的空腔（天然岩洞 / 遗迹）不用提示制冷
-      var furnished = (r.beds || 0) > 0;   // 只有住人的房间才提示制冷，遗迹/空腔不提示
-      if (furnished && r.area >= 60 && r.coolers < r.cooling) {
-        issues.push({
-          kind: 'temp', level: 'info',
-          msg: '房间 #' + (idx + 1) + '（' + r.area + ' 格）估算需要约 ' + r.cooling + ' 台制冷器，当前只有 ' + r.coolers + ' 台',
-          cells: r.cells
-        });
-      }
+      var ro = Rooms
+        ? Rooms.roleOf(state, r)
+        : { role: 'none', name: '普通房间', temp: 21, def: null };
+      r.role = ro.role;
+      r.roleName = ro.name;
+      r.temp = ro.temp;
+      r.def = ro.def;
+      r.ambient = ambient;
+      var need = Rooms
+        ? Rooms.temperatureNeed(r, ambient, ro.temp)
+        : { kind: 'cool', need: Math.max(1, Math.ceil(r.area / 30)), delta: 21 };
+      r.tempNeed = need;
+      // 兼容旧字段：cooling / heating 表示「需要几台」
+      r.cooling = need.kind === 'cool' ? need.need : 0;
+      r.heating = need.kind === 'heat' ? need.need : 0;
+      r.coolingOld = Math.max(1, Math.ceil(r.area / 30));   // 老的经验值，仅供参考
     });
+
+    // 用途要求的检查
+    if (Rooms) {
+      rooms.rooms.forEach(function (r, idx) {
+        var label = '房间 #' + (idx + 1);
+        if (r.role !== 'none' && r.def && r.def.need && !Rooms.meetsNeed(r, r.def.need)) {
+          issues.push({
+            kind: 'roomNeed', level: 'warn',
+            msg: label + ' 指定为「' + r.roleName + '」，但里面没有' + needText(r.def.need) +
+                 '（' + r.roleName + '需要：' + r.def.desc + '）',
+            cells: r.cells
+          });
+        }
+        // 有床却没指定成卧室
+        if (r.beds > 0 && r.role !== 'bedroom' && r.role !== 'barracks' && r.role !== 'prison' && !r.ancient) {
+          issues.push({
+            kind: 'roomRole', level: 'info',
+            msg: label + ' 里有 ' + r.beds + ' 张床，指定成「卧室」殖民者才能在这儿睡',
+            cells: r.cells
+          });
+        }
+        // 温控
+        if (r.tempNeed.kind === 'cool' && r.coolers < r.tempNeed.need) {
+          issues.push({
+            kind: 'temp', level: 'info',
+            msg: label + '（' + r.roleName + '，目标 ' + r.temp + '°C，环境 ' + ambient + '°C）估算需要约 ' +
+                 r.tempNeed.need + ' 台制冷器，当前只有 ' + r.coolers + ' 台',
+            cells: r.cells
+          });
+        }
+        if (r.tempNeed.kind === 'heat' && r.heaters < r.tempNeed.need) {
+          issues.push({
+            kind: 'temp', level: 'info',
+            msg: label + '（' + r.roleName + '，目标 ' + r.temp + '°C，环境 ' + ambient + '°C）估算需要约 ' +
+                 r.tempNeed.need + ' 台加热器，当前只有 ' + r.heaters + ' 台',
+            cells: r.cells
+          });
+        }
+      });
+    }
+
+    // ---------- 5.5 制冷机的冷热端 ----------
+    // 游戏里制冷机是「一冷一热」：冷的那侧房间降温，热的那侧房间升温。
+    // 所以最常见的翻车点就是：它两侧各是一个房间 —— 一个变冷一个变热。
+    // 这个判断不依赖朝向，所以两边到底是哪边冷都无所谓。
+    (function () {
+      var rgOf = {};
+      rooms.regions.forEach(function (rg) {
+        rg.cells.forEach(function (c) { rgOf[key(c[0], c[1])] = rg; });
+      });
+      state.buildings.forEach(function (b) {
+        var def = Data.byId[b.defId];
+        if (!def || def.id !== 'cooler') return;
+        var zs = RW.zonesOf(def, b.rot);
+        if (zs.length < 2) return;
+        var sides = zs.map(function (zn) {
+          var cx = b.x + zn.x + Math.floor(zn.w / 2);
+          var cz = b.z + zn.z + Math.floor(zn.h / 2);
+          return rgOf[key(cx, cz)] || null;
+        });
+        var a = sides[0], b2 = sides[1];
+        if (!a && !b2) {
+          issues.push({
+            kind: 'coolerSide', level: 'warn',
+            msg: '有一台制冷机两侧都不是房间，它冷不到任何地方（要装在房间的墙上）',
+            cells: [[b.x, b.z]]
+          });
+        } else if (a && b2 && a !== b2) {
+          issues.push({
+            kind: 'coolerSide', level: 'warn',
+            msg: '有一台制冷机两侧是两个不同的房间：冷的那间会降温、热的那间会升温。' +
+                 '把它挪到「一侧是房间、另一侧通室外」的位置才对',
+            cells: [[b.x, b.z]]
+          });
+        } else if (a && b2 && a === b2) {
+          issues.push({
+            kind: 'coolerSide', level: 'info',
+            msg: '有一台制冷机装在房间内部，冷热端在同一个房间里，制不成冷',
+            cells: [[b.x, b.z]]
+          });
+        }
+      });
+    })();
 
     state.issues = issues;
     state.powerInfo = power;
@@ -7221,13 +7519,14 @@ kbd {
       var blocked = 0, coolers = 0, heaters = 0, beds = 0, ancient = false;
       // 设备按「个数」统计：床是 1×2 的，会占两格，不能按格子算成两张床
       var counted = {};
+      var things = [];
       r.cells.forEach(function (c) {
         var list = cellMap[key(c[0], c[1])] || [];
         list.forEach(function (b) {
           var def = Data.byId[b.defId]; if (!def) return;
           if (blocksWalk(def)) blocked++;
           var once = !counted[b.uid];
-          if (once) counted[b.uid] = true;
+          if (once) { counted[b.uid] = true; things.push(b); }
           if (once && (def.id === 'cooler' || def.id === 'passive_cooler')) coolers++;
           if (once && def.id === 'heater') heaters++;
           if (once && has(def, 'bed')) beds++;
@@ -7239,7 +7538,8 @@ kbd {
       heaters += countWallUnits(cellMap, r.cells, ['heater']);
       var space = 1.4 * area - 0.9 * blocked;
       rooms.push({
-        area: area, cells: r.cells, doors: regionDoors[r.id] ? regionDoors[r.id].doors.length : 0,
+        id: r.id, area: area, cells: r.cells, things: things,
+        doors: regionDoors[r.id] ? regionDoors[r.id].doors.length : 0,
         space: Math.round(space * 10) / 10, spaceText: spaceRating(space),
         reachable: !!reach[r.id], outdoor: false,
         blocked: blocked, coolers: coolers, heaters: heaters, beds: beds, ancient: ancient
@@ -8573,6 +8873,7 @@ kbd {
   'use strict';
 
   var RW = global.RW, Data = global.RWData, Art = global.RWArt, X = global.RWExport, Io = global.RWIo, Checks = global.RWChecks;
+  var Rooms = global.RWRooms;
   var state = RW.state;
   var $ = function (id) { return document.getElementById(id); };
 
@@ -9043,15 +9344,56 @@ kbd {
 
     // 房间
     var rb = $('roomList');
+    var roleOptions = function (cur) {
+      if (!Rooms) return '';
+      return Rooms.ROLES.map(function (x) {
+        return '<option value="' + x.id + '"' + (x.id === cur ? ' selected' : '') + '>' + esc(x.name) + '</option>';
+      }).join('');
+    };
     rb.innerHTML = lastReport.rooms.length ? lastReport.rooms.map(function (r, i) {
-      return '<div class="rrow roomJump" data-idx="' + i + '" title="点击定位到这个房间"><b>房间 #' + (i + 1) + '</b> ' + r.area + ' 格 · 空间 ' + r.space +
-        '（' + r.spaceText + '）· 门 ' + r.doors + ' · 制冷器 ' + r.coolers + '/' + r.cooling +
-        ' ' + (r.reachable ? '' : '<span class="bad">不通</span>') + '</div>';
+      var tempRow = '';
+      if (r.role === 'cold' || r.role === 'freezer') {
+        tempRow = '<label class="roomTemp">目标 <input type="number" class="roomTempIn" data-idx="' + i +
+                  '" value="' + r.temp + '" min="-60" max="60" step="1"> °C</label>';
+      }
+      var tempInfo = '';
+      if (r.tempNeed && r.tempNeed.kind === 'cool' && r.tempNeed.need > 0) {
+        tempInfo = ' · 需制冷 ' + r.coolers + '/' + r.tempNeed.need;
+      } else if (r.tempNeed && r.tempNeed.kind === 'heat' && r.tempNeed.need > 0) {
+        tempInfo = ' · 需加热 ' + r.heaters + '/' + r.tempNeed.need;
+      }
+      return '<div class="rrow roomBox" data-idx="' + i + '">' +
+        '<div class="roomJump" data-idx="' + i + '" title="点击定位到这个房间"><b>房间 #' + (i + 1) + '</b> ' +
+        r.area + ' 格 · 空间 ' + r.space + '（' + r.spaceText + '）· 门 ' + r.doors +
+        tempInfo + ' ' + (r.reachable ? '' : '<span class="bad">不通</span>') + '</div>' +
+        '<div class="roomRoleRow"><select class="roomRole" data-idx="' + i + '" title="指定这个房间的用途">' +
+        roleOptions(r.role) + '</select>' + tempRow + '</div>' +
+        '</div>';
     }).join('') : '<div class="muted">没有封闭的房间</div>';
     Array.prototype.forEach.call(rb.querySelectorAll('.roomJump'), function (el) {
       el.onclick = function () {
         var r = lastReport.rooms[+el.dataset.idx];
         if (r) focusCells(r.cells);
+      };
+    });
+    Array.prototype.forEach.call(rb.querySelectorAll('.roomRole'), function (el) {
+      el.onchange = function () {
+        if (!Rooms) return;
+        var r = lastReport.rooms[+el.dataset.idx];
+        if (!r) return;
+        Rooms.setRole(state, r, this.value);
+        runCheck();
+      };
+    });
+    Array.prototype.forEach.call(rb.querySelectorAll('.roomTempIn'), function (el) {
+      el.onchange = function () {
+        if (!Rooms) return;
+        var r = lastReport.rooms[+el.dataset.idx];
+        if (!r) return;
+        var t = parseFloat(this.value);
+        if (isNaN(t)) return;
+        Rooms.setRole(state, r, r.role, t);
+        runCheck();
       };
     });
 
@@ -9848,6 +10190,17 @@ kbd {
 
     // 校验
     $('btnCheck2').onclick = runCheck;
+
+    // 环境温度（算制冷 / 加热需求用）
+    if ($('ambientTemp')) {
+      $('ambientTemp').value = state.ambientTemp == null ? 21 : state.ambientTemp;
+      $('ambientTemp').onchange = function () {
+        var t = parseFloat(this.value);
+        if (isNaN(t)) { this.value = state.ambientTemp; return; }
+        state.ambientTemp = t;
+        runCheck();
+      };
+    }
 
     // 自动更新
     RW.on('change', function () {

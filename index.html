@@ -212,6 +212,12 @@
 
       <div class="panel">
         <h3>房间</h3>
+        <div class="group" style="margin-bottom:6px">
+          <label title="室外 / 环境温度。用来算每个房间要几台制冷器或加热器">
+            环境温度 <input type="number" id="ambientTemp" value="21" min="-60" max="60" step="1"
+              style="width:64px"> °C
+          </label>
+        </div>
         <div id="roomList"></div>
       </div>
 
@@ -383,6 +389,7 @@
   <script src="js/engine.js"></script>
   <!-- 存档地形 / 山体 / 可建造性 -->
   <script src="js/site.js"></script>
+  <script src="js/rooms.js"></script>
   <script src="js/checks.js"></script>
   <script src="js/workload.js"></script>
   <script src="js/exporters.js"></script>

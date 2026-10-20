@@ -26,6 +26,7 @@ const FILES = [
   'js/icons.js',
   'js/engine.js',
   'js/site.js',
+  'js/rooms.js',
   'js/checks.js',
   'js/workload.js',
   'js/exporters.js',

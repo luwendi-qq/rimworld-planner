@@ -36,6 +36,26 @@
     return '极其宽敞';
   }
 
+  // 房间用途要求的人话描述
+  var NEED_CN = { bed: '床', solid: '家具' };
+  var NEED_CAT_CN = { production: '工作台', joy: '娱乐设施' };
+  function needText(need) {
+    if (!need) return '必要的东西';
+    var parts = [];
+    if (need.defs && need.defs.length) {
+      parts.push(need.defs.map(function (d) {
+        var def = Data.byId[d]; return def ? def.name : d;
+      }).join(' / '));
+    }
+    if (need.tags && need.tags.length) {
+      parts.push(need.tags.map(function (t) { return NEED_CN[t] || t; }).join(' / '));
+    }
+    if (need.cats && need.cats.length) {
+      parts.push(need.cats.map(function (c) { return NEED_CAT_CN[c] || c; }).join(' / '));
+    }
+    return parts.join('、') || '必要的东西';
+  }
+
   function analyse(state) {
     var RW = global.RW;
     var key = RW.key;
@@ -201,20 +221,110 @@
       }
     });
 
-    // ---------- 5. 温控估算 ----------
+    // ---------- 5. 房间指定 + 温控 ----------
+    var Rooms = global.RWRooms;
+    var ambient = state.ambientTemp == null ? 21 : state.ambientTemp;
     rooms.rooms.forEach(function (r, idx) {
-      r.cooling = Math.max(1, Math.ceil(r.area / 30));
-      r.heating = Math.max(1, Math.ceil(r.area / 30));
-      // 里面什么都没有的空腔（天然岩洞 / 遗迹）不用提示制冷
-      var furnished = (r.beds || 0) > 0;   // 只有住人的房间才提示制冷，遗迹/空腔不提示
-      if (furnished && r.area >= 60 && r.coolers < r.cooling) {
-        issues.push({
-          kind: 'temp', level: 'info',
-          msg: '房间 #' + (idx + 1) + '（' + r.area + ' 格）估算需要约 ' + r.cooling + ' 台制冷器，当前只有 ' + r.coolers + ' 台',
-          cells: r.cells
-        });
-      }
+      var ro = Rooms
+        ? Rooms.roleOf(state, r)
+        : { role: 'none', name: '普通房间', temp: 21, def: null };
+      r.role = ro.role;
+      r.roleName = ro.name;
+      r.temp = ro.temp;
+      r.def = ro.def;
+      r.ambient = ambient;
+      var need = Rooms
+        ? Rooms.temperatureNeed(r, ambient, ro.temp)
+        : { kind: 'cool', need: Math.max(1, Math.ceil(r.area / 30)), delta: 21 };
+      r.tempNeed = need;
+      // 兼容旧字段：cooling / heating 表示「需要几台」
+      r.cooling = need.kind === 'cool' ? need.need : 0;
+      r.heating = need.kind === 'heat' ? need.need : 0;
+      r.coolingOld = Math.max(1, Math.ceil(r.area / 30));   // 老的经验值，仅供参考
     });
+
+    // 用途要求的检查
+    if (Rooms) {
+      rooms.rooms.forEach(function (r, idx) {
+        var label = '房间 #' + (idx + 1);
+        if (r.role !== 'none' && r.def && r.def.need && !Rooms.meetsNeed(r, r.def.need)) {
+          issues.push({
+            kind: 'roomNeed', level: 'warn',
+            msg: label + ' 指定为「' + r.roleName + '」，但里面没有' + needText(r.def.need) +
+                 '（' + r.roleName + '需要：' + r.def.desc + '）',
+            cells: r.cells
+          });
+        }
+        // 有床却没指定成卧室
+        if (r.beds > 0 && r.role !== 'bedroom' && r.role !== 'barracks' && r.role !== 'prison' && !r.ancient) {
+          issues.push({
+            kind: 'roomRole', level: 'info',
+            msg: label + ' 里有 ' + r.beds + ' 张床，指定成「卧室」殖民者才能在这儿睡',
+            cells: r.cells
+          });
+        }
+        // 温控
+        if (r.tempNeed.kind === 'cool' && r.coolers < r.tempNeed.need) {
+          issues.push({
+            kind: 'temp', level: 'info',
+            msg: label + '（' + r.roleName + '，目标 ' + r.temp + '°C，环境 ' + ambient + '°C）估算需要约 ' +
+                 r.tempNeed.need + ' 台制冷器，当前只有 ' + r.coolers + ' 台',
+            cells: r.cells
+          });
+        }
+        if (r.tempNeed.kind === 'heat' && r.heaters < r.tempNeed.need) {
+          issues.push({
+            kind: 'temp', level: 'info',
+            msg: label + '（' + r.roleName + '，目标 ' + r.temp + '°C，环境 ' + ambient + '°C）估算需要约 ' +
+                 r.tempNeed.need + ' 台加热器，当前只有 ' + r.heaters + ' 台',
+            cells: r.cells
+          });
+        }
+      });
+    }
+
+    // ---------- 5.5 制冷机的冷热端 ----------
+    // 游戏里制冷机是「一冷一热」：冷的那侧房间降温，热的那侧房间升温。
+    // 所以最常见的翻车点就是：它两侧各是一个房间 —— 一个变冷一个变热。
+    // 这个判断不依赖朝向，所以两边到底是哪边冷都无所谓。
+    (function () {
+      var rgOf = {};
+      rooms.regions.forEach(function (rg) {
+        rg.cells.forEach(function (c) { rgOf[key(c[0], c[1])] = rg; });
+      });
+      state.buildings.forEach(function (b) {
+        var def = Data.byId[b.defId];
+        if (!def || def.id !== 'cooler') return;
+        var zs = RW.zonesOf(def, b.rot);
+        if (zs.length < 2) return;
+        var sides = zs.map(function (zn) {
+          var cx = b.x + zn.x + Math.floor(zn.w / 2);
+          var cz = b.z + zn.z + Math.floor(zn.h / 2);
+          return rgOf[key(cx, cz)] || null;
+        });
+        var a = sides[0], b2 = sides[1];
+        if (!a && !b2) {
+          issues.push({
+            kind: 'coolerSide', level: 'warn',
+            msg: '有一台制冷机两侧都不是房间，它冷不到任何地方（要装在房间的墙上）',
+            cells: [[b.x, b.z]]
+          });
+        } else if (a && b2 && a !== b2) {
+          issues.push({
+            kind: 'coolerSide', level: 'warn',
+            msg: '有一台制冷机两侧是两个不同的房间：冷的那间会降温、热的那间会升温。' +
+                 '把它挪到「一侧是房间、另一侧通室外」的位置才对',
+            cells: [[b.x, b.z]]
+          });
+        } else if (a && b2 && a === b2) {
+          issues.push({
+            kind: 'coolerSide', level: 'info',
+            msg: '有一台制冷机装在房间内部，冷热端在同一个房间里，制不成冷',
+            cells: [[b.x, b.z]]
+          });
+        }
+      });
+    })();
 
     state.issues = issues;
     state.powerInfo = power;
@@ -434,13 +544,14 @@
       var blocked = 0, coolers = 0, heaters = 0, beds = 0, ancient = false;
       // 设备按「个数」统计：床是 1×2 的，会占两格，不能按格子算成两张床
       var counted = {};
+      var things = [];
       r.cells.forEach(function (c) {
         var list = cellMap[key(c[0], c[1])] || [];
         list.forEach(function (b) {
           var def = Data.byId[b.defId]; if (!def) return;
           if (blocksWalk(def)) blocked++;
           var once = !counted[b.uid];
-          if (once) counted[b.uid] = true;
+          if (once) { counted[b.uid] = true; things.push(b); }
           if (once && (def.id === 'cooler' || def.id === 'passive_cooler')) coolers++;
           if (once && def.id === 'heater') heaters++;
           if (once && has(def, 'bed')) beds++;
@@ -452,7 +563,8 @@
       heaters += countWallUnits(cellMap, r.cells, ['heater']);
       var space = 1.4 * area - 0.9 * blocked;
       rooms.push({
-        area: area, cells: r.cells, doors: regionDoors[r.id] ? regionDoors[r.id].doors.length : 0,
+        id: r.id, area: area, cells: r.cells, things: things,
+        doors: regionDoors[r.id] ? regionDoors[r.id].doors.length : 0,
         space: Math.round(space * 10) / 10, spaceText: spaceRating(space),
         reachable: !!reach[r.id], outdoor: false,
         blocked: blocked, coolers: coolers, heaters: heaters, beds: beds, ancient: ancient

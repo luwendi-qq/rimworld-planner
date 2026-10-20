@@ -22,6 +22,7 @@ rimworld-planner/
 │   ├── icons.js                贴图渲染（原版贴图优先，缺失时用原创矢量图兜底）
 │   ├── engine.js               网格 / 相机 / 编辑 / 撤销 / 渲染
 │   ├── site.js                 存档地形 / 山体 / 可建造性（affordance 校验、离屏地形画布）
+│   ├── rooms.js                房间指定（用途 / 目标温度）+ 温控估算模型
 │   ├── checks.js               布局校验（重叠·地形·电力·房间·连通·温控）
 │   ├── workload.js             可行性 / 工作量 / 工期估算（小人技能·科技·库存）
 │   ├── exporters.js            蓝图 .xml / 工程 JSON
@@ -36,6 +37,7 @@ rimworld-planner/
     ├── geometry.test.js        占地 / 朝向 / 坐标换算
     ├── blueprint.test.js       蓝图 XML 结构与内容
     ├── checks.test.js          冲突 / 电力 / 房间 / 可达性
+    ├── rooms.test.js           房间指定 / 温控需求 / 制冷机冷热端
     ├── site.test.js            地形 / 山体 / 可建造性
     └── workload.test.js        材料 / 科技 / 工期估算
 ```
@@ -51,7 +53,8 @@ rimworld-planner/
 | `RWArt` | `icons.js` + `sprites.js` | 绘制：原版贴图 / 矢量图兜底、连接图集、材质染色 |
 | `RW` | `engine.js` | 状态机 + 相机 + 编辑操作 + 撤销栈 + 渲染循环 |
 | `RWSite` | `site.js` | 存档地形 / 山体查询、affordance 可建造性、地形离屏画布 |
-| `RWChecks` | `checks.js` | 六项布局校验（含地形 / 山体） |
+| `RWRooms` | `rooms.js` | 房间用途表、用途读写、温控需求估算 |
+| `RWChecks` | `checks.js` | 六项布局校验（含地形 / 山体 / 房间指定） |
 | `RWWork` | `workload.js` | 蓝图材料 / 科技 / 工时 / 工期估算 |
 | `RWExport` | `exporters.js` | 蓝图 `.xml` / 工程 JSON 序列化 |
 | `RWIo` | `io.js` | 本地存档、`.rws` 解析（建筑 / 地形 / 小人 / 科技 / 库存） |

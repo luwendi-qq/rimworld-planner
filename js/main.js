@@ -5,6 +5,7 @@
   'use strict';
 
   var RW = global.RW, Data = global.RWData, Art = global.RWArt, X = global.RWExport, Io = global.RWIo, Checks = global.RWChecks;
+  var Rooms = global.RWRooms;
   var state = RW.state;
   var $ = function (id) { return document.getElementById(id); };
 
@@ -475,15 +476,56 @@
 
     // 房间
     var rb = $('roomList');
+    var roleOptions = function (cur) {
+      if (!Rooms) return '';
+      return Rooms.ROLES.map(function (x) {
+        return '<option value="' + x.id + '"' + (x.id === cur ? ' selected' : '') + '>' + esc(x.name) + '</option>';
+      }).join('');
+    };
     rb.innerHTML = lastReport.rooms.length ? lastReport.rooms.map(function (r, i) {
-      return '<div class="rrow roomJump" data-idx="' + i + '" title="点击定位到这个房间"><b>房间 #' + (i + 1) + '</b> ' + r.area + ' 格 · 空间 ' + r.space +
-        '（' + r.spaceText + '）· 门 ' + r.doors + ' · 制冷器 ' + r.coolers + '/' + r.cooling +
-        ' ' + (r.reachable ? '' : '<span class="bad">不通</span>') + '</div>';
+      var tempRow = '';
+      if (r.role === 'cold' || r.role === 'freezer') {
+        tempRow = '<label class="roomTemp">目标 <input type="number" class="roomTempIn" data-idx="' + i +
+                  '" value="' + r.temp + '" min="-60" max="60" step="1"> °C</label>';
+      }
+      var tempInfo = '';
+      if (r.tempNeed && r.tempNeed.kind === 'cool' && r.tempNeed.need > 0) {
+        tempInfo = ' · 需制冷 ' + r.coolers + '/' + r.tempNeed.need;
+      } else if (r.tempNeed && r.tempNeed.kind === 'heat' && r.tempNeed.need > 0) {
+        tempInfo = ' · 需加热 ' + r.heaters + '/' + r.tempNeed.need;
+      }
+      return '<div class="rrow roomBox" data-idx="' + i + '">' +
+        '<div class="roomJump" data-idx="' + i + '" title="点击定位到这个房间"><b>房间 #' + (i + 1) + '</b> ' +
+        r.area + ' 格 · 空间 ' + r.space + '（' + r.spaceText + '）· 门 ' + r.doors +
+        tempInfo + ' ' + (r.reachable ? '' : '<span class="bad">不通</span>') + '</div>' +
+        '<div class="roomRoleRow"><select class="roomRole" data-idx="' + i + '" title="指定这个房间的用途">' +
+        roleOptions(r.role) + '</select>' + tempRow + '</div>' +
+        '</div>';
     }).join('') : '<div class="muted">没有封闭的房间</div>';
     Array.prototype.forEach.call(rb.querySelectorAll('.roomJump'), function (el) {
       el.onclick = function () {
         var r = lastReport.rooms[+el.dataset.idx];
         if (r) focusCells(r.cells);
+      };
+    });
+    Array.prototype.forEach.call(rb.querySelectorAll('.roomRole'), function (el) {
+      el.onchange = function () {
+        if (!Rooms) return;
+        var r = lastReport.rooms[+el.dataset.idx];
+        if (!r) return;
+        Rooms.setRole(state, r, this.value);
+        runCheck();
+      };
+    });
+    Array.prototype.forEach.call(rb.querySelectorAll('.roomTempIn'), function (el) {
+      el.onchange = function () {
+        if (!Rooms) return;
+        var r = lastReport.rooms[+el.dataset.idx];
+        if (!r) return;
+        var t = parseFloat(this.value);
+        if (isNaN(t)) return;
+        Rooms.setRole(state, r, r.role, t);
+        runCheck();
       };
     });
 
@@ -1280,6 +1322,17 @@
 
     // 校验
     $('btnCheck2').onclick = runCheck;
+
+    // 环境温度（算制冷 / 加热需求用）
+    if ($('ambientTemp')) {
+      $('ambientTemp').value = state.ambientTemp == null ? 21 : state.ambientTemp;
+      $('ambientTemp').onchange = function () {
+        var t = parseFloat(this.value);
+        if (isNaN(t)) { this.value = state.ambientTemp; return; }
+        state.ambientTemp = t;
+        runCheck();
+      };
+    }
 
     // 自动更新
     RW.on('change', function () {
