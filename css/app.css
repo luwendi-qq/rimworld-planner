@@ -429,6 +429,13 @@ button.mini { padding: 0 6px; font-size: 10.5px; }
 .prow, .rrow, .srow { border-radius: 3px; }
 .srow:hover { background: rgba(255,255,255,.10); }
 .issue { border-radius: 3px; }
+/* 物品栏上的收藏星标 */
+.favMark {
+  float: right; margin-left: 4px; font-style: normal; font-size: 13px;
+  color: var(--fg2); cursor: pointer; user-select: none; line-height: 1;
+}
+.favMark:hover { color: var(--accent2); }
+.favMark.on { color: var(--accent2); }
 /* 近似模型标记：带 ≈ 的提示来自本工具自己的近似规则 */
 .approxMark {
   display: inline-block; margin-right: 4px; color: var(--fg2);

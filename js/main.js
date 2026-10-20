@@ -36,9 +36,35 @@
   var activeCat = 'structure';
   var searchText = '';
 
+  // ------------------------------------------------------------------ 收藏
+  function isFav(id) { return (state.favorites || []).indexOf(id) >= 0; }
+  function toggleFav(id) {
+    var list = state.favorites || (state.favorites = []);
+    var i = list.indexOf(id);
+    if (i >= 0) list.splice(i, 1);
+    else list.push(id);
+    savePrefs();
+    buildPalette();
+  }
+  function savePrefs() {
+    var s = Io.loadSettings() || {};
+    s.favorites = state.favorites || [];
+    s.recent = state.recent || [];
+    s.ambientTemp = state.ambientTemp;
+    Io.saveSettings(s);
+  }
+
   function buildTabs() {
     var box = $('catTabs');
     box.innerHTML = '';
+    // 收藏 / 最近：200 多个建筑全靠搜索太累，这两个页签把常用的挑出来
+    [['fav', '★ 收藏'], ['recent', '🕘 最近']].forEach(function (pair) {
+      var b = document.createElement('button');
+      b.className = 'tab' + (pair[0] === activeCat ? ' on' : '');
+      b.textContent = pair[1];
+      b.onclick = function () { activeCat = pair[0]; buildTabs(); buildPalette(); };
+      box.appendChild(b);
+    });
     Data.CATEGORIES.forEach(function (c) {
       var n = Data.BUILDINGS.filter(function (b) { return b.cat === c.id; }).length;
       var b = document.createElement('button');
@@ -65,6 +91,14 @@
     var list;
     if (activeCat === 'floor') {
       list = Data.FLOORS.map(function (f) { return { floor: f }; });
+    } else if (activeCat === 'fav') {
+      list = (state.favorites || []).map(function (id) {
+        var d = Data.byId[id]; return d ? { def: d } : null;
+      }).filter(Boolean);
+    } else if (activeCat === 'recent') {
+      list = (state.recent || []).map(function (id) {
+        var d = Data.byId[id]; return d ? { def: d } : null;
+      }).filter(Boolean);
     } else {
       list = Data.BUILDINGS.filter(function (b) {
         if (b.cat !== activeCat) return false;
@@ -72,13 +106,18 @@
         return (b.name + ' ' + (b.en || '') + ' ' + b.id).toLowerCase().indexOf(q) >= 0;
       }).map(function (b) { return { def: b }; });
     }
-    if (q && activeCat !== 'floor') {
+    if (q && activeCat !== 'floor' && activeCat !== 'fav' && activeCat !== 'recent') {
       // 搜索时跨类别
       list = Data.BUILDINGS.filter(function (b) {
         return (b.name + ' ' + (b.en || '') + ' ' + b.id).toLowerCase().indexOf(q) >= 0;
       }).map(function (b) { return { def: b }; });
     }
-    if (!list.length) { box.innerHTML = '<div class="empty">没有匹配项</div>'; return; }
+    if (!list.length) {
+      box.innerHTML = '<div class="empty">' +
+        (activeCat === 'fav' ? '还没收藏东西 —— 点物品上的 ☆ 可以收藏' :
+         activeCat === 'recent' ? '还没有用过的东西' : '没有匹配项') + '</div>';
+      return;
+    }
 
     list.forEach(function (item) {
       var el = document.createElement('button');
@@ -110,6 +149,19 @@
         el.title = f.name;
       }
       el.appendChild(label);
+      // 收藏标记：点一下 ☆ 把它收进「★ 收藏」页签
+      if (def) {
+        var fav = document.createElement('em');
+        var on = isFav(def.id);
+        fav.className = 'favMark' + (on ? ' on' : '');
+        fav.textContent = on ? '★' : '☆';
+        fav.title = on ? '取消收藏' : '收藏（会出现在「★ 收藏」页签）';
+        fav.onclick = function (e) {
+          e.stopPropagation(); e.preventDefault();
+          toggleFav(def.id);
+        };
+        label.appendChild(fav);
+      }
       el.onclick = function () {
         if (item.def) RW.setBrush('building', item.def.id);
         else RW.setBrush('floor', item.floor.id);
@@ -579,12 +631,14 @@
 
   // 直接写进用户选定的文件夹（Chrome/Edge 支持；省得手动找路径）
   function bpResult() {
+    var cat = $('bpCategory') ? ($('bpCategory').value || '').trim() : '';
     return X.toBlueprintsXML(state, {
       name: currentName(), stuff: currentStuff,
       rotFix: state.rotFix !== false,
       excludeLocked: $('excludeLocked') ? $('excludeLocked').checked : true,
       gameVersion: (state.saveMeta && state.saveMeta.gameVersion) || state.saveVersion || '',
-      meta: state.saveMeta || null
+      meta: state.saveMeta || null,
+      category: cat || '布局'
     });
   }
 
@@ -1115,6 +1169,13 @@
     RW.attach(cv);
     RW.reindex();
     applyStuff();
+    // 读回上次收藏 / 最近使用 / 环境温度
+    (function () {
+      var s = Io.loadSettings() || {};
+      if (s.favorites) state.favorites = s.favorites;
+      if (s.recent) state.recent = s.recent;
+      if (s.ambientTemp != null) state.ambientTemp = s.ambientTemp;
+    })();
     buildTabs();
     buildPalette();
     initGameImport();
@@ -1154,9 +1215,19 @@
     $('btnZoomIn').onclick = function () { RW.zoomAt(1.2); };
     $('btnZoomOut').onclick = function () { RW.zoomAt(1 / 1.2); };
     $('btnClear').onclick = function (e) {
+      var ok = false;
       if (e && e.shiftKey) {
-        if (confirm('连存档原有建筑一起清空？此操作可用 Ctrl+Z 撤销。')) RW.clearAll(true);
-      } else if (confirm('清空你画的建筑/地板？存档原有建筑会保留（按住 Shift 点可连底图一起清）。')) RW.clearAll(false);
+        ok = confirm('连存档原有建筑一起清空？此操作可用 Ctrl+Z 撤销。');
+        if (ok) RW.clearAll(true);
+      } else {
+        ok = confirm('清空你画的建筑/地板？存档原有建筑会保留（按住 Shift 点可连底图一起清）。');
+        if (ok) RW.clearAll(false);
+      }
+      // 主动清空了，就别让自动保存又把它恢复回来
+      if (ok) {
+        Io.deleteNamed('（自动保存）');
+        autoDirty = false;
+      }
     };
     $('btnSelRotate').onclick = function () { RW.rotateSelection(); updateBrushInfo(); updateInspector(); };
     $('btnSelCopy').onclick = doCopy;
@@ -1327,6 +1398,53 @@
     }
     refreshSaved();
 
+    // ---- 自动保存 ----
+    // 每隔一会儿把当前布局存一份到浏览器，浏览器崩了 / 误关窗口也不至于全丢。
+    // 存的是一个固定名字的存档（不占「本地存档」列表），下次打开自动恢复。
+    var AUTO_NAME = '（自动保存）';
+    var autoTimer = null, autoDirty = false;
+    function autoSaveNow(quiet) {
+      if (!Io.lsAvailable()) return;
+      if (!state.buildings.length && !Object.keys(state.floors || {}).length) return;
+      state.mapName = currentName();
+      var ok = Io.saveNamed(AUTO_NAME, RW.exportProject());
+      if (!ok) return;
+      autoDirty = false;
+      var el = $('autoSaveInfo');
+      if (el) {
+        var d = new Date();
+        el.textContent = '上次自动保存：' + d.getHours() + ':' + String(d.getMinutes()).padStart(2, '0');
+      }
+      if (!quiet) toast('已自动保存到浏览器');
+    }
+    if ($('autoSave')) {
+      $('autoSave').onchange = function () {
+        var s = Io.loadSettings() || {};
+        s.autoSave = this.checked;
+        Io.saveSettings(s);
+        if (this.checked) autoSaveNow(true);
+      };
+      var st0 = Io.loadSettings() || {};
+      if (st0.autoSave === false) $('autoSave').checked = false;
+      // 有自动保存、而当前画布是空的 → 直接恢复
+      var store = Io.loadStore();
+      if (store[AUTO_NAME] && !state.buildings.length && !Object.keys(state.floors || {}).length) {
+        try {
+          RW.loadProject(store[AUTO_NAME]);
+          $('mapName').value = state.mapName;
+          RW.fitView();
+          updateSaveInfo();
+          toast('已恢复上次自动保存的布局');
+        } catch (e) { /* 存档坏了就当没有 */ }
+      }
+      autoTimer = setInterval(function () {
+        if (!autoDirty) return;
+        if ($('autoSave') && !$('autoSave').checked) return;
+        autoSaveNow(true);
+      }, 20000);
+      RW.on('change', function () { autoDirty = true; });
+    }
+
     // 校验
     $('btnCheck2').onclick = runCheck;
     if ($('showApprox')) {
@@ -1349,6 +1467,14 @@
       updateInspector();
       if (state.layers.power || state.layers.rooms) runCheck();
     });
+    // 收藏 / 最近使用记到本机（做个防抖，别每次改动都写一遍 localStorage）
+    (function () {
+      var t = null;
+      RW.on('change', function () {
+        if (t) clearTimeout(t);
+        t = setTimeout(function () { t = null; savePrefs(); }, 800);
+      });
+    })();
     RW.on('hover', function (h) {
       $('coords').textContent = '(' + h.x + ', ' + h.z + ')';
       updateInspector();

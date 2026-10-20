@@ -26,6 +26,8 @@
     drawMode: 'brush',   // brush(自由) | rect(方框) | rectFill(填充)
     brush: null,         // {kind:'building'|'floor', id, stuff}
     lastStuff: {},       // defId -> 上次选的材质（和游戏一样记住）
+    recent: [],          // 最近用过的建筑 id（物品栏的「最近」页签）
+    favorites: [],       // 收藏的建筑 id
     rotation: 0,
     flip: false,
     layers: { grid: true, floors: true, buildings: true, power: false, rooms: false, zones: true, terrain: true, blocked: false, home: true },
@@ -1772,6 +1774,13 @@
         var def = Data.byId[id];
         state.brush.stuff = (stuff !== undefined) ? stuff
           : (prev && prev.stuff !== undefined) ? prev.stuff : defaultStuff(def);
+        // 记一下最近用过哪些建筑（物品栏的「最近」页签）
+        var rec = state.recent || (state.recent = []);
+        rec.unshift(id);
+        var seen = {};
+        state.recent = rec.filter(function (x) {
+          if (seen[x]) return false; seen[x] = true; return true;
+        }).slice(0, 24);
       }
     }
     if (kind === 'building') { state.tool = 'place'; state.drawMode = defaultDrawMode(Data.byId[id]); }

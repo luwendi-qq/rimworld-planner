@@ -438,6 +438,18 @@ button.mini { padding: 0 6px; font-size: 10.5px; }
 .prow, .rrow, .srow { border-radius: 3px; }
 .srow:hover { background: rgba(255,255,255,.10); }
 .issue { border-radius: 3px; }
+/* 物品栏上的收藏星标 */
+.favMark {
+  float: right; margin-left: 4px; font-style: normal; font-size: 13px;
+  color: var(--fg2); cursor: pointer; user-select: none; line-height: 1;
+}
+.favMark:hover { color: var(--accent2); }
+.favMark.on { color: var(--accent2); }
+/* 近似模型标记：带 ≈ 的提示来自本工具自己的近似规则 */
+.approxMark {
+  display: inline-block; margin-right: 4px; color: var(--fg2);
+  font-size: 12px; cursor: help; border-bottom: 1px dotted var(--fg2);
+}
 .ok { color: var(--ok); font-size: 12px; padding: 4px; }
 .bad { color: var(--err); }
 .good { color: var(--ok); }
@@ -507,7 +519,7 @@ kbd {
 .pitem b { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
 
 </style>
-<!-- 单文件构建：2026-10-20 10:52  内联模块：js/data.js, js/zh-names.js, js/buildings.generated.js, js/sprites.js, js/vendor/fzstd.js, js/gamezip.js, js/gamedefs.js, js/gameimport.js, js/icons.js, js/engine.js, js/site.js, js/rooms.js, js/checks.js, js/workload.js, js/exporters.js, js/io.js, js/main.js -->
+<!-- 单文件构建：2026-10-20 11:28  内联模块：js/data.js, js/zh-names.js, js/buildings.generated.js, js/sprites.js, js/vendor/fzstd.js, js/gamezip.js, js/gamedefs.js, js/gameimport.js, js/icons.js, js/engine.js, js/site.js, js/rooms.js, js/checks.js, js/workload.js, js/exporters.js, js/io.js, js/main.js -->
 </head>
 
 <body>
@@ -670,6 +682,11 @@ kbd {
           <button id="btnDelLocal" class="danger">删除</button>
         </div>
         <select id="savedSel" style="width:100%;margin-top:6px"></select>
+        <label class="chk" style="margin-top:6px;display:block"
+               title="每隔一会儿自动把当前布局存到浏览器里；下次打开自动恢复，浏览器崩了也不至于全丢">
+          <input type="checkbox" id="autoSave" checked> 自动保存到浏览器
+        </label>
+        <div id="autoSaveInfo" class="muted" style="font-size:11.5px;margin-top:2px"></div>
       </div>
 
       <div class="panel">
@@ -704,6 +721,10 @@ kbd {
       <div class="panel">
         <h3>校验结果</h3>
         <button id="btnCheck2" class="cmd" style="width:100%;margin-bottom:6px">运行校验</button>
+        <label class="chk" style="margin-bottom:6px;display:block"
+               title="带 ≈ 的是本工具自己的近似模型（电力连接规则、房间识别、温控估算），不是游戏里的精确规则">
+          <input type="checkbox" id="showApprox" checked> 显示近似提示（≈）
+        </label>
         <div id="issuesList"></div>
       </div>
 
@@ -733,6 +754,12 @@ kbd {
         <div id="planOpts">
           <div class="muted" style="font-size:11.5px">
             材质逐物品：<b>长按左键</b>（或右键）左边任意建筑即可选材质。
+          </div>
+          <div class="group" style="margin-top:6px">
+            <label title="导出蓝图时写进 &lt;Category&gt;，游戏里按分类找蓝图">
+              蓝图分类
+              <input id="bpCategory" type="text" value="布局" style="width:90px">
+            </label>
           </div>
         </div>
         <div class="group" style="margin-top:6px">
@@ -4439,6 +4466,8 @@ kbd {
     drawMode: 'brush',   // brush(自由) | rect(方框) | rectFill(填充)
     brush: null,         // {kind:'building'|'floor', id, stuff}
     lastStuff: {},       // defId -> 上次选的材质（和游戏一样记住）
+    recent: [],          // 最近用过的建筑 id（物品栏的「最近」页签）
+    favorites: [],       // 收藏的建筑 id
     rotation: 0,
     flip: false,
     layers: { grid: true, floors: true, buildings: true, power: false, rooms: false, zones: true, terrain: true, blocked: false, home: true },
@@ -6185,6 +6214,13 @@ kbd {
         var def = Data.byId[id];
         state.brush.stuff = (stuff !== undefined) ? stuff
           : (prev && prev.stuff !== undefined) ? prev.stuff : defaultStuff(def);
+        // 记一下最近用过哪些建筑（物品栏的「最近」页签）
+        var rec = state.recent || (state.recent = []);
+        rec.unshift(id);
+        var seen = {};
+        state.recent = rec.filter(function (x) {
+          if (seen[x]) return false; seen[x] = true; return true;
+        }).slice(0, 24);
       }
     }
     if (kind === 'building') { state.tool = 'place'; state.drawMode = defaultDrawMode(Data.byId[id]); }
@@ -7143,7 +7179,7 @@ kbd {
     var power = analysePower(state, cellMap);
     power.problems.forEach(function (p) {
       // 电网是近似模型（游戏内的连接规则更宽松），所以只当提示、不当错误
-      issues.push({ kind: 'power', level: 'warn', msg: p.msg, cells: p.cells });
+      issues.push({ kind: 'power', level: 'warn', approx: true, msg: p.msg, cells: p.cells });
     });
 
     // ---------- 2.5 作用范围被占用 ----------
@@ -7164,7 +7200,7 @@ kbd {
         }
         if (blocked.length) {
           issues.push({
-            kind: 'zoneBlocked', level: 'warn',
+            kind: 'zoneBlocked', level: 'warn', approx: true,
             msg: '「' + def.name + '」的' + zn.label + '被挡住了（有 ' + blocked.length + ' 格被实体占用，会导致它不工作）',
             cells: blocked
           });
@@ -7179,14 +7215,14 @@ kbd {
       if (r.doors === 0) {
         // 天然岩洞 / 远古遗迹本来就没门，玩家忘了开门也可能。属于提示，不是错误。
         issues.push({
-          kind: 'sealed', level: 'info',
+          kind: 'sealed', level: 'info', approx: true,
           msg: '房间 #' + (idx + 1) + '（' + r.area + ' 格）是封闭的、没有门' +
             (r.ancient ? '（天然/遗迹结构，通常不用管）' : '（天然岩洞、遗迹，或你还没装门）'),
           cells: r.cells
         });
       } else if (!r.reachable) {
         issues.push({
-          kind: 'unreachable', level: 'warn',
+          kind: 'unreachable', level: 'warn', approx: true,
           msg: '房间 #' + (idx + 1) + '（' + r.area + ' 格）无法通到室外',
           cells: r.cells
         });
@@ -7224,7 +7260,7 @@ kbd {
         var label = '房间 #' + (idx + 1);
         if (r.role !== 'none' && r.def && r.def.need && !Rooms.meetsNeed(r, r.def.need)) {
           issues.push({
-            kind: 'roomNeed', level: 'warn',
+            kind: 'roomNeed', level: 'warn', approx: true,
             msg: label + ' 指定为「' + r.roleName + '」，但里面没有' + needText(r.def.need) +
                  '（' + r.roleName + '需要：' + r.def.desc + '）',
             cells: r.cells
@@ -7241,7 +7277,7 @@ kbd {
         // 温控
         if (r.tempNeed.kind === 'cool' && r.coolers < r.tempNeed.need) {
           issues.push({
-            kind: 'temp', level: 'info',
+            kind: 'temp', level: 'info', approx: true,
             msg: label + '（' + r.roleName + '，目标 ' + r.temp + '°C，环境 ' + ambient + '°C）估算需要约 ' +
                  r.tempNeed.need + ' 台制冷器，当前只有 ' + r.coolers + ' 台',
             cells: r.cells
@@ -7249,7 +7285,7 @@ kbd {
         }
         if (r.tempNeed.kind === 'heat' && r.heaters < r.tempNeed.need) {
           issues.push({
-            kind: 'temp', level: 'info',
+            kind: 'temp', level: 'info', approx: true,
             msg: label + '（' + r.roleName + '，目标 ' + r.temp + '°C，环境 ' + ambient + '°C）估算需要约 ' +
                  r.tempNeed.need + ' 台加热器，当前只有 ' + r.heaters + ' 台',
             cells: r.cells
@@ -7280,20 +7316,20 @@ kbd {
         var a = sides[0], b2 = sides[1];
         if (!a && !b2) {
           issues.push({
-            kind: 'coolerSide', level: 'warn',
+            kind: 'coolerSide', level: 'warn', approx: true,
             msg: '有一台制冷机两侧都不是房间，它冷不到任何地方（要装在房间的墙上）',
             cells: [[b.x, b.z]]
           });
         } else if (a && b2 && a !== b2) {
           issues.push({
-            kind: 'coolerSide', level: 'warn',
+            kind: 'coolerSide', level: 'warn', approx: true,
             msg: '有一台制冷机两侧是两个不同的房间：冷的那间会降温、热的那间会升温。' +
                  '把它挪到「一侧是房间、另一侧通室外」的位置才对',
             cells: [[b.x, b.z]]
           });
         } else if (a && b2 && a === b2) {
           issues.push({
-            kind: 'coolerSide', level: 'info',
+            kind: 'coolerSide', level: 'info', approx: true,
             msg: '有一台制冷机装在房间内部，冷热端在同一个房间里，制不成冷',
             cells: [[b.x, b.z]]
           });
@@ -7343,23 +7379,55 @@ kbd {
     });
 
     // 连边：任意一侧是输电建筑、且两者相距不超过 6 格
+    //
+    // 性能：只从「输电建筑」这一侧发起（用电器之间本来就不会相连），
+    // 并且用空间分桶（16×16 一格）缩小候选范围 ——
+    // 早先每个电力建筑都要扫 13×13 = 169 个格子，几百个设备时会很慢。
+    var BUCKET = 16;
+    var buckets = {};
+    items.forEach(function (it) {
+      // 一个建筑可能横跨好几个桶（大型建筑 / 太阳能板），它占的每个桶都登记它
+      var bx0 = Math.floor(it.x / BUCKET), bx1 = Math.floor((it.x + it.w - 1) / BUCKET);
+      var bz0 = Math.floor(it.z / BUCKET), bz1 = Math.floor((it.z + it.h - 1) / BUCKET);
+      for (var bx = bx0; bx <= bx1; bx++) {
+        for (var bz = bz0; bz <= bz1; bz++) {
+          var bk = bx + ',' + bz;
+          (buckets[bk] = buckets[bk] || []).push(it);
+        }
+      }
+    });
+    function nearItems(A) {
+      var out = [];
+      var x0 = A.x - POWER_RANGE, x1 = A.x + A.w - 1 + POWER_RANGE;
+      var z0 = A.z - POWER_RANGE, z1 = A.z + A.h - 1 + POWER_RANGE;
+      var bx0 = Math.floor(x0 / BUCKET), bx1 = Math.floor(x1 / BUCKET);
+      var bz0 = Math.floor(z0 / BUCKET), bz1 = Math.floor(z1 / BUCKET);
+      for (var bx = bx0; bx <= bx1; bx++) {
+        for (var bz = bz0; bz <= bz1; bz++) {
+          var list = buckets[bx + ',' + bz];
+          if (!list) continue;
+          for (var i = 0; i < list.length; i++) out.push(list[i]);
+        }
+      }
+      return out;
+    }
+
     var links = [], seen = {};
     items.forEach(function (A) {
+      if (!A.tx) return;                 // 只要输电建筑发起就够了
       var ka = key(A.x, A.z);
-      for (var x = A.x - POWER_RANGE; x < A.x + A.w + POWER_RANGE; x++) {
-        for (var z = A.z - POWER_RANGE; z < A.z + A.h + POWER_RANGE; z++) {
-          var list = byCell[key(x, z)];
-          if (!list) continue;
-          for (var i = 0; i < list.length; i++) {
-            var B = list[i];
-            if (B === A) continue;
-            if (!A.tx && !B.tx) continue;      // 两个用电器之间不会相连
-            var kb = key(B.x, B.z);
-            union(ka, kb);
-            var ek = ka < kb ? ka + '>' + kb : kb + '>' + ka;
-            if (!seen[ek]) { seen[ek] = 1; links.push({ a: [A.x, A.z], b: [B.x, B.z] }); }
-          }
-        }
+      var cand = nearItems(A);
+      for (var n = 0; n < cand.length; n++) {
+        var B = cand[n];
+        if (B === A) continue;
+        // 距离判定：两栋建筑占的格子最近也要在 6 格之内
+        var dx = Math.max(0, Math.max(B.x - (A.x + A.w - 1), A.x - (B.x + B.w - 1)));
+        var dz = Math.max(0, Math.max(B.z - (A.z + A.h - 1), A.z - (B.z + B.h - 1)));
+        if (dx > POWER_RANGE || dz > POWER_RANGE) continue;
+        var kb = key(B.x, B.z);
+        union(ka, kb);
+        var ek = ka < kb ? ka + '>' + kb : kb + '>' + ka;
+        if (!seen[ek]) { seen[ek] = 1; links.push({ a: [A.x, A.z], b: [B.x, B.z] }); }
       }
     });
 
@@ -8904,9 +8972,35 @@ kbd {
   var activeCat = 'structure';
   var searchText = '';
 
+  // ------------------------------------------------------------------ 收藏
+  function isFav(id) { return (state.favorites || []).indexOf(id) >= 0; }
+  function toggleFav(id) {
+    var list = state.favorites || (state.favorites = []);
+    var i = list.indexOf(id);
+    if (i >= 0) list.splice(i, 1);
+    else list.push(id);
+    savePrefs();
+    buildPalette();
+  }
+  function savePrefs() {
+    var s = Io.loadSettings() || {};
+    s.favorites = state.favorites || [];
+    s.recent = state.recent || [];
+    s.ambientTemp = state.ambientTemp;
+    Io.saveSettings(s);
+  }
+
   function buildTabs() {
     var box = $('catTabs');
     box.innerHTML = '';
+    // 收藏 / 最近：200 多个建筑全靠搜索太累，这两个页签把常用的挑出来
+    [['fav', '★ 收藏'], ['recent', '🕘 最近']].forEach(function (pair) {
+      var b = document.createElement('button');
+      b.className = 'tab' + (pair[0] === activeCat ? ' on' : '');
+      b.textContent = pair[1];
+      b.onclick = function () { activeCat = pair[0]; buildTabs(); buildPalette(); };
+      box.appendChild(b);
+    });
     Data.CATEGORIES.forEach(function (c) {
       var n = Data.BUILDINGS.filter(function (b) { return b.cat === c.id; }).length;
       var b = document.createElement('button');
@@ -8933,6 +9027,14 @@ kbd {
     var list;
     if (activeCat === 'floor') {
       list = Data.FLOORS.map(function (f) { return { floor: f }; });
+    } else if (activeCat === 'fav') {
+      list = (state.favorites || []).map(function (id) {
+        var d = Data.byId[id]; return d ? { def: d } : null;
+      }).filter(Boolean);
+    } else if (activeCat === 'recent') {
+      list = (state.recent || []).map(function (id) {
+        var d = Data.byId[id]; return d ? { def: d } : null;
+      }).filter(Boolean);
     } else {
       list = Data.BUILDINGS.filter(function (b) {
         if (b.cat !== activeCat) return false;
@@ -8940,13 +9042,18 @@ kbd {
         return (b.name + ' ' + (b.en || '') + ' ' + b.id).toLowerCase().indexOf(q) >= 0;
       }).map(function (b) { return { def: b }; });
     }
-    if (q && activeCat !== 'floor') {
+    if (q && activeCat !== 'floor' && activeCat !== 'fav' && activeCat !== 'recent') {
       // 搜索时跨类别
       list = Data.BUILDINGS.filter(function (b) {
         return (b.name + ' ' + (b.en || '') + ' ' + b.id).toLowerCase().indexOf(q) >= 0;
       }).map(function (b) { return { def: b }; });
     }
-    if (!list.length) { box.innerHTML = '<div class="empty">没有匹配项</div>'; return; }
+    if (!list.length) {
+      box.innerHTML = '<div class="empty">' +
+        (activeCat === 'fav' ? '还没收藏东西 —— 点物品上的 ☆ 可以收藏' :
+         activeCat === 'recent' ? '还没有用过的东西' : '没有匹配项') + '</div>';
+      return;
+    }
 
     list.forEach(function (item) {
       var el = document.createElement('button');
@@ -8978,6 +9085,19 @@ kbd {
         el.title = f.name;
       }
       el.appendChild(label);
+      // 收藏标记：点一下 ☆ 把它收进「★ 收藏」页签
+      if (def) {
+        var fav = document.createElement('em');
+        var on = isFav(def.id);
+        fav.className = 'favMark' + (on ? ' on' : '');
+        fav.textContent = on ? '★' : '☆';
+        fav.title = on ? '取消收藏' : '收藏（会出现在「★ 收藏」页签）';
+        fav.onclick = function (e) {
+          e.stopPropagation(); e.preventDefault();
+          toggleFav(def.id);
+        };
+        label.appendChild(fav);
+      }
       el.onclick = function () {
         if (item.def) RW.setBrush('building', item.def.id);
         else RW.setBrush('floor', item.floor.id);
@@ -9320,13 +9440,20 @@ kbd {
     var box = $('issuesList');
     box.innerHTML = '';
     var issues = lastReport.issues;
-    if (!issues.length) {
-      box.innerHTML = '<div class="ok">未发现问题 👍</div>';
+    var showApprox = $('showApprox') ? $('showApprox').checked : true;
+    var shown = issues.filter(function (it) { return showApprox || !it.approx; });
+    if (!shown.length) {
+      box.innerHTML = issues.length
+        ? '<div class="muted">没有确定的问题（' + issues.length + ' 条近似提示已隐藏）</div>'
+        : '<div class="ok">未发现问题 👍</div>';
     } else {
-      issues.forEach(function (it) {
+      shown.forEach(function (it) {
         var d = document.createElement('div');
         d.className = 'issue ' + it.level;
-        d.innerHTML = '<span class="dot"></span><span>' + esc(it.msg) + '</span>';
+        var mark = it.approx
+          ? '<span class="approxMark" title="这条来自本工具的近似模型，不完全等于游戏里的规则">≈</span>'
+          : '';
+        d.innerHTML = '<span class="dot"></span><span>' + mark + esc(it.msg) + '</span>';
         d.onclick = function () { focusCells(it.cells); };
         box.appendChild(d);
       });
@@ -9440,12 +9567,14 @@ kbd {
 
   // 直接写进用户选定的文件夹（Chrome/Edge 支持；省得手动找路径）
   function bpResult() {
+    var cat = $('bpCategory') ? ($('bpCategory').value || '').trim() : '';
     return X.toBlueprintsXML(state, {
       name: currentName(), stuff: currentStuff,
       rotFix: state.rotFix !== false,
       excludeLocked: $('excludeLocked') ? $('excludeLocked').checked : true,
       gameVersion: (state.saveMeta && state.saveMeta.gameVersion) || state.saveVersion || '',
-      meta: state.saveMeta || null
+      meta: state.saveMeta || null,
+      category: cat || '布局'
     });
   }
 
@@ -9976,6 +10105,13 @@ kbd {
     RW.attach(cv);
     RW.reindex();
     applyStuff();
+    // 读回上次收藏 / 最近使用 / 环境温度
+    (function () {
+      var s = Io.loadSettings() || {};
+      if (s.favorites) state.favorites = s.favorites;
+      if (s.recent) state.recent = s.recent;
+      if (s.ambientTemp != null) state.ambientTemp = s.ambientTemp;
+    })();
     buildTabs();
     buildPalette();
     initGameImport();
@@ -10015,9 +10151,19 @@ kbd {
     $('btnZoomIn').onclick = function () { RW.zoomAt(1.2); };
     $('btnZoomOut').onclick = function () { RW.zoomAt(1 / 1.2); };
     $('btnClear').onclick = function (e) {
+      var ok = false;
       if (e && e.shiftKey) {
-        if (confirm('连存档原有建筑一起清空？此操作可用 Ctrl+Z 撤销。')) RW.clearAll(true);
-      } else if (confirm('清空你画的建筑/地板？存档原有建筑会保留（按住 Shift 点可连底图一起清）。')) RW.clearAll(false);
+        ok = confirm('连存档原有建筑一起清空？此操作可用 Ctrl+Z 撤销。');
+        if (ok) RW.clearAll(true);
+      } else {
+        ok = confirm('清空你画的建筑/地板？存档原有建筑会保留（按住 Shift 点可连底图一起清）。');
+        if (ok) RW.clearAll(false);
+      }
+      // 主动清空了，就别让自动保存又把它恢复回来
+      if (ok) {
+        Io.deleteNamed('（自动保存）');
+        autoDirty = false;
+      }
     };
     $('btnSelRotate').onclick = function () { RW.rotateSelection(); updateBrushInfo(); updateInspector(); };
     $('btnSelCopy').onclick = doCopy;
@@ -10188,8 +10334,58 @@ kbd {
     }
     refreshSaved();
 
+    // ---- 自动保存 ----
+    // 每隔一会儿把当前布局存一份到浏览器，浏览器崩了 / 误关窗口也不至于全丢。
+    // 存的是一个固定名字的存档（不占「本地存档」列表），下次打开自动恢复。
+    var AUTO_NAME = '（自动保存）';
+    var autoTimer = null, autoDirty = false;
+    function autoSaveNow(quiet) {
+      if (!Io.lsAvailable()) return;
+      if (!state.buildings.length && !Object.keys(state.floors || {}).length) return;
+      state.mapName = currentName();
+      var ok = Io.saveNamed(AUTO_NAME, RW.exportProject());
+      if (!ok) return;
+      autoDirty = false;
+      var el = $('autoSaveInfo');
+      if (el) {
+        var d = new Date();
+        el.textContent = '上次自动保存：' + d.getHours() + ':' + String(d.getMinutes()).padStart(2, '0');
+      }
+      if (!quiet) toast('已自动保存到浏览器');
+    }
+    if ($('autoSave')) {
+      $('autoSave').onchange = function () {
+        var s = Io.loadSettings() || {};
+        s.autoSave = this.checked;
+        Io.saveSettings(s);
+        if (this.checked) autoSaveNow(true);
+      };
+      var st0 = Io.loadSettings() || {};
+      if (st0.autoSave === false) $('autoSave').checked = false;
+      // 有自动保存、而当前画布是空的 → 直接恢复
+      var store = Io.loadStore();
+      if (store[AUTO_NAME] && !state.buildings.length && !Object.keys(state.floors || {}).length) {
+        try {
+          RW.loadProject(store[AUTO_NAME]);
+          $('mapName').value = state.mapName;
+          RW.fitView();
+          updateSaveInfo();
+          toast('已恢复上次自动保存的布局');
+        } catch (e) { /* 存档坏了就当没有 */ }
+      }
+      autoTimer = setInterval(function () {
+        if (!autoDirty) return;
+        if ($('autoSave') && !$('autoSave').checked) return;
+        autoSaveNow(true);
+      }, 20000);
+      RW.on('change', function () { autoDirty = true; });
+    }
+
     // 校验
     $('btnCheck2').onclick = runCheck;
+    if ($('showApprox')) {
+      $('showApprox').onchange = function () { runCheck(); };
+    }
 
     // 环境温度（算制冷 / 加热需求用）
     if ($('ambientTemp')) {
@@ -10207,6 +10403,14 @@ kbd {
       updateInspector();
       if (state.layers.power || state.layers.rooms) runCheck();
     });
+    // 收藏 / 最近使用记到本机（做个防抖，别每次改动都写一遍 localStorage）
+    (function () {
+      var t = null;
+      RW.on('change', function () {
+        if (t) clearTimeout(t);
+        t = setTimeout(function () { t = null; savePrefs(); }, 800);
+      });
+    })();
     RW.on('hover', function (h) {
       $('coords').textContent = '(' + h.x + ', ' + h.z + ')';
       updateInspector();

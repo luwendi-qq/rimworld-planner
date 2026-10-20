@@ -168,6 +168,11 @@
           <button id="btnDelLocal" class="danger">删除</button>
         </div>
         <select id="savedSel" style="width:100%;margin-top:6px"></select>
+        <label class="chk" style="margin-top:6px;display:block"
+               title="每隔一会儿自动把当前布局存到浏览器里；下次打开自动恢复，浏览器崩了也不至于全丢">
+          <input type="checkbox" id="autoSave" checked> 自动保存到浏览器
+        </label>
+        <div id="autoSaveInfo" class="muted" style="font-size:11.5px;margin-top:2px"></div>
       </div>
 
       <div class="panel">
@@ -235,6 +240,12 @@
         <div id="planOpts">
           <div class="muted" style="font-size:11.5px">
             材质逐物品：<b>长按左键</b>（或右键）左边任意建筑即可选材质。
+          </div>
+          <div class="group" style="margin-top:6px">
+            <label title="导出蓝图时写进 &lt;Category&gt;，游戏里按分类找蓝图">
+              蓝图分类
+              <input id="bpCategory" type="text" value="布局" style="width:90px">
+            </label>
           </div>
         </div>
         <div class="group" style="margin-top:6px">
