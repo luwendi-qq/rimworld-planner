@@ -99,7 +99,7 @@
 
     // ---------- 1.5 地形 / 山体（导入了存档才有数据）----------
     if (global.RWSite && (state.terrain || state.rocks) && state.respectTerrain !== false) {
-      var rockCells = [], terrainCells = [], rockDefs = {}, terrainDefs = {};
+      var rockCells = [], terrainCells = [], rockDefs = {}, terrainDefs = {}, terrainWhy = {};
       state.buildings.forEach(function (b) {
         if (b.locked) return;                     // 存档原有建筑不报地形问题
         var def = Data.byId[b.defId]; if (!def) return;
@@ -114,6 +114,7 @@
           terrainCells.push(c);
           var t = global.RWSite.terrainAt(c[0], c[1]);
           if (t) terrainDefs[t.name] = (terrainDefs[t.name] || 0) + 1;
+          if (chk.why) terrainWhy[chk.why] = (terrainWhy[chk.why] || 0) + 1;
         });
       });
       // 新铺的地板
@@ -136,9 +137,13 @@
       }
       if (terrainCells.length) {
         var tList = Object.keys(terrainDefs).map(function (n) { return n + '×' + terrainDefs[n]; }).join('、');
+        var whys = Object.keys(terrainWhy);
+        var detail = whys.length
+          ? whys.slice(0, 3).join('；') + (whys.length > 3 ? '；…' : '')
+          : '地形不满足这些建筑的要求（换材质 / 垫地基 / 铺桥）';
         issues.push({
           kind: 'terrain', level: 'error',
-          msg: '有 ' + terrainCells.length + ' 格地形撑不住蓝图（' + tList + '）：沼泽/软沙/水面需要先垫地基或改成桥',
+          msg: '有 ' + terrainCells.length + ' 格地形撑不住蓝图（' + tList + '）：' + detail,
           cells: terrainCells
         });
       }
@@ -177,6 +182,9 @@
       });
     });
 
+    // ---------- 2.8 门 ----------
+    issues = issues.concat(analyseDoors(state, cellMap, key));
+
     // ---------- 3&4. 房间 / 连通 ----------
     var rooms = analyseRooms(state, cellMap);
     state.roomInfo = rooms.rooms;
@@ -186,8 +194,8 @@
         // 天然岩洞 / 远古遗迹本来就没门，玩家忘了开门也可能。属于提示，不是错误。
         issues.push({
           kind: 'sealed', level: 'info', approx: true,
-          msg: '房间 #' + (idx + 1) + '（' + r.area + ' 格）是封闭的、没有门' +
-            (r.ancient ? '（天然/遗迹结构，通常不用管）' : '（天然岩洞、遗迹，或你还没装门）'),
+          msg: '房间 #' + (idx + 1) + '（' + r.area + ' 格）是封闭的、没有能通行的门' +
+            (r.ancient ? '（天然/遗迹结构，通常不用管）' : '（天然岩洞、遗迹，或门没装对位置）'),
           cells: r.cells
         });
       } else if (!r.reachable) {
@@ -267,10 +275,30 @@
       rooms.regions.forEach(function (rg) {
         rg.cells.forEach(function (c) { rgOf[key(c[0], c[1])] = rg; });
       });
+      // 新规划的建筑格：房间如果是用 plan 的墙围出来的，存档里当然没有屋顶数据，
+      // 不能因此把它当成「室外」——游戏里盖好墙会自动封顶。
+      var planCells = {};
+      state.buildings.forEach(function (b) {
+        if (b.src !== 'plan') return;
+        var d = Data.byId[b.defId]; if (!d) return;
+        var fp = RW.footprint(d, b.rot);
+        for (var i = 0; i < fp[0]; i++) for (var j = 0; j < fp[1]; j++) {
+          planCells[key(b.x + i, b.z + j)] = true;
+        }
+      });
+      function roomIsPlanned(rg) {
+        if (!rg || !rg.cells) return false;
+        for (var i = 0; i < rg.cells.length; i++) {
+          var c = rg.cells[i];
+          if (planCells[key(c[0] + 1, c[1])] || planCells[key(c[0] - 1, c[1])] ||
+              planCells[key(c[0], c[1] + 1)] || planCells[key(c[0], c[1] - 1)]) return true;
+        }
+        return false;
+      }
       function indoorSide(cell) {
         var rg = rgOf[key(cell[0], cell[1])] || null;
         if (!rg || prefabIds[rg.id]) return null;
-        if (state.roofs && state.roofs.cells && global.RWSite && global.RWSite.roofAt) {
+        if (state.roofs && state.roofs.cells && global.RWSite && global.RWSite.roofAt && !roomIsPlanned(rg)) {
           // 有屋顶数据：没屋顶的格子按室外算（院子 / 露天平台）
           return global.RWSite.roofAt(cell[0], cell[1]) > 0 ? rg : null;
         }
@@ -307,6 +335,26 @@
         }
       });
     })();
+
+    // 标注问题来自新规划还是存档原有（贴边、遗迹门这类多半不是玩家的锅）
+    var oldCells = {}, newCells = {};
+    state.buildings.forEach(function (b) {
+      var def = Data.byId[b.defId]; if (!def) return;
+      var fp = RW.footprint(def, b.rot);
+      for (var i = 0; i < fp[0]; i++) for (var j = 0; j < fp[1]; j++) {
+        (b.locked ? oldCells : newCells)[key(b.x + i, b.z + j)] = true;
+      }
+    });
+    issues.forEach(function (it) {
+      if (!it.cells || !it.cells.length) return;
+      var o = 0, n = 0;
+      it.cells.forEach(function (c) {
+        var k = key(c[0], c[1]);
+        if (oldCells[k]) o++;
+        if (newCells[k]) n++;
+      });
+      it.source = (!n && o) ? 'existing' : (!o && n) ? 'plan' : 'mixed';
+    });
 
     state.issues = issues;
     state.powerInfo = power;
@@ -459,6 +507,76 @@
     });
 
     return { nets: netList, links: links, problems: problems };
+  }
+
+  // -------------------------------------------------- 门
+  /**
+   * 门要真的能过人。
+   *
+   * 门的通行轴由 rot 决定：0/2 = 南北，1/3 = 东西；两侧都必须是可通行格。
+   * 最常见的错法是把门放在墙角：墙在南边+东边，开口在北边+西边，任何一轴都
+   * 凑不出一对通行格 —— 游戏里就是堵死的。但房间 flood-fill 仍把门当围合，
+   * 所以以前只会报「房间没有门」，看不出是门摆错了。
+   */
+  function analyseDoors(state, cellMap, key) {
+    var issues = [];
+    var Site = global.RWSite;
+
+    // 对外一律报游戏坐标（和 plan.json / get_area 一致），别把画布坐标漏出去
+    function gameCell(x, z) {
+      return {
+        x: state.flipX ? state.cols - 1 - x : x,
+        z: state.flipZ !== false ? state.rows - 1 - z : z
+      };
+    }
+
+    function blockedCell(x, z) {
+      if (x < 0 || z < 0 || x >= state.cols || z >= state.rows) return true;
+      var list = cellMap[key(x, z)] || [];
+      for (var i = 0; i < list.length; i++) {
+        var d = Data.byId[list[i].defId];
+        if (d && blocksWalk(d)) return true;
+      }
+      if (Site) {
+        if (Site.rockAt(x, z)) return true;
+        var t = Site.terrainAt(x, z);
+        if (t && t.aff && t.aff.indexOf('Walkable') < 0) return true;
+      }
+      return false;
+    }
+
+    state.buildings.forEach(function (b) {
+      var def = Data.byId[b.defId];
+      if (!def || !isDoor(def)) return;
+      var rot = ((Math.round((b.rot || 0) / 90) % 4) + 4) % 4;
+      var ns = !blockedCell(b.x, b.z - 1) && !blockedCell(b.x, b.z + 1);
+      var ew = !blockedCell(b.x - 1, b.z) && !blockedCell(b.x + 1, b.z);
+      var g = gameCell(b.x, b.z);
+      var at = '门在 (' + g.x + ',' + g.z + ')';
+      var level = b.locked ? 'info' : 'error';
+      var tag = b.locked ? '（存档原有的）' : '';
+
+      if (!ns && !ew) {
+        issues.push({
+          kind: 'door', level: level,
+          msg: at + tag + ' 过不去：上下和左右都凑不出一对可通行的格子（常见是放在墙角 / 贴着两面墙）',
+          cells: [[b.x, b.z]]
+        });
+      } else if (rot % 2 === 0 && !ns && ew) {
+        issues.push({
+          kind: 'door', level: b.locked ? 'info' : 'warn', approx: true,
+          msg: at + tag + ' 的方向和墙线垂直：这面墙是东西向，门应该转 90°（rot=' + ((rot + 1) % 4) + '）',
+          cells: [[b.x, b.z]]
+        });
+      } else if (rot % 2 === 1 && !ew && ns) {
+        issues.push({
+          kind: 'door', level: b.locked ? 'info' : 'warn', approx: true,
+          msg: at + tag + ' 的方向和墙线垂直：这面墙是南北向，门应该转 90°（rot=' + ((rot + 1) % 4) + '）',
+          cells: [[b.x, b.z]]
+        });
+      }
+    });
+    return issues;
   }
 
   // -------------------------------------------------- 房间 + 连通

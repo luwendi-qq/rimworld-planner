@@ -811,6 +811,189 @@
   }
   function safeName(s) { return String(s).replace(/[\\/:*?"<>|]/g, '_').slice(0, 60) || 'layout'; }
 
+  /** 当前选中的建筑 + 地板，在画布坐标里的包围盒。没选中返回 null */
+  function selectionBoxEditor() {
+    var minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity;
+    function add(x, z) {
+      if (x < minX) minX = x; if (x > maxX) maxX = x;
+      if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+    }
+    RW.selectedBuildings().forEach(function (b) {
+      var def = Data.byId[b.defId]; if (!def) return;
+      var fp = RW.footprint(def, b.rot);
+      for (var i = 0; i < fp[0]; i++) for (var j = 0; j < fp[1]; j++) add(b.x + i, b.z + j);
+    });
+    RW.selectedFloors().forEach(function (f) {
+      var p = String(f.key).split(',');
+      add(+p[0], +p[1]);
+    });
+    return isFinite(minX) ? [minX, minZ, maxX, maxZ] : null;
+  }
+
+  /**
+   * 导出「基地简报」：优先用**框选区域**（边界明确），没框选就用当前视口。
+   * 不额外加边距 —— 玩家框到哪，简报就到哪。
+   */
+  function doExportBrief() {
+    var PI = global.RWPlanImport, Brief = global.RWBrief;
+    if (!PI || !Brief) { toast('简报模块没加载', true); return; }
+
+    // 优先用「最后一次框选的矩形」——框空地也算；没有再退回选中物体的包围盒
+    var box = null;
+    var br = state.briefRect;
+    if (br) box = [br.x0, br.z0, br.x1, br.z1];
+    else box = selectionBoxEditor();
+
+    var rect, source;
+    if (box) {
+      var a0 = PI.cellToGame(state, box[0], box[1]);
+      var c0 = PI.cellToGame(state, box[2], box[3]);
+      rect = [Math.min(a0.x, c0.x), Math.min(a0.z, c0.z), Math.max(a0.x, c0.x), Math.max(a0.z, c0.z)];
+      source = 'selection';
+    } else {
+      var v = RW.visibleRange();
+      var a = PI.cellToGame(state, v.x0, v.z0);
+      var c = PI.cellToGame(state, Math.max(v.x0, v.x1 - 1), Math.max(v.z0, v.z1 - 1));
+      rect = [Math.min(a.x, c.x), Math.min(a.z, c.z), Math.max(a.x, c.x), Math.max(a.z, c.z)];
+      source = 'viewport';
+    }
+
+    var brief = Brief.build(state, { rect: rect, source: source });
+    var text = Brief.toMarkdown(brief);
+    X.download(safeName(currentName()) + '.brief.md', text, 'text/markdown;charset=utf-8');
+
+    var size = (rect[2] - rect[0] + 1) + '×' + (rect[3] - rect[1] + 1);
+    toast((source === 'selection'
+      ? '已导出简报：框选 ' + size + ' 格'
+      : '未框选，已按当前视口导出 ' + size + ' 格') +
+      '（x ' + rect[0] + '–' + rect[2] + '，z ' + rect[1] + '–' + rect[3] + '），' +
+      Math.round(text.length / 1024) + ' KB');
+  }
+
+  function doImportPlan() { $('filePlan').click(); }
+
+  /** 复制到剪贴板（file:// 下 navigator.clipboard 可能不可用，退回 textarea） */
+  function copyText(text) {
+    function fallback() {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); } catch (e) {}
+      document.body.removeChild(ta);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text).catch(fallback);
+    }
+    fallback();
+    return Promise.resolve();
+  }
+
+  function gameCellsText(cells) {
+    var PI = global.RWPlanImport;
+    var shown = cells.slice(0, 10).map(function (c) {
+      var g = PI.cellToGame(state, c[0], c[1]);
+      return '(' + g.x + ',' + g.z + ')';
+    }).join(' ');
+    return shown + (cells.length > 10 ? ' …共 ' + cells.length + ' 格' : '');
+  }
+
+  /** 生成一段可以直接发回给 AI 的报告 */
+  function buildImportReport(planName, r, issues) {
+    var errs = r.errors.map(function (e) { return e.at + '：' + e.msg; });
+    (issues || []).forEach(function (it) {
+      if (it.level !== 'error' || it.source === 'existing') return;
+      errs.push(it.msg + (it.cells && it.cells.length ? '\n   格子：' + gameCellsText(it.cells) : ''));
+    });
+    var warns = r.warnings.slice();
+    (issues || []).forEach(function (it) {
+      if (it.level === 'warn' && it.source !== 'existing' && warns.length < 8) warns.push(it.msg);
+    });
+
+    var L = [];
+    L.push('【RimWorld planner 导入报告】');
+    L.push('方案：' + (planName || state.mapName || '未命名'));
+    L.push('结果：' + errs.length + ' 个 error' + (warns.length ? ' / ' + warns.length + ' 条 warning' : ''));
+    L.push('');
+    L.push('错误（必须改）：');
+    if (!errs.length) L.push('（无）');
+    errs.forEach(function (e, i) { L.push((i + 1) + '. ' + e); });
+    if (warns.length) {
+      L.push('');
+      L.push('警告（能建但会不舒服，尽量一起改）：');
+      warns.forEach(function (w) { L.push('- ' + w); });
+    }
+    L.push('');
+    L.push('请按上面的错误修改，重新输出**完整**的 plan.json：');
+    L.push('- 标准 JSON：不要 // 注释、不要尾逗号');
+    L.push('- 坐标用游戏坐标；def 用游戏 defName');
+    L.push('- 不要只给改动片段');
+    return L.join('\n');
+  }
+
+  /** 从剪贴板/文本粘贴 plan.json */
+  function doPastePlan() {
+    if (!global.RWPlanImport) { toast('导入模块没加载', true); return; }
+    openText('粘贴 AI 规划', '', function (v) {
+      if (!v || !v.trim()) { toast('还没有内容', true); return; }
+      importPlanText(v);
+    }, '把 AI 回复的 plan.json 整段粘进来（Ctrl+V），然后点「导入」', '导入');
+    try {
+      if (navigator.clipboard && navigator.clipboard.readText) {
+        navigator.clipboard.readText().then(function (txt) {
+          if (txt && !$('ioText').value) $('ioText').value = txt;
+        }).catch(function () {});
+      }
+    } catch (e) {}
+    setTimeout(function () { try { $('ioText').focus(); } catch (e) {} }, 30);
+  }
+
+  /** 导入 AI 写的 plan.json（和命令行 apply 共用 js/planimport.js） */
+  function importPlanText(t) {
+    var PI = global.RWPlanImport;
+    if (!PI) { toast('导入模块没加载', true); return; }
+    var parsed;
+    try { parsed = PI.parsePlan(t); }
+    catch (e) { toast('plan.json 解析失败：' + e.message, true); return; }
+    var plan = parsed.plan;
+
+    var r = PI.apply(state, plan, { autoStuff: true });
+    var issues = [];
+    if (r.applied.buildings || r.applied.floors) {
+      // 走一遍 export/load，触发 reindex / render / change，让房间、校验、面板同步
+      RW.loadProject(RW.exportProject());
+      $('mapName').value = state.mapName;
+      RW.fitContent();
+      updateSaveInfo();
+      try { issues = Checks.analyse(state).issues || []; } catch (e) { issues = []; }
+    }
+
+    var softWarn = parsed.warnings.length ? parsed.warnings[0] : null;
+    var msg = '导入 ' + r.applied.buildings + ' 件建筑、' + r.applied.floors + ' 格地板';
+    if (softWarn) msg += '；' + softWarn;
+    var assumed = Object.keys(r.stuffAssumed).length;
+    if (assumed) msg += '；自动选材质 ' + assumed + ' 种';
+    if (r.demolish.length) msg += '；' + r.demolish.length + ' 处压到存档原有建筑';
+    if (r.roomTemp.length) msg += '；设了 ' + r.roomTemp.length + ' 个房间温度';
+
+    // 应用错误 + 校验 error（存档原有的不算，别让玩家去改遗迹）
+    var errCount = r.errors.length + issues.filter(function (it) {
+      return it.level === 'error' && it.source !== 'existing';
+    }).length;
+
+    if (errCount) {
+      var report = buildImportReport(plan.name, r, issues);
+      openText('导入 AI 规划：' + errCount + ' 个错误', report, function (v) {
+        copyText(v).then(function () { toast('错误信息已复制，发回给 AI 让它改'); });
+      }, '点「复制错误信息」把这段发回给 AI；也可以先自己看一遍', '复制错误信息');
+      toast(msg + '；' + errCount + ' 个错误，见弹窗', true);
+      return;
+    }
+    toast(msg);
+  }
+
   /** 导出 PNG（整个布局）。 */
   function doExportPng() {
     var name = safeName(currentName()) + '.png';
@@ -828,10 +1011,11 @@
     if (!r) { toast('画布上还没有东西可以导出'); return; }
   }
 
-  function openText(title, text, onApply, hint) {
+  function openText(title, text, onApply, hint, applyLabel) {
     $('ioTitle').textContent = title;
     $('ioHint').textContent = hint || '';
     $('ioText').value = text || '';
+    $('ioApply').textContent = applyLabel || '应用';
     $('ioModal').classList.add('show');
     $('ioApply').onclick = function () {
       var v = $('ioText').value;
@@ -1477,6 +1661,14 @@
     $('btnExportBpDir').onclick = exportBlueprintToFolder;
     $('btnExportJson').onclick = doExportJson;
     if ($('btnExportPng')) $('btnExportPng').onclick = doExportPng;
+  if ($('btnBrief')) $('btnBrief').onclick = doExportBrief;
+  if ($('btnImportPlan')) $('btnImportPlan').onclick = doImportPlan;
+  if ($('btnPastePlan')) $('btnPastePlan').onclick = doPastePlan;
+  if ($('filePlan')) $('filePlan').onchange = function () {
+    var f = this.files[0]; if (!f) return;
+    X.readFile(f).then(importPlanText);
+    this.value = '';
+  };
 
     // 锁定存档原有建筑
     if ($('btnLockSel')) $('btnLockSel').onclick = function () {
@@ -1648,12 +1840,21 @@
         return;
       }
       if (k === 'r') { RW.rotateSelection(); updateBrushInfo(); }
-      else if (k === 'escape') { RW.setBrush(null); state.paste = null; updateBrushInfo(); RW.render(); }
+      else if (k === 'escape') {
+      // Esc = 取消当前操作：有笔刷/粘贴时先取消它们；都空着就清掉「AI 简报区域」的框
+      var hadTool = !!state.brush || !!state.paste;
+      RW.setBrush(null); state.paste = null;
+      var hadRect = false;
+      if (!hadTool && state.briefRect) { delete state.briefRect; hadRect = true; }
+      updateBrushInfo(); RW.render();
+      if (hadRect) toast('已清除框选区域');
+    }
       else if (k === 'delete' || k === 'backspace') { RW.deleteSelection(); }
       else if (k === 'f') { RW.fitView(); }
       else if (k === '1') { RW.setTool('place'); updateTools(); }
       else if (k === '2') { RW.setTool('select'); updateTools(); }
       else if (k === '3') { RW.setTool('erase'); updateTools(); }
+    else if (k === '4') { RW.setTool('brief'); updateTools(); }
       else if (k === 'g') { state.layers.grid = !state.layers.grid; $('lyGrid').checked = state.layers.grid; RW.render(); }
       else if (k === 't') { state.layers.terrain = !state.layers.terrain; if ($('lyTerrain')) $('lyTerrain').checked = state.layers.terrain; RW.render(); }
       else if (k === 'b') { state.layers.blocked = !state.layers.blocked; if ($('lyBlocked')) $('lyBlocked').checked = state.layers.blocked; RW.render(); }

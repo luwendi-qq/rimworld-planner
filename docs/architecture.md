@@ -26,13 +26,17 @@ rimworld-planner/
 │   ├── checks.js               布局校验（重叠·地形·电力·房间·连通·温控）
 │   ├── workload.js             可行性 / 工作量 / 工期估算（小人技能·科技·库存）
 │   ├── exporters.js            蓝图 .xml / 工程 JSON
+│   ├── buildops.js             规划 → 游戏侧 build() 调用（CLI / MCP 落地）
 │   ├── io.js                   本地存档 / RimWorld 存档读取（地形网格·小人·科技·库存）
 │   └── main.js                 界面装配
 └── tools/
+    ├── plan.js                 命令行入口（读档 / 校验 / 估算 / build-ops）
+    ├── lib/dom.js              极简 XML DOM（Node 里顶替 DOMParser）
+    ├── lib/load.js             在 Node 里加载 js/*.js（复用 tests/harness.js）
     ├── extract_defs.py         从本地游戏目录生成精确尺寸表（命令行路线，可选）
     ├── extract_textures.py     从本地游戏目录提取原版贴图（命令行路线，可选）
     ├── build_single.py         打包单文件版
-    └── README.md               三个脚本的说明
+    └── README.md               脚本说明
 tests/                          纯逻辑断言测试（node 自带测试运行器，零依赖）
 ├── harness.js                  在 Node 里加载浏览器端脚本的沙箱
 ├── geometry.test.js            占地 / 朝向 / 坐标换算
@@ -60,8 +64,34 @@ tests/                          纯逻辑断言测试（node 自带测试运行�
 | `RWRooms` | `rooms.js` | 房间角色自动推导、目标温度读写、温控需求估算 |
 | `RWChecks` | `checks.js` | 布局校验（重叠·地形·电力·房间·连通·温控·角色） |
 | `RWWork` | `workload.js` | 蓝图材料 / 科技 / 工时 / 工期估算 |
-| `RWExport` | `exporters.js` | 蓝图 `.xml` / 工程 JSON 序列化 |
+| `RWExport` | `exporters.js` | 蓝图 `.xml` / 工程 JSON 序列化；`blueprintEntries()` 是唯一的坐标换算入口 |
+| `RWBuild` | `buildops.js` | 规划 → `build()` 调用（合并矩形、排除锁定、分层排序） |
 | `RWIo` | `io.js` | 本地存档、`.rws` 解析（建筑 / 地形 / 小人 / 科技 / 库存） |
+
+## 命令行入口（tools/plan.js）
+
+内核是浏览器端的 IIFE，但 `tests/harness.js` 早就证明它能在一个 `node:vm` 沙箱里跑起来。
+`tools/plan.js` 就把这条路做成了正式入口，浏览器里没有的三样东西由 `tools/lib/` 补：
+
+| 缺什么 | 补法 |
+| --- | --- |
+| `DOMParser` | `tools/lib/dom.js` —— 只实现 `io.js` 用到的 API，迭代式解析，16 MB 存档不爆栈 |
+| `Blob.stream()` / `Response` | `tools/lib/load.js` —— 用 `Readable.toWeb()` 喂给 `DecompressionStream`，地形网格才解得开 |
+| `atob` / `btoa` | `Buffer` base64 |
+
+**同一份代码，两种脸**：`plan.js` 不重新实现任何业务逻辑，`validate` 直接调 `RWChecks.analyse`，
+`build-ops` 直接调 `RWBuild.toBuildOps`。所以「网页里通过」和「命令行通过」不会分叉。
+
+坐标在这条链路上只换算一次：
+
+```
+存档 (x,z)  ──io.importFromSave──▶  画布 (z 翻转)  ──exporters.blueprintEntries──▶  游戏 (x,z)
+                                          ▲                    │
+                                          └──── plan.js apply ──┘  (gameThingToEditor)
+```
+
+`plan.js` 对外的输入输出**一律是游戏坐标**，翻转只发生在读写缓存的那一刻。
+`tests/buildops.test.js` 会断言「合并矩形之后覆盖的格子 = 蓝图条目」，防止哪天改了合并逻辑漏几格。
 
 ## 撤销栈（增量式）
 

@@ -529,7 +529,7 @@ kbd {
 .pitem b { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
 
 </style>
-<!-- 单文件构建：2026-10-20 14:09 UTC  内联模块：js/data.js, js/zh-names.js, js/buildings.generated.js, js/vendor/fzstd.js, js/gamezip.js, js/gamedefs.js, js/gameimport.js, js/icons.js, js/engine.js, js/site.js, js/rooms.js, js/checks.js, js/workload.js, js/exporters.js, js/io.js, js/main.js -->
+<!-- 单文件构建：2026-10-21 21:30  内联模块：js/data.js, js/zh-names.js, js/buildings.generated.js, js/sprites.js, js/vendor/fzstd.js, js/gamezip.js, js/gamedefs.js, js/gameimport.js, js/icons.js, js/engine.js, js/site.js, js/rooms.js, js/checks.js, js/workload.js, js/exporters.js, js/buildops.js, js/planimport.js, js/brief.js, js/io.js, js/main.js -->
 </head>
 
 <body>
@@ -574,6 +574,12 @@ kbd {
         <button id="btnExportPng" class="ghost" title="把整个布局导出成 PNG 图片（分享 / 存档用）">导出图片</button>
         <button id="btnHelp" class="ghost" title="使用说明 / 存档路径">? 帮助</button>
       </div>
+      <div class="group">
+        <button id="btnBrief" title="导出「基地简报」：先用「简报区域」工具（4）拖出范围（画布上留青色虚线框，Esc 清除）；没定义就用当前视口">AI 简报</button>
+        <button id="btnImportPlan" title="从文件导入 AI 写好的 plan.json（和命令行 apply 同一套规则）">导入 AI 规划</button>
+        <button id="btnPastePlan" title="直接粘贴 AI 在对话里回复的 plan.json（Ctrl+V）">粘贴 AI 规划</button>
+        <input type="file" id="filePlan" accept=".json" hidden>
+      </div>
     </header>
 
     <!-- ================= 左侧：物品栏 ================= -->
@@ -604,6 +610,10 @@ kbd {
         <button data-tool="erase" title="橡皮 (3)：拖一个框整片删掉（连地板）">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 15l7-7 6 6-4 4H7z"/><path d="M11 8l4-4 6 6-4 4"/><path d="M4 20h16"/></svg>
           <span>橡皮</span>
+        </button>
+        <button data-tool="brief" title="简报区域 (4)：拖一个矩形，定义 AI 简报的范围；不会影响框选">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h4M10 4h4M16 4h4M20 4v4M20 10v4M20 16v4M16 20h4M10 20h4M4 20h4M4 16v4M4 10v4M4 4v4"/></svg>
+          <span>简报</span>
         </button>
       </div>
     </main>
@@ -795,7 +805,7 @@ kbd {
         <details>
           <summary>快捷键</summary>
           <p>
-            <kbd>1</kbd>/<kbd>2</kbd>/<kbd>3</kbd> 放置 / 框选 / 橡皮<br>
+            <kbd>1</kbd>/<kbd>2</kbd>/<kbd>3</kbd>/<kbd>4</kbd> 放置 / 框选 / 橡皮 / 简报区域<br>
             <kbd>R</kbd> 旋转 · <kbd>Delete</kbd> 删除 · <kbd>Esc</kbd> 取消<br>
             <kbd>G</kbd>/<kbd>T</kbd>/<kbd>B</kbd> 网格 / 地形 / 不可建造标记<br>
             <kbd>P</kbd>/<kbd>O</kbd> 电力 / 房间 · <kbd>F</kbd> 适配视图<br>
@@ -1627,6 +1637,19 @@ kbd {
     mergeRocks: mergeRocks,
     researches: function () { return researches; },
     research: function (def) { return researches[def] || null; },
+    /**
+     * 存档里的 research.progress 收录**所有**研究项目（没研究的记 0），
+     * 只有进度达到成本（或没有成本数据时 >0 且不是当前项目）才算已完成。
+     * 直接数 key 会把 100 多项没研究的当成已解锁。
+     */
+    researchDone: function (rs, def) {
+      if (!rs || !rs.progress) return false;
+      var pt = rs.progress[def];
+      if (pt == null) return false;
+      var info = researches[def];
+      if (info && info.cost > 0) return pt >= info.cost - 0.001;
+      return pt > 0 && def !== rs.current;
+    },
     mergeResearches: function (list) {
       if (!list) return 0;
       var n = 0;
@@ -1906,6 +1929,18 @@ kbd {
   g.RWData.ITEM_NAMES = {"TextBook":"教材","Schematic":"技术图解","Novel":"小说","Beer":"啤酒","Wort":"麦芽汁","Ambrosia":"仙馐果","GoJuice":"活力水","Luciferium":"魔鬼素","Penoxycyline":"佩诺西林","Flake":"薄片","PsychiteTea":"精神茶","Yayo":"呀呦粉","SmokeleafJoint":"大麻烟","WakeUp":"清醒丸","Mote_SparkThrown":"尘埃","Mote_SparkThrownFast":"尘埃","Mote_SparkThrownFastBlue":"火花","Mote_LongSparkThrown":"尘埃","Mote_Splash":"尘埃","Mote_ToxicDamage":"毒","Mote_SmokeJoint":"尘埃","Mote_SmokeFlake":"尘埃","Mote_ExtinguisherPuff":"尘埃","Mote_Clean":"特效","Mote_Paint":"特效","Mote_Sow":"特效","Mote_Harvest":"特效","Mote_ClearSnow":"特效","Mote_Cards":"特效","Mote_Stun":"特效","Mote_ColonistFleeing":"特效","Mote_ColonistAttacking":"特效","Mote_DrunkBubble":"特效","Mote_BerserkBit":"特效","Mote_Speech":"特效","Mote_Thought":"特效","Mote_ThoughtGood":"特效","Mote_ThoughtBad":"特效","Mote_Text":"特效","Mote_ProgressBar":"特效","Mote_ProgressBarAlwaysVisible":"特效","Mote_TempRoof":"特效","Mote_Danger":"特效（危险）","Mote_ActivatorCountdownGlow":"光亮","Mote_ActivatorProximityGlow":"光亮","Mote_Leaf":"特效","Mote_FoodBitVegetarian":"特效","Mote_FoodBitMeat":"特效","Mote_StoneBit":"特效","Mote_CookBit":"特效","Mote_VomitBit":"特效","Mote_Bombardment":"特效","Mote_PowerBeam":"特效","Mote_GiantExplosion":"特效","Mote_GiantExplosionInner":"特效","Mote_PsychicConditionCauserEffect":"线缆","Mote_PsychicEmanatorEffect":"发生器","Mote_ForceJob":"强制","Mote_ForceJobMaintained":"维持","FlashShieldBreak":"护盾闪光","CracksShieldBreak":"护盾破坏","Mote_SparkThrownFastBright":"特效","Mote_ResurrectAbility":"复活能力","Mote_ResurrectFlash":"复活闪光","Mote_PowerCellBurning":"电池燃烧","Mote_ForcedVisible":"特效","GroundCrackHuge":"特效","Mote_Hacking":"特效","Mote_CocoonBreaking":"特效","Mote_CocoonDestroyedMist":"特效","Mote_CocoonDestroyedFlyingSlime":"特效","Mote_CocoonDestroyedFlyingPiece":"特效","Mote_AnimalWarcallDistortion":"特效","Mote_AnimalWarcallFlash":"特效","Mote_TerrorHalo":"特效","PsychicAmplifier":"启灵装置","ArchotechEye":"超凡仿生眼","ArchotechArm":"超凡仿生臂","ArchotechLeg":"超凡仿生腿","BionicEye":"仿生眼","BionicArm":"仿生臂","BionicLeg":"仿生腿","BionicSpine":"仿生脊椎","BionicHeart":"仿生心脏","BionicStomach":"仿生胃","DeathAcidifier":"质溶器","BionicEar":"仿生耳","BionicTongue":"仿生舌","BionicJaw":"仿生颌","Heart":"心脏","Lung":"肺","Kidney":"肾","Liver":"肝","SimpleProstheticLeg":"假腿","SimpleProstheticArm":"假臂","SimpleProstheticHeart":"人工心脏","CochlearImplant":"人工耳蜗","PowerClaw":"动力爪","Joywire":"乐丝芯片","Painstopper":"止痛芯片","AncientConcreteBarrier":"远古水泥围栏","AncientLamppost":"远古路灯杆","Urn":"瓮","AncientCryptosleepPod":"远古低温休眠荚","AncientHermeticCrate":"密封储存箱","AncientFuelNode":"远古燃油站","AncientLamp":"远古落地灯","AncientSystemRack":"远古设备架","AncientBarrel":"远古桶","AncientBed":"远古床","AncientMicrowave":"远古微波炉","AncientKitchenSink":"远古厨房水槽","AncientRefrigerator":"远古冰箱","AncientOven":"远古烤箱","AncientStove":"远古锅炉","AncientOperatingTable":"远古手术台","AncientMachine":"远古机械","AncientGenerator":"远古发电机","AncientBasicRecharger":"远古机械充电站","AncientStandardRecharger":"远古大型机械充电站","AncientMechDropBeacon":"远古机械空投信标","AncientSecurityTurret":"远古安保机枪塔","AncientMechGestator":"远古机械培育器","AncientMechGestatorTank":"远古机械培育舱","AncientLargeMechGestator":"远古大型机械培育器","AncientLockerBank":"远古储物柜","AncientDisplayBank":"远古显示器","AncientCrate":"远古储物箱","AncientEquipmentBlocks":"远古设备组","AncientStorageCylinder":"远古液罐","AncientSpacerCrate":"远古太空物资箱","AncientMilitaryCrate":"远古军用物资箱","ChunkMechanoidSlag":"机械族残块","AncientLargeContainer":"远古集装箱","AncientShipBeacon":"远古导航信标","AncientLargeCrate":"远古大储物箱","AncientVendingMachine":"远古自动售货机","AncientToilet":"远古马桶","AncientLongCrate":"远古长储物箱","AncientSmallCrate":"远古小储物箱","AncientMegaCannonTripod":"远古巨型加农炮平台","AncientMegaCannonBarrel":"远古巨型加农炮管","AncientLargeRustedEngineBlock":"远古大型发动机","AncientFence":"远古围墙","AncientTank":"远古坦克残骸","AncientTankTrap":"远古坦克陷阱","AncientRustedEngineBlock":"远古发动机组","AncientShoppingCart":"远古购物车","AncientPostbox":"远古信箱","AncientAirConditioner":"远古空调外机","AncientATM":"远古ATM","AncientWashingMachine":"远古洗衣机","AncientHydrant":"远古消防栓","AncientWheel":"远古轮毂","AncientGiantWheel":"远古大型轮毂","AncientRustedCar":"远古车","AncientRustedTruck":"远古卡车","AncientRustedJeep":"远古装甲车","AncientRustedCarFrame":"远古车架","AncientWarwalkerTorso":"远古战争践踏者躯体","AncientRustedDropship":"远古登陆艇","AncientWarwalkerClaw":"远古战争践踏者动力爪","AncientWarwalkerLeg":"远古战争践踏者腿部","AncientMiniWarwalkerRemains":"远古战争疾行者残骸","AncientWarspiderRemains":"远古战争爬行者残骸","AncientPipelineSection":"远古管道段","AncientWarwalkerFoot":"远古战争践踏者足部","AncientAPC":"远古装甲运兵车残骸","AncientWarwalkerShell":"远古战争践踏者装甲外壳","AncientJetEngine":"远古喷气式发动机","AncientDropshipEngine":"远古登陆艇引擎","AncientPodCar":"远古自动交通工具","AncientRazorWire":"远古铁丝网","AncientPipes":"远古管道堆","SculptureSmall":"小雕塑","SculptureLarge":"大雕塑","SculptureGrand":"宏伟雕塑","Snowman":"雪人","PsychicDronerShipPart":"飞船部件（灵质）","DefoliatorShipPart":"飞船部件（枯萎）","ShipChunk":"飞船残骸","Shuttle":"帝国穿梭机","ShuttleCrashed":"坠毁的帝国穿梭机","SleepingSpot":"睡眠点","DoubleSleepingSpot":"双人睡眠点","Bed":"单人床","DoubleBed":"双人床","RoyalBed":"豪华双人床","HospitalBed":"医疗床","Bedroll":"睡袋","BedrollDouble":"双人睡袋","AnimalSleepingSpot":"动物睡眠点","AnimalSleepingBox":"动物睡眠箱","AnimalBed":"动物床铺","Stool":"凳子","DiningChair":"餐椅","Armchair":"扶手椅","Couch":"沙发","EndTable":"床头柜","Table1x2c":"桌子（1x2）","Table2x2c":"桌子（2x2）","Table2x4c":"桌子（2x4）","Table3x3c":"桌子（3x3）","PlantPot":"花盆","TorchLamp":"火把","TorchWallLamp":"壁挂火把","StandingLamp":"落地灯","SunLamp":"太阳灯","WallLamp":"壁灯","FloodLight":"泛光灯","Shelf":"物品架","ShelfSmall":"小物品架","Bookcase":"书柜","BookcaseSmall":"小书柜","Dresser":"矮柜","HorseshoesPin":"马蹄钉","HoopstoneRing":"投石圈","GameOfUrBoard":"皇家博弈棋","ChessTable":"象棋桌","PokerTable":"扑克桌","BilliardsTable":"台球桌","TubeTelevision":"显像管电视","FlatscreenTelevision":"平板电视","MegascreenTelevision":"巨屏电视","Telescope":"望远镜","BurningPowerCell":"燃烧的能量电池","Turret_AutoMiniTurret":"小型射弹炮塔","Gun_MiniTurretMech":"小型射弹枪","Bullet_MiniSlug":"小弹头","Gloomlight":"机械节点","Turret_AutoChargeBlaster":"自动电荷冲击炮塔","Gun_ChargeBlasterHeavyTurret":"轻型电荷冲击炮","Turret_AutoInferno":"自动地狱火加农炮塔","Gun_InfernoCannonTurret":"地狱火加农炮","Turret_AutoMortar":"自动迫击炮","Artillery_AutoMortar":"自动迫击炮","EggBox":"卵箱","OrbitalTradeBeacon":"轨道交易信标","CommsConsole":"通讯台","FirefoamPopper":"泡沫灭火器","MoisturePump":"排水泵","GroundPenetratingScanner":"地质扫描仪","LongRangeMineralScanner":"远距离矿物扫描仪","PodLauncher":"运输舱发射器","TransportPod":"运输舱","MultiAnalyzer":"多元分析仪","VitalsMonitor":"生命体征监测仪","ToolCabinet":"工具柜","Grave":"坟墓","Sarcophagus":"棺材","CryptosleepCasket":"低温休眠舱","AncientCryptosleepCasket":"远古低温休眠舱","MarriageSpot":"婚礼举办点","PartySpot":"聚会举办点","CaravanPackingSpot":"远行队牵引点","SteleLarge":"大型石碑","SteleGrand":"宏伟石碑","PenMarker":"畜栏标牌","DelayedEffecterSpawner":"延迟触发器","CraterSmall":"爆炸坑","CraterMedium":"爆炸坑","CraterLarge":"爆炸坑","CaveExit":"离洞绳","UnfinishedMusicalInstrument":"未完成的乐器","CollapsedRocks":"崩落的石头","MineableSteel":"压埋的钢材","MineableSilver":"银矿","MineableGold":"金矿","MineableUranium":"铀矿","MineablePlasteel":"压埋的玻璃钢","MineableJade":"翡翠矿","MineableComponentsIndustrial":"压埋的机械","SteamGeyser":"蒸汽间歇喷泉","Hive":"虫巢","GlowPod":"萤光茧","RaisedRocks":"垒石","CocoonMegaspider":"巨型蜘蛛茧","CocoonMegascarab":"巨型甲虫茧","CocoonSpelopede":"洞穴阔步虫茧","PowerConduit":"电缆","HiddenConduit":"隐藏电缆","WaterproofConduit":"防水电缆","PowerSwitch":"电力开关","WoodFiredGenerator":"木柴发电机","ChemfuelPoweredGenerator":"化合燃料发电机","WindTurbine":"风力发电机","Battery":"蓄电池","SolarGenerator":"太阳能板","GeothermalGenerator":"地热发电机","WatermillGenerator":"水轮发电机","CraftingSpot":"手工加工点","ButcherSpot":"屠宰点","TableSculpting":"艺创台","TableButcher":"屠宰台","HandTailoringBench":"裁缝台（手工）","ElectricTailoringBench":"裁缝台（电力）","FueledSmithy":"锻造台（燃料）","ElectricSmithy":"锻造台（电力）","TableMachining":"机械加工台","ElectricStove":"炉灶（电力）","FueledStove":"炉灶（燃料）","TableStonecutter":"切石桌","Brewery":"酿造台","DrugLab":"药物实验台","ElectricSmelter":"熔炼器（电力）","BiofuelRefinery":"精炼设备","FabricationBench":"精密装配台","SimpleResearchBench":"基础研究台","HiTechResearchBench":"高级研究台","ElectricCrematorium":"火化炉（电力）","HydroponicsBasin":"水栽培植物盆","FermentingBarrel":"发酵桶","DeepDrill":"深钻井","NutrientPasteDispenser":"营养膏合成机","Hopper":"进料口","Sandbags":"沙袋","Barricade":"路障","TrapSpike":"尖刺陷阱","TrapIED_HighExplosive":"简易炸弹陷阱","TrapIED_Incendiary":"简易燃烧陷阱","TrapIED_EMP":"简易EMP陷阱","TrapIED_Smoke":"简易烟雾陷阱","TrapIED_Firefoam":"简易泡沫灭火陷阱","TrapIED_AntigrainWarhead":"简易反粒子弹头陷阱","Turret_MiniTurret":"小型自动机枪塔","Bullet_MiniTurret":"小型机枪塔子弹","Gun_MiniTurret":"小型机枪","Turret_Autocannon":"自动加农炮塔","Bullet_AutocannonTurret":"自动加农炮弹","Gun_AutocannonTurret":"自动加农炮","Turret_Sniper":"铀弹加农炮塔","Bullet_TurretSniper":"铀弹","Gun_TurretSniper":"铀弹加农炮","Turret_Mortar":"迫击炮","Artillery_Mortar":"迫击炮","Turret_FoamTurret":"泡沫喷射塔","Proj_Foam":"阻燃泡沫","Gun_TurretFoam":"泡沫喷射器","Turret_RocketswarmLauncher":"集群火箭发射塔","Proj_Rocket":"火箭弹","Gun_RocketswarmLauncher":"集群火箭发射器","Ship_Beam":"飞船结构梁","Ship_CryptosleepCasket":"飞船低温休眠舱","Ship_ComputerCore":"飞船电脑核心","Ship_Reactor":"飞船反应堆","Ship_Engine":"飞船推进器","Ship_SensorCluster":"集成传感器","PsychicEmanator":"心灵放射器","VanometricPowerCell":"虚空电池","InfiniteChemreactor":"无限反应釜","Door":"门","Autodoor":"自动门","AnimalFlap":"帷幔","OrnateDoor":"豪华大门","Wall":"墙","Fence":"栅栏","FenceGate":"栅栏门","Column":"支撑柱","Campfire":"篝火","PassiveCooler":"蒸发制冷器","Heater":"加热器","Cooler":"制冷机","Vent":"通风孔","PsychicAnimalPulser":"动物心灵脉冲发生器","PsychicSoothePulser":"心灵抚慰脉冲发生器","AIPersonaCore":"人格核心","MechSerumHealer":"治愈机械液","MechSerumResurrector":"复活机械液","TechprofSubpersonaCore":"科技核心","ThrumboHorn":"敲击兽角","ElephantTusk":"象牙","MealSurvivalPack":"包装生存食物","MealNutrientPaste":"营养膏","MealSimple":"简单食物","MealFine":"精致食物","MealFine_Veg":"精致素食","MealFine_Meat":"精致肉食","MealLavish":"奢侈食物","MealLavish_Veg":"奢侈素食","MealLavish_Meat":"奢侈肉食","Kibble":"粗饲料","Pemmican":"干肉饼","Chocolate":"巧克力","Milk":"奶","InsectJelly":"虫胶","Skull":"头颅","EggChickenUnfertilized":"鸡蛋（未受精）","EggChickenFertilized":"鸡蛋（已受精）","EggCobraFertilized":"眼镜蛇蛋（已受精）","EggCobraUnfertilized":"眼镜蛇蛋（未受精）","EggIguanaFertilized":"鬣蜥蛋（已受精）","EggIguanaUnfertilized":"鬣蜥蛋（未受精）","EggTortoiseFertilized":"乌龟蛋（已受精）","EggTortoiseUnfertilized":"乌龟蛋（未受精）","EggCassowaryFertilized":"鹤鸵蛋（已受精）","EggCassowaryUnfertilized":"鹤鸵蛋（未受精）","EggEmuFertilized":"鸸鹋蛋（已受精）","EggEmuUnfertilized":"鸸鹋蛋（未受精）","EggOstrichFertilized":"鸵鸟蛋（已受精）","EggOstrichUnfertilized":"鸵鸟蛋（未受精）","EggTurkeyFertilized":"火鸡蛋（已受精）","EggTurkeyUnfertilized":"火鸡蛋（未受精）","EggDuckUnfertilized":"鸭蛋（未受精）","EggDuckFertilized":"鸭蛋（已受精）","EggGooseUnfertilized":"鹅蛋（未受精）","EggGooseFertilized":"鹅蛋（已受精）","MedicineHerbal":"草药","MedicineIndustrial":"医药","MedicineUltratech":"闪耀世界医药","ComponentIndustrial":"零部件","ComponentSpacer":"高级零部件","Neutroamine":"中性胺","Chemfuel":"化合燃料","ReinforcedBarrel":"加固炮管","RawPotatoes":"土豆","RawFungus":"菌菇","RawRice":"稻米","RawAgave":"龙舌兰果","RawCorn":"玉米","RawBerries":"莓果","Hay":"干草","RawHops":"啤酒花","PsychoidLeaves":"精神叶","SmokeleafLeaves":"大麻叶","Shell_HighExplosive":"高爆弹","Bullet_Shell_HighExplosive":"高爆弹","Shell_Incendiary":"燃烧弹","Bullet_Shell_Incendiary":"燃烧弹","Shell_EMP":"EMP弹","Bullet_Shell_EMP":"EMP弹","Shell_Smoke":"烟雾弹","Bullet_Shell_Smoke":"烟雾弹","Shell_Firefoam":"泡沫灭火弹","Bullet_Shell_Firefoam":"泡沫灭火弹","Shell_AntigrainWarhead":"反粒子弹头","Bullet_Shell_AntigrainWarhead":"反粒子弹头","Silver":"白银","Gold":"黄金","Steel":"钢铁","Plasteel":"玻璃钢","WoodLog":"原木","Uranium":"铀","Jade":"翡翠","Cloth":"布","Synthread":"合成纤维","DevilstrandCloth":"魔菇布","Hyperweave":"超织物","WoolSheep":"羊毛","WoolAlpaca":"羊驼毛","WoolMegasloth":"大地懒毛","WoolMuffalo":"雪牛毛","WoolBison":"野牛毛","Leather_Plain":"普通皮革","Leather_Dog":"狗皮","Leather_Wolf":"狼皮","Leather_Panthera":"豹皮","Leather_Camel":"驼皮","Leather_Bluefur":"蓝色毛皮","Leather_Bear":"熊皮","Leather_GuineaPig":"豚鼠皮","Leather_Human":"人皮","Leather_Pig":"猪皮","Leather_Light":"轻薄皮革","Leather_Bird":"鸟皮","Leather_Chinchilla":"栗鼠皮","Leather_Fox":"狐皮","Leather_Lizard":"蜥蜴皮","Leather_Elephant":"象皮","Leather_Heavy":"厚重毛皮","Leather_Rhinoceros":"犀牛皮","Leather_Thrumbo":"敲击兽皮","Leather_Patch":"杂皮","UnfinishedSculpture":"未完成的雕塑","UnfinishedGun":"未完成的枪械","UnfinishedWeapon":"未完成的武器","UnfinishedArmor":"未完成的护甲","UnfinishedTechArmor":"未完成的先进装甲","UnfinishedMetallicTechArmor":"未完成的护甲","UnfinishedApparel":"未完成的衣物","UnfinishedBelt":"未完成的腰带","UnfinishedPack":"未完成的背包","UnfinishedComponent":"未完成的零部件","UnfinishedHealthItemProsthetic":"未完成的假体","UnfinishedHealthItemBionic":"未完成的仿生体","UnfinishedMask":"未完成的面具","MinifiedThing":"卸载的物品","MinifiedThingRealtimeDraw":"卸载的物品","MinifiedTree":"掘起的树","Apparel_ShieldBelt":"护盾腰带","Apparel_CowboyHat":"牛仔帽","Apparel_BowlerHat":"圆顶礼帽","Apparel_TribalHeaddress":"部落头饰","Apparel_Tuque":"御寒帽","Apparel_WarMask":"战争面具","Apparel_WarVeil":"面罩","Apparel_SimpleHelmet":"简易头盔","Apparel_AdvancedHelmet":"防弹头盔","Apparel_PowerArmorHelmet":"海军头盔","Apparel_ArmorHelmetRecon":"斥候头盔","Apparel_PsychicFoilHelmet":"心灵防护头盔","Apparel_HatHood":"兜帽","Apparel_ClothMask":"防毒口罩","Apparel_SmokepopBelt":"烟罐背包","Apparel_FirefoampopPack":"消防背包","Apparel_PsychicShockLance":"心灵冲击枪","Apparel_PsychicInsanityLance":"心灵错乱枪","Apparel_TribalA":"部落装","Apparel_Parka":"风雪大衣","Apparel_Pants":"裤子","Apparel_BasicShirt":"T恤衫","Apparel_CollarShirt":"衬衫","Apparel_Duster":"防尘大衣","Apparel_Jacket":"夹克","Apparel_PlateArmor":"板甲","Apparel_FlakVest":"防弹背心","Apparel_FlakPants":"防弹裤","Apparel_FlakJacket":"防弹夹克","Apparel_PowerArmor":"海军装甲","Apparel_ArmorRecon":"斥候装甲","Apparel_Cape":"披肩","Apparel_Robe":"长袍","Bombardment":"轰炸","Mote_Bombardment_PreImpact":"轰炸前导","PowerBeam":"能量束","SignalAction_Letter":"信号-信件","SignalAction_Ambush":"信号-伏击","DropPodIncoming":"运输舱（下落中）","DropPodIncomingMechanoidRapid":"运输舱（下落中）","DropPodLeaving":"运输舱（发射中）","ShipChunkIncoming":"飞船残骸（下落中）","ShipChunkIncoming_SmallExplosion":"飞船残骸（下落中）","CrashedShipPartIncoming":"坠毁的飞船部件（下落中）","MeteoriteIncoming":"陨石（下落中）","MeteoriteCraterIncoming":"陨石（下落中）","ShuttleCrashing":"穿梭机（坠毁中）","FlyerArrival":"飞行生物","FlyerLeaving":"飞行生物","RectTrigger":"触发方块","TriggerUnfogged":"触发解除迷雾","TriggerContainerEmptied":"清空触发","Explosion":"爆炸","Blight":"枯萎","Tornado":"龙卷风","TunnelHiveSpawner":"隧道","PawnFlyer":"飞行","RadialTrigger":"接近触发","PawnGroundSpawner":"被破坏的土地","PawnFlyer_Stun":"飞行","Filth_Dirt":"尘土","Filth_AnimalFilth":"动物污物","Filth_Trash":"垃圾","Filth_Sand":"沙子","Filth_RubbleRock":"岩屑","Filth_RubbleBuilding":"建筑废墟","SlagRubble":"散落的碎片","SandbagRubble":"散落的沙袋","Filth_BlastMark":"爆炸焦痕","Filth_Blood":"血","Filth_BloodSmear":"血污","Filth_BloodInsect":"虫血","Filth_MachineBits":"机械碎片","Filth_AmnioticFluid":"羊水","Filth_GestationFluid":"培育液","Filth_Slime":"黏液","Filth_Vomit":"呕吐物","Filth_FireFoam":"灭火剂泡沫","Filth_Fuel":"化合燃料","Filth_CorpseBile":"尸液","Filth_Ash":"灰烬","Filth_Water":"水洼","Filth_Hair":"毛发","Filth_SpentAcid":"残酸","Filth_LooseGround":"松动地面","Filth_OilSmear":"油渍","Filth_ScatteredDocuments":"散落的文件","Filth_MoldyUniform":"发霉的制服","ActiveDropPod":"运输舱","ActiveDropPodMechanoid":"运输舱","Fire":"火","Spark":"火花","ChunkSlagSteel":"钢渣块","Sandstone":"砂岩","SmoothedSandstone":"光滑的砂岩","ChunkSandstone":"砂岩块","BlocksSandstone":"砂岩砖","Granite":"花岗岩","SmoothedGranite":"光滑的花岗岩","ChunkGranite":"花岗岩块","BlocksGranite":"花岗岩砖","Limestone":"石灰岩","SmoothedLimestone":"光滑的石灰岩","ChunkLimestone":"石灰岩块","BlocksLimestone":"石灰岩砖","Slate":"板岩","SmoothedSlate":"光滑的板岩","ChunkSlate":"板岩块","BlocksSlate":"板岩砖","Marble":"大理石","SmoothedMarble":"光滑的大理石","ChunkMarble":"大理石块","BlocksMarble":"大理石砖","MeleeWeapon_BreachAxe":"破墙斧","MeleeWeapon_Mace":"钉头锤","MeleeWeapon_Gladius":"短剑","MeleeWeapon_LongSword":"长剑","MeleeWeapon_Club":"棍棒","MeleeWeapon_Knife":"匕首","MeleeWeapon_Ikwa":"短矛","MeleeWeapon_Spear":"长矛","Bullet_Revolver":"左轮手枪子弹","Gun_Revolver":"左轮手枪","Gun_Autopistol":"自动手枪","Bullet_Autopistol":"自动手枪子弹","Gun_MachinePistol":"冲锋手枪","Bullet_MachinePistol":"冲锋手枪子弹","Gun_IncendiaryLauncher":"燃烧弹发射器","Bullet_IncendiaryLauncher":"燃烧弹","Gun_SmokeLauncher":"烟雾弹发射器","Bullet_SmokeLauncher":"烟雾弹","Gun_EmpLauncher":"EMP发射器","Bullet_EMPLauncher":"EMP弹","Gun_BoltActionRifle":"栓动步枪","Bullet_BoltActionRifle":"栓动步枪子弹","Gun_PumpShotgun":"泵动霰弹枪","Bullet_Shotgun":"霰弹枪子弹","Gun_ChainShotgun":"链式霰弹枪","Gun_HeavySMG":"重型冲锋枪","Bullet_HeavySMG":"重型冲锋枪子弹","Gun_LMG":"轻机枪","Bullet_LMG":"轻机枪子弹","Gun_AssaultRifle":"突击步枪","Bullet_AssaultRifle":"突击步枪子弹","Gun_SniperRifle":"狙击步枪","Bullet_SniperRifle":"狙击步枪子弹","Gun_Minigun":"速射机枪","Bullet_Minigun":"速射机枪子弹","Gun_TripleRocket":"三重火箭发射器","Bullet_Rocket":"火箭弹","Gun_DoomsdayRocket":"末日火箭发射器","Bullet_DoomsdayRocket":"末日火箭弹","Weapon_GrenadeFrag":"破片手榴弹","Proj_GrenadeFrag":"破片手榴弹","Weapon_GrenadeMolotov":"燃烧瓶","Proj_GrenadeMolotov":"燃烧瓶","Weapon_GrenadeEMP":"EMP手榴弹","Proj_GrenadeEMP":"EMP手榴弹","Bullet_ChargeBlasterHeavy":"电荷冲击弹","Gun_ChargeBlasterHeavy":"电荷冲击炮","Bullet_InfernoCannon":"地狱火炮弹","Gun_InfernoCannon":"地狱火加农炮","Gun_Needle":"刺针枪","Bullet_NeedleGun":"刺针弹","Bow_Short":"短弓","Arrow_Short":"短弓箭矢","Pila":"重标枪","Pilum_Thrown":"重标枪","Bow_Recurve":"反曲弓","Arrow_Recurve":"反曲弓箭矢","Bow_Great":"巨弓","Arrow_Great":"巨弓箭矢","Gun_ChargeRifle":"电荷步枪","Bullet_ChargeRifle":"电荷弹","Gun_ChargeLance":"电荷标枪","Bullet_ChargeLance":"电荷标枪弹","OrbitalTargeterBombardment":"轨道轰炸靶向器","OrbitalTargeterPowerBeam":"轨道能量束靶向器","TornadoGenerator":"龙卷风靶向器","Gun_ThumpCannon":"破城炮","Bullet_ThumpCannon":"破城炮弹","Glowstool":"光屎菇","Agarilux":"萤蕈","Bryolux":"萤苔","Plant_Rose":"玫瑰","Plant_Daylily":"黄花","Plant_Rice":"水稻","Plant_Potato":"土豆","Plant_Corn":"玉米","Plant_Strawberry":"草莓","Plant_Haygrass":"干草","Plant_Cotton":"棉花","Plant_Devilstrand":"恶魔菇","Plant_Healroot":"药草","Plant_Hops":"啤酒花","Plant_Smokeleaf":"大麻叶","Plant_Psychoid":"精神叶","Plant_TreeCocoa":"可可树","BurnedTree":"烧毁的树桩","ChoppedStump":"砍断的树桩","SmashedStump":"粉碎的树桩","Plant_Ambrosia":"仙馐树","Plant_Tinctoria":"七色花","Dye":"染料","Plant_Timbershroom":"木菇","Plant_Agave":"龙舌兰","Plant_PincushionCactus":"针垫掌","Plant_SaguaroCactus":"巨掌仙人掌","Plant_TreeDrago":"龙血树","Plant_Grass":"草","Plant_TallGrass":"高草","Plant_Bush":"灌木","Plant_Brambles":"荆棘","Plant_HealrootWild":"野生药草","Plant_TreeWillow":"柳树","Plant_TreeCypress":"柏树","Plant_TreeMaple":"枫树","Plant_Chokevine":"勒藤","Plant_Dandelion":"蒲公英","Plant_Astragalus":"紫云英","Plant_Moss":"苔藓","Plant_Berry":"野山莓","Plant_TreeOak":"橡树","Plant_TreePoplar":"杨树","Plant_TreePine":"松树","Plant_TreeBirch":"桦树","Plant_ShrubLow":"矮灌木","Plant_Alocasia":"海芋","Plant_Clivia":"君子兰","Plant_Rafflesia":"大王花","Plant_TreeTeak":"柚木树","Plant_TreeCecropia":"号角树","Plant_TreePalm":"棕榈树","Plant_TreeBamboo":"竹","Bear_Grizzly":"灰熊","Bear_Polar":"北极熊","Ostrich":"鸵鸟","Emu":"鸸鹋","Cassowary":"鹤鸵","Cougar":"美洲狮","Panther":"黑豹","Lynx":"猞猁","Cat":"猫","YorkshireTerrier":"约克夏犬","GuineaPig":"豚鼠","LabradorRetriever":"拉布拉多犬","Husky":"哈士奇犬","Monkey":"猴","Chicken":"鸡","Duck":"鸭","Turkey":"火鸡","Goose":"鹅","Cow":"牛","Boomalope":"爆炸羊","Muffalo":"雪牛","Bison":"野牛","Dromedary":"单峰骆驼","Goat":"山羊","Elk":"马鹿","Yak":"牦牛","Caribou":"驯鹿","Horse":"马","Donkey":"驴","Elephant":"大象","Rhinoceros":"犀牛","Hare":"野兔","Snowhare":"雪兔","Megascarab":"巨型甲虫","Spelopede":"洞穴阔步虫","Megaspider":"巨型蜘蛛","Thrumbo":"敲击兽","Cobra":"眼镜蛇","Tortoise":"乌龟","Alphabeaver":"阿尔法海狸","Pig":"猪","WildBoar":"野猪","Ibex":"野山羊","Deer":"鹿","Gazelle":"瞪羚","Chinchilla":"栗鼠","Sheep":"绵羊","Alpaca":"羊驼","Megasloth":"大地懒","Capybara":"水豚","Squirrel":"松鼠","Rat":"老鼠","Boomrat":"爆炸鼠","Raccoon":"浣熊","Iguana":"鬣蜥","Warg":"座狼","Wolf_Timber":"森林狼","Wolf_Arctic":"北极狼","Fox_Fennec":"耳廓狐","Fox_Red":"赤狐","Fox_Arctic":"北极狐","Human":"人类","Mech_CentipedeBlaster":"机械冲击蜈蚣","Mech_CentipedeGunner":"机械速射蜈蚣","Mech_CentipedeBurner":"机械狱火蜈蚣","Mech_Lancer":"机械静螳","Mech_Scyther":"机械飞螳","Mech_Pikeman":"机械蝎蝽","Mech_Termite":"机械白蚁","Spike_Toughspike":"骨刺","Spike_Fingerspike":"骨刺","Spine_Gorehulk":"脊刺","Bullet_Heatspike":"热能棘刺弹","Bullet_FleshmelterBolt":"血肉熔融弹","Proj_CorrosiveFluid":"腐蚀酸液","Tome":"魔经","Mote_ShamblerAlert":"尘埃","Mote_RevenantHeard":"尘埃","Mote_MeatExplosionMist":"尘埃","Mote_MeatExplosionFlyingSplatter":"尘埃","Mote_MeatExplosionFlyingPiece":"尘埃","Mote_MeatExplosionFlyingPieceOverloaded":"尘埃","TachycardiacArrestExplosion":"尘埃","Mote_ShamblerRaiseMist":"尘埃","Mote_HoraxHugeSpellWarmup":"尘埃","Mote_HoraxSmallSpellWarmup":"尘埃","Mote_PsychicBanshee":"尘埃","Mote_ActivatedVoidStructure":"尘埃","Mote_HateChantCall":"尘埃","Mote_PsychicRitualInvocation":"尘埃","Mote_HateChantShadow":"尘埃","Mote_ChargingElectroCables":"尘埃","Mote_BioFerriteHarvested":"尘埃","Mote_PsychicDistortionRingContractingQuick":"尘埃","Mote_FleshmelterBolt_Aim":"尘埃","Mote_FleshmelterBolt_Charge":"尘埃","Mote_FleshmelterBolt_Target":"尘埃","Mote_DistortionPulse":"尘埃","Mote_RitualCandleA":"尘埃","Mote_RitualCandleB":"尘埃","Mote_RitualCandleC":"尘埃","Mote_AbductWarmupDistortionRing":"尘埃","Mote_AbductWarmupDistortionRingBuilding":"尘埃","Mote_IncineratorBurst":"尘埃","Mote_SparkSimple":"尘埃","Mote_Clipboard":"尘埃","BiomutationWarmup":"尘埃","AtmosphericHeaterGlowingVents":"尘埃","MetalHellFog":"尘埃","MetalHellFogHigh":"尘埃","VoidNodeDistortion":"尘埃","Mote_HarbingerTreeRoots":"尘埃","Mote_NoctolEyes":"尘埃","Mote_VoidNode":"尘埃","VoidNodeCore_DustA":"尘埃","VoidNodeCore_DustB":"尘埃","Mote_ObeliskExplosionWarmupArea":"尘埃","UnfinishedHealthItemGhoul":"未完成的食尸鬼假体","GhoulPlating":"食尸鬼护板","GhoulBarbs":"食尸鬼钩刺","AdrenalHeart":"激素心脏","CorrosiveHeart":"酸液心脏","MetalbloodHeart":"钢血心脏","RevenantVertebrae":"幽魂脊椎","Fleshmass":"血肉块","Fleshmass_Active":"血肉块","FleshSack":"血肉袋","FleshmassHeart":"血肉心脏","FleshmassHeartSpawner":"正在塌陷的地面","Fleshbulb":"血肉灯","NerveBundle":"神经结节","FleshmassSpitter":"血肉喷吐器","Bullet_Shell_AcidSpit":"酸性涎液","PitGate":"巨坑","PitGateSpawner":"正在塌陷的地面","PitGateExit":"离洞绳","PitBurrowSpawner":"正在塌陷的地面","HoldingSpot":"收容点","HoldingPlatform":"收容平台","DirtCubeSculpture":"泥土魔方雕塑","StoneCubeSculpture":"石制魔方雕塑","SandCubeSculpture":"沙子魔方雕塑","ScrapCubeSculpture":"废料魔方雕塑","PitBurrow":"坑洞","Turret_TacticalTurret":"战术炮塔","Gun_TacticalTurret":"战术炮塔机枪","Bullet_TacticalTurret":"战术炮塔子弹","GrayDoor":"门","GrayWall":"墙","FloorEtching":"地绘","FloorEtchingRambling":"地绘","GrayBox":"灰盒","GrayStatueDeadlifeDust":"灰色雕塑","GrayStatueTeleporter":"灰色雕塑","SecurityDoor":"安全大门","ElectricInhibitor":"电子阻滞器","ShardInhibitor":"碎片阻滞器","ProximityDetector":"潜近探测器","AtmosphericHeater":"大气升温器","FrenzyInducer":"狂热诱发器","SleepSuppressor":"睡眠抑制器","Noctolith":"夜光柱","TrapIED_Deadlife":"简易死灵陷阱","DelayedMetalhorrorEmerger":"延迟苏醒的金属怪形","EndlessPit2x2c":"无底深坑","EndlessPit3x2c":"无底深坑","EndlessPit3x3c":"无底深坑","WarpedObelisk_Mutator":"畸变方尖碑","WarpedObelisk_Duplicator":"腐化方尖碑","WarpedObelisk_Abductor":"扭曲方尖碑","WarpedObelisk_Labyrinth":"扭曲方尖碑","BioferriteGenerator":"活铁发电机","Electroharvester":"汲电器","BioferriteShaper":"活铁塑造台","SerumCentrifuge":"血清实验台","BioferriteHarvester":"活铁采集器","PsychicRitualSpot":"心灵仪式举办点","ShardBeacon":"碎片信标","VoidSculpture":"虚空雕塑","VoidMonolith":"虚空巨石","VoidMonolithAttachmentLeft":"虚空巨石附属结构","VoidMonolithAttachmentRight":"虚空巨石附属结构","VoidMonolithAttachmentTop":"虚空巨石附属结构","VoidMonolithAttachmentBottomLeft":"虚空巨石附属结构","VoidMonolithAttachmentBottomRight":"虚空巨石附属结构","VoidStructure":"虚空结构","VoidmetalWall":"虚空金属墙","VoidmetalMass":"void metal mass","VoidmetalMassSmall":"虚空金属块","VoidmetalMassMedium":"虚空金属块","VoidmetalMassLarge":"虚空金属块","VoidNode":"虚空节点","TwistedArchotechSupport_Small":"扭曲超凡支柱","TwistedArchotechSupport_Large":"扭曲超凡支柱","TwistedArchotechSupport_Vertical":"扭曲超凡支柱","ShardAnimalPulser":"动物碎片脉冲发生器","BiomutationPulser":"动物突变脉冲发生器","Shell_Deadlife":"死灵弹","Bullet_Shell_Deadlife":"死灵弹","Shell_Deadlife_Releasing":"死灵弹","VoidsightSerum":"虚空视界血清","MetalbloodSerum":"钢血血清","JuggernautSerum":"强力血清","MindNumbSerum":"思滞血清","GhoulResurrectionSerum":"食尸鬼复活血清","Bioferrite":"活铁","LabyrinthMatter":"灰质","Leather_Dread":"骇人皮革","Shard":"暗黑超凡碎片","RevenantSpine":"幽魂脊椎","Meat_Twisted":"扭曲肉","GoldenCube":"金色魔方","GrayFleshSample":"灰色血肉样本","FleshmassNeuralLump":"神经组织块","RevenantFleshChunk":"幽魂肉块","MonolithFragment":"巨石碎块","Apparel_CultistMask":"仪式面具","Apparel_CeremonialCultistMask":"仪式兜帽","Apparel_DisruptorFlarePack":"眩光背包","Grenade_DisruptorFlare":"眩光照明弹","DisruptorFlare":"眩光照明弹","Apparel_PackTurret":"炮塔背包","Grenade_TurretPack":"炮塔背包胶囊","Apparel_DeadlifePack":"死灵背包","Grenade_Deadlife":"死灵胶囊","Apparel_ShardPsychicShockLance":"碎片冲击枪","Apparel_ShardPsychicInsanityLance":"碎片错乱枪","Apparel_BiomutationLance":"生物突变枪","Apparel_LabCoat":"实验服","PawnFlyer_ConsumeLeap":"飞行中","WarpedObeliskIncoming":"方尖碑（下落中）","FleshbeastGroundSpawner":"浑沌土壤","NoctolithIncoming":"夜光柱（下落中）","Filth_RevenantSmear":"幽魂污垢","Filth_RevenantBloodPool":"幽魂血池","Filth_GrayFlesh":"灰色血肉","Filth_GrayFleshNoticeable":"灰色血肉","Filth_TwistedFlesh":"扭曲血肉","Filth_Fleshmass":"血肉残片","Filth_DarkBlood":"黑血","Filth_DarkBloodSmear":"黑血污","Filth_MetalhorrorDebris":"金属怪形残片","Gun_HellcatRifle":"地狱猫步枪","Bullet_HellcatRifle":"地狱猫步枪子弹","Gun_Incinerator":"焚烬者喷射器","NerveSpiker":"麻痹毒弩","NerveSpiker_Spike":"麻痹毒刺","Plant_TreeHarbinger":"厄兆噬树","ChoppedStump_Harbinger":"砍断的厄兆噬树桩","SmashedStump_Harbinger":"粉碎的厄兆噬树桩","HarbingerSeed":"厄兆噬树种子","Nociosphere":"苦痛之球","Metalhorror":"金属怪形","Revenant":"幽魂","Sightstealer":"隐形魔","CreepJoiner":"人类","Noctol":"夜魇","FleshmassNucleus":"血肉核心","Gorehulk":"血棘巨人","Devourer":"吞噬兽","Chimera":"嵌合兽","Bulbfreak":"恶臭瘤兽","Toughspike":"双爪兽","Trispike":"三爪兽","Fingerspike":"独爪兽","Dreadmeld":"惊惧母兽","PiercingSpine":"硬化脊刺","Proj_Acid":"酸液","Proj_Foam_Ability":"阻燃泡沫","Mote_Toy":"尘埃","MechGestatorForming_South":"尘埃","MechGestatorForming_East":"尘埃","MechGestatorForming_North":"尘埃","MechGestatorCycleComplete_South":"尘埃","MechGestatorCycleComplete_East":"尘埃","MechGestatorCycleComplete_North":"尘埃","MechGestatorFormed_South":"尘埃","MechGestatorFormed_East":"尘埃","MechGestatorFormed_North":"尘埃","MechGestatorFormingLarge_South":"尘埃","MechGestatorFormingLarge_East":"尘埃","MechGestatorFormingLarge_West":"尘埃","MechGestatorFormingLarge_North":"尘埃","MechGestatorCycleCompleteLarge_South":"尘埃","MechGestatorCycleCompleteLarge_East":"尘埃","MechGestatorCycleCompleteLarge_West":"尘埃","MechGestatorCycleCompleteLarge_North":"尘埃","MechGestatorFormedLarge_South":"尘埃","MechGestatorFormedLarge_East":"尘埃","MechGestatorFormedLarge_West":"尘埃","MechGestatorFormedLarge_North":"尘埃","Mote_PollutionPump":"尘埃","Mote_GraserBeamBase":"尘埃","Mote_MechCharging":"尘埃","Mote_ChargingCablesPulse":"尘埃","Mote_HellsphereCannon_Aim":"尘埃","Mote_HellsphereCannon_Charge":"尘埃","Mote_HellsphereCannon_Target":"尘埃","SoftScannerGlow_North":"尘埃","SoftScannerGlow_South":"尘埃","SoftScannerGlow_East":"尘埃","SoftScannerGlow_West":"尘埃","RipScannerGlow_North":"尘埃","RipScannerGlow_South":"尘埃","RipScannerGlow_East":"尘埃","RipScannerGlow_West":"尘埃","Mote_RipscannerHeadGlow":"尘埃","Mote_SubcoreEncoderNorth":"尘埃","Mote_SubcoreEncoderSouth":"尘埃","Mote_SubcoreEncoderEast":"尘埃","Mote_MechbandAntennaWaves":"尘埃","Mote_MechbandDishWaves":"尘埃","Mote_MechbandPreparing":"尘埃","Mote_WarhUrchinSpawnElectricity":"尘埃","Mote_WarUrchinSpawnFlash":"尘埃","Mote_WarQueenSpineGlow":"尘埃","Mote_MechTunnelerSlowedDown":"尘埃","Mote_NewbornBecomeChildGlow":"尘埃","Mote_MechUncontrolled":"尘埃","Mote_MechResurrectWarmupOnTarget":"尘埃","Mote_ApocritonWarmupArea":"尘埃","Mote_MechResurrectGlow":"尘埃","Mote_MechResurrectFlash":"尘埃","Mote_XenogermImplantation":"尘埃","Mote_MechControlTakingSparkArch":"尘埃","Mote_RedFlash":"尘埃","Mote_RedFlashStrong":"尘埃","Mote_CoagulateStencil":"尘埃","Mote_CoagulateA":"尘埃","Mote_CoagulateB":"尘埃","Mote_SanguophageMeetingSmoke":"尘埃","Mote_Deathresting":"尘埃","Mote_VatGlowHorizontal":"尘埃","Mote_VatGlowVertical":"尘埃","Mote_MechbandElectricity":"尘埃","Mote_ApocritonPulse":"尘埃","Mote_MechSparkSimple":"尘埃","Mote_AnimalWarcallTarget":"尘埃","Mote_AnimalWarcallWarmup":"尘埃","Mote_AnimalWarcallTargetFlash":"尘埃","Mote_AnimalWarcallMentalState":"尘埃","Mote_BabyCryingDots":"尘埃","DetoxifierLung":"排毒肺","DetoxifierKidney":"排毒肾","Mechlink":"机控中枢","ControlSublink":"控制子链（标准）","ControlSublinkHigh":"控制子链（高级）","RemoteRepairer":"远程维修模块","MechFormfeeder":"机械培育处理器","RemoteShielder":"远程护盾模块","RepairProbe":"维修探针","AncientToxifierGenerator":"远古排污发电机","AncientBandNode":"远古频带节点","AncientExostriderRemains":"远古重炮机兽躯体","AncientExostriderHead":"远古重炮机兽头部","AncientExostriderLeg":"远古重炮机兽腿部","AncientExostriderCannon":"远古重炮机兽火炮","DeathrestCasket":"死眠棺材","Hemopump":"血液提纯泵","HemogenAmplifier":"血原增幅器","GlucosoidPump":"糖苷疾行泵","PsychofluidPump":"心灵增流泵","DeathrestAccelerator":"死眠加速器","ToyBox":"玩具盒","SchoolDesk":"课桌","BabyDecoration":"婴儿装饰品","BabySleepingSpot":"婴儿睡眠点","Crib":"婴儿床","Blackboard":"黑板","BandNode":"频带节点","ToxifierGenerator":"排污发电机","GeneAssembler":"基因装配器","GeneBank":"基因库","GeneExtractor":"基因提取器","GrowthVat":"培育舱","BurnoutMechlinkBooster":"射频天线","MechbandDish":"碟形天线","PollutionPump":"清污泵","ShuttleCrashed_Exitable":"坠毁的穿梭机","ShuttleCrashed_Exitable_Mechanitor":"坠毁的机械师飞船","WastepackAtomizer":"垃圾分解器","SanguphageMeetingTorch":"血光火把","GeneProcessor":"基因处理器","MechBooster":"机械超频仪","TrapIED_ToxGas":"简易毒气陷阱","MechGestator":"机械培育器","LargeMechGestator":"大型机械培育器","SubcoreEncoder":"次核编译器","SubcoreSoftscanner":"差分扫描仪","SubcoreRipscanner":"裂解扫描仪","BasicRecharger":"机械充电站","StandardRecharger":"大型机械充电站","BabyFood":"婴儿食物","HemogenPack":"血原包","RawToxipotato":"毒薯","SubcoreBasic":"次生核心（基础）","SubcoreRegular":"次生核心（标准）","SubcoreHigh":"次生核心（高级）","SignalChip":"同步信号芯片","PowerfocusChip":"能量汇聚芯片","NanostructuringChip":"纳米结构芯片","DeathrestCapacitySerum":"死眠扩容血清","Wastepack":"有毒垃圾","Shell_Toxic":"毒气弹","Bullet_Shell_Tox":"毒气弹","Shell_Toxic_Releasing":"毒气弹","Shell_Toxic_Releasing_Water":"毒气弹","UnfinishedSubcore":"未完成的次生核心","Genepack":"基因组","Xenogerm":"异种胚芽","ArchiteCapsule":"超凡胶囊","MechanoidTransponder":"信号转发器","HumanOvum":"卵细胞","HumanEmbryo":"胚胎","Apparel_KidRomper":"儿童连衫裤","Apparel_KidShirt":"儿童衬衫","Apparel_KidPants":"儿童裤子","Apparel_KidParka":"儿童风雪大衣","Apparel_KidTribal":"儿童部落装","Apparel_KidHelmet":"儿童头盔","Apparel_AirwireHeadset":"无线耳机","Apparel_ArrayHeadset":"矩阵耳机","Apparel_IntegratorHeadset":"集成耳机","Apparel_ArmorHelmetMechCommander":"机械指挥官头盔","Apparel_ArmorHelmetMechlordHelmet":"机械领主头盔","Apparel_GasMask":"防毒面具","Apparel_HeavyShield":"重型护盾装置","Apparel_PackControl":"数控背包","Apparel_PackBandwidth":"带宽背包","Apparel_PackTox":"毒气背包","Apparel_MechlordSuit":"机械领主装甲","Apparel_Bandolier":"重型弹药挎包","Apparel_Sash":"肩带","ShuttleCrashing_Mechanitor":"机械师飞船（坠毁中）","MechShield":"机械护盾","CocoonSpawner":"虫茧","Filth_FlammableBile":"易燃胆汁","Filth_Floordrawing":"地板涂鸦","Gun_ToxbombLauncher":"毒气弹发射器","Bullet_ToxbombLauncher":"毒气弹","Weapon_GrenadeTox":"毒气手榴弹","Proj_GrenadeTox":"毒气手榴弹","Flamebow":"火焰弓","Proj_FireArrow":"火焰箭","Gun_HellsphereCannon":"帝王业火炮","Bullet_HellsphereCannonGun":"帝王业火炮弹","Gun_MiniShotgun":"迷你霰弹枪","Bullet_MiniShotgun":"霰弹","Gun_Slugthrower":"射弹枪","Bullet_Slugthrower":"破片","Gun_Spiner":"脊刺枪","Bullet_Spiner":"脊刺弹","Gun_MiniFlameblaster":"迷你火焰冲击枪","Gun_BeamGraser":"广域射线炮","Gun_ToxicNeedle":"剧毒刺针枪","Bullet_ToxicNeedleGun":"剧毒刺针弹","Gun_NeedleLauncher":"刺针发射器","Plant_Toxipotato":"毒薯","Plant_TreePolux":"粹树","ChoppedStump_Polux":"砍断的粹树桩","SmashedStump_Polux":"粉碎的粹树桩","PoluxSeed":"粹树种子","Plant_GrayGrass":"灰草","Plant_Ripthorn":"刺棘灌木","Plant_PebbleCactus":"砾石仙人掌","Plant_TreeGrayPine":"灰松树","Plant_Witchwood":"巫木树","Plant_RatPalm":"鼠棕榈树","ChoppedStump_Polluted":"砍断的树桩","SmashedStump_Polluted":"粉碎的树桩","WasteRat":"污鼠","Toxalope":"毒爆羊","Mech_Tunneler":"掘进机","Mech_Militor":"机械辅兵","Mech_Lifter":"搬运机","Mech_Constructoid":"建造机","Mech_Fabricor":"工艺机","Mech_Agrihand":"园艺机","Mech_Cleansweeper":"清洁机","Mech_WarUrchin":"战争爪牙","Mech_Paramedic":"救护机","Mech_Legionary":"机械盾卫","Mech_Tesseron":"机械哨卫","Mech_Scorcher":"机械炽蚕","Mech_Apocriton":"憎恶毒蜂","Mech_Centurion":"百机长","Gun_ChargeBlasterTurret":"电荷冲击炮塔","Mech_Warqueen":"战争女皇","Mech_Diabolus":"炼狱魔王","Mote_RitualGlowRays":"微粒","Mote_RitualSmoke":"微粒","Mote_RitualSmokeThick":"微粒","Mote_RitualSmokeThickSlim":"微粒","Mote_RitualSmokeDust":"微粒","Mote_RitualSmokeDustVague":"微粒","Mote_TotemOutline":"微粒","Mote_RolePositionHighlight":"微粒","Mote_RolePawnHighlight":"微粒","Mote_SpikePipe":"微粒","Mote_RitualTechLineA":"微粒","Mote_RitualTechLineB":"微粒","Mote_RitualTechLineC":"微粒","Mote_RitualGlowSingleRay":"微粒","Mote_LightBall":"微粒","Mote_LightBallLights":"微粒","Mote_LoudspeakerLights":"微粒","Mote_SkyLanternGlow":"微粒","Mote_SkyLanternOuterGlow":"微粒","Mote_SkyLanternSmoke":"微粒","Mote_DuelCircle":"微粒","Mote_GauranlenCasteChanged":"微粒","TunnelJellySpawner":"隧道","Mote_CombatCommand":"微粒","Mote_CombatCommandLinkLine":"微粒","Mote_WorkCommand":"微粒","Mote_WorkCommandLinkLine":"微粒","AncientTerminal_Worshipful":"远古控制台","AncientTerminal":"远古终端机","AncientEnemyTerminal":"远古敌属终端机","AncientSecurityCrate":"保险储存箱","AncientCommsConsole":"远古通讯台","SculptureTerror":"可怖的雕像","Spacedrone":"太空无人机","Altar_Small":"小型祭坛","Altar_Medium":"中型祭坛","Altar_Large":"大型祭坛","Altar_Grand":"宏伟祭坛","Ideogram":"符号图像","Darktorch":"微光火把","DarktorchFungus":"微光菌炬","SleepAccelerator":"速眠装置","BiosculpterPod":"塑形舱","NeuralSupercharger":"神经超频装置","ChristmasTree":"圣诞树","CannibalPlatter":"全人宴","Effigy":"木雕","SacrificialFlag":"献祭旗","Pyre":"柴堆","Burnbong":"烟壶","IncenseShrine":"香炉","RitualSpot":"仪式举办点","Lectern":"讲台","Reliquary":"圣物展台","StylingStation":"梳妆台","GibbetCage":"刑笼","LightBall":"灯球","Loudspeaker":"音响","Drum":"木鼓","Pew":"长凳","KneelSheet":"跪垫","KneelPillow":"跪枕","PlantPot_Bonsai":"景盆","SlabBed":"平板床","SlabDoubleBed":"双人平板床","Skullspike":"枭示","DryadCocoon":"树精茧","DryadHealingPod":"治愈茧","GaumakerCocoon":"母树荚种","Autobong":"散烟器","ArchonexusCore":"超凡枢纽核心","GrandArchotechStructure":"宏伟超凡结构","MajorArchotechStructure":"超凡主体结构","MajorArchotechStructureStudiable":"超凡主体结构","ArchotechTower":"超凡结构塔","Apparel_Headwrap":"裹头巾","Apparel_Broadwrap":"头巾","Apparel_VisageMask":"假面","Apparel_Slicecap":"壳帽","Apparel_Collar":"奴隶项圈","Apparel_AuthorityCap":"威权帽","Apparel_Tailcap":"毛皮帽","Apparel_Shadecone":"箬帽","Apparel_Flophat":"睡帽","Apparel_BodyStrap":"束缚带","Apparel_Burka":"布卡罩袍","Apparel_TortureCrown":"荆棘皇冠","Apparel_Blindfold":"眼罩","SpacedroneIncoming":"太空无人机(降落中)","SkyLantern":"天灯","Filth_DriedBlood":"干血渍","Filth_PodSlime":"粘液","MorbidSlab_Medium":"病态文化雕板","MorbidSlab_Broad":"病态文化雕板(宽)","TotemicSlab_Medium":"图腾文化雕板","TotemicSlab_Broad":"图腾文化雕板(宽)","SpikecoreFloorStar_Medium":"尖刺文化金属板","SpikecoreFloorStar_Broad":"尖刺文化金属板(宽)","RusticRug_Medium":"民俗文化地毯","RusticRug_Broad":"民俗文化地毯(宽)","AnimalistSlab_Medium":"泛灵文化雕板","AnimalistSlab_Broad":"泛灵文化雕板(宽)","RelicInertCup":"圣杯","RelicInertPendant":"坠饰","RelicInertBox":"匣子","RelicInertTablet":"石碑","RelicInertFragment":"碎片","RelicInertSwordHandle":"剑柄","RelicInertArk":"约柜","RelicInertCube":"魔方","Plant_Nutrifungus":"营养菇","Plant_TreeBonsai":"盆栽树","Plant_Fibercorn":"纤维秆","Plant_TreeGauranlen":"母树","ChoppedStump_Gauranlen":"砍断的母树树桩","SmashedStump_Gauranlen":"粉碎的母树树桩","Plant_MossGauranlen":"母树苔藓","Plant_PodGauranlen":"母树荚囊","GauranlenSeed":"母树种子","Dryad_Basic":"幼年树精","Dryad_Woodmaker":"供木树精","Dryad_Berrymaker":"蜜果树精","Dryad_Medicinemaker":"药师树精","Dryad_Gaumaker":"共生树精","Dryad_Carrier":"协运树精","Dryad_Clawer":"利爪树精","Dryad_Barkskin":"盾皮树精","Proj_SludgeSpray":"酸浆","Proj_StrongSludgeSpray":"酸浆","Proj_EggSac":"卵囊","Map":"地图","Drug_Psilocap":"灵蕈","Mote_FishingRod":"鱼竿","Mote_BeamRepeaterLaser":"射线","Mote_BeamRepeater_Charge":"特效","Mote_WarTrumpetDistortion":"特效","Mote_WarTrumpetFlash":"特效","Mote_TerrorRoarDistortion":"特效","Mote_TerrorRoarFlash":"特效","BloodWarmer":"血液加热器","PilotAssistant":"驾驶助理","VacskinGland":"蜡肤腺体","RubblePile":"瓦砾堆","AncientExcavator":"远古挖掘机","AncientDrillPlatform":"远古钻探机","AncientTunnelerClaw":"远古掘进机爪","AncientTunnelerHusk":"远古掘进机残骸","AncientSimpleResearchBench":"远古基础研究台","AncientTableBrewery":"远古酿造台","AncientTableButcher":"远古屠宰台","AncientTableDrugLab":"远古药物实验台","AncientTableMachining":"远古机械加工台","AncientTableSmithingFueled":"远古锻造台（燃料）","AncientTableSmithingElectric":"远古锻造台（电力）","AncientTableStoveElectric":"远古炉灶（电力）","AncientTableStoveFueled":"远古炉灶（燃料）","AncientTableTailorElectric":"远古裁缝台（电力）","AncientTableTailorHand":"远古裁缝台（手工）","AncientWindTurbineBody":"远古风力发电机","AncientBarrierLong":"大型混凝土围栏","AncientMilitaryBarrier":"远古军用围栏","AncientChembarrel":"远古燃料桶","AncientChembarrelPallet":"远古燃料桶托盘","AncientChemtruck":"远古燃料车","AncientPipe":"远古管道","AncientArmchair":"远古扶手椅","AncientPlantPot":"远古花盆","AncientTV":"损坏的电视","AncientBathtub":"破裂的浴缸","AncientShower":"破裂的淋浴间","AncientFilingCabinet":"生锈的文件柜","AncientColdStorage":"远古冷藏柜","AncientLockers":"生锈的储物柜","AncientRustedMicrowave":"生锈的微波炉","AncientSingleBed":"生锈的单人床","AncientDoubleBed":"生锈的双人床","AncientAmmoStack":"远古弹药箱","AncientAntenna":"远古天线","AncientMilitaryGeneratorSmall":"远古军用发电机","AncientAutocannonTurret":"损坏的自动加农炮塔","AncientUraniumSlugTurret":"损坏的铀弹加农炮塔","AncientMortar":"损坏的迫击炮","AncientMediumContainer":"远古集装箱","AncientOpenContainer":"生锈的敞口集装箱","AncientCratePallet":"远古箱式托盘","AncientWoodenCrate":"旧木箱","AncientCraneBase":"损坏的吊车底座","AncientCraneArm":"损坏的吊车臂","AncientCraneArmSmall":"损坏的吊车臂碎片","AncientCraneColumn":"损坏的吊车支柱","AncientForklift":"损坏的叉车","AncientIndustrialTruck":"生锈的工业卡车","AncientMetalCrate":"生锈的金属箱","AncientSmallContainer":"远古小型集装箱","AncientCardboardBox":"旧纸箱","AncientIndustrialShelf":"远古工业物品架","AncientShelf":"远古物品架","AncientSmallShelf":"远古小物品架","AncientDestroyedConsole":"远古损坏控制台","AncientDestroyedConsoleLarge":"远古损坏控制台","Pallet_Medicine":"医药托盘","Pallet_SurvivalMeals":"生存食物托盘","AncientBox_ComponentIndustrial":"零部件箱","AncientBox_ComponentSpacer":"高级零部件箱","AncientBox_SteelSlag":"钢料箱","MalfunctioningTransportPod":"故障运输舱","AncientChemfuelCanister":"化合燃料罐","AncientSafe":"生锈的保险箱","AncientSealedContainer":"密封集装箱","AncientSealedContainer_GravshipUpgrade":"密封集装箱","SealedCrate":"密封储物箱","AncientSealedCrate":"密封储物箱","AncientSealedCrate_Gravlite":"密封储物箱","AncientSealedCrate_Shells":"密封储物箱","AncientPallet_SteelSlag":"钢料托盘","Statue":"雕像","Building_OutfitStand":"服装架","Building_KidOutfitStand":"儿童服装架","GravshipHull":"逆重飞船舱壁","ShipChunk_Mech":"机械族飞船残骸","MinifiedGravEngine":"卸载的逆重引擎","GravEngine":"逆重引擎","GravFieldExtender":"逆重力场延展器","PilotConsole":"飞船控制台","ChemfuelTank":"小型化合燃料箱","LargeChemfuelTank":"大型化合燃料箱","SmallThruster":"小型推进器","LargeThruster":"大型推进器","FuelOptimizer":"燃料优化器","SignalJammer":"信号干扰器","GravcorePowerCell":"逆重核心能量电池","PilotSubpersonaCore":"助驾核心","GravshipShieldGenerator":"逆重飞船护盾发生器","GravAnchor":"逆重锚","MechStabilizer":"中继稳定器","MechRelay":"机械族中继器","MechRelay_Crashed":"坠毁的机械族中继器","AncientFortifiedWall":"加固墙","OrbitalAncientFortifiedWall":"加固墙","AncientBlastDoor":"远古防爆门","AncientGravReactor":"远古逆重反应堆","AncientGravEngine":"远古逆重引擎","AncientMiningCharge":"远古采矿炸药","AncientExplosivesCrate":"远古炸药箱","AncientSecurityTerminal":"远古安保终端","EggSac":"卵囊","CocoonLocust":"蝗虫茧","AncientTransportPod":"远古运输舱","ActiveDropPodAncient":"远古运输舱","AncientHatch":"远古仓库入口","AncientHatchExit":"远古仓库出口","MechanoidDropPod":"机械运输舱","AncientTerraformer":"远古环境改造装置","CerebrexCore":"主脑核心","CerebrexCore_Destroyed":"被毁的主脑核心","CerebrexStabilizer":"主脑稳定器","MechanoidProcessor":"机械处理器","PassengerShuttle":"载客穿梭机","MechPylon":"机械阵列桩","SurveyScanner":"勘测扫描仪","AncientUplink":"远古上行链路","GaussCannon":"高斯炮","AnticraftBeam":"反舰射线炮","MechhiveAssembler":"机械主巢孕育器","InsectLairEntrance":"洞穴入口","GeothermalVent":"硫磺喷口","BurrowWall":"穴壁","AncientSmokeVent":"远古烟气排放孔","AncientToxVent":"远古毒气排放孔","AncientHeatVent":"远古热气排放孔","AncientEmergencyLight_Red":"远古应急灯","AncientEmergencyLight_Blue":"远古灯","AncientEmergencyLight_Green":"机械族灯","LifeSupportUnit":"生命维持单元","MineableObsidian":"黑曜岩","OrbitalScanner":"轨道扫描仪","OxygenPump":"氧气泵","VacBarrier":"真空屏障","HunterDroneTrap":"猎手陷阱","WaspDroneTrap":"胡蜂陷阱","Turret_AncientArmoredTurret":"远古守卫炮塔","Bullet_AncientArmoredTurret":"远古守卫炮塔子弹","Gun_AncientArmoredTurret":"远古守卫炮塔机枪","MastodonTusk":"乳齿象牙","AlphaThrumboHorn":"阿尔法敲击兽角","SentienceCatalyst":"感知催化剂","EggMonitorLizardFertilized":"巨蜥蛋（已受精）","EggMonitorLizardUnfertilized":"巨蜥蛋（未受精）","EggFlamingoFertilized":"火烈鸟蛋（已受精）","EggFlamingoUnfertilized":"火烈鸟蛋（未受精）","EggHeronFertilized":"苍鹭蛋（已受精）","EggHeronUnfertilized":"苍鹭蛋（未受精）","EggSwanFertilized":"天鹅蛋（已受精）","EggSwanUnfertilized":"天鹅蛋（未受精）","EggSparrowFertilized":"麻雀蛋（已受精）","EggSparrowUnfertilized":"麻雀蛋（未受精）","EggCrowFertilized":"乌鸦蛋（已受精）","EggCrowUnfertilized":"乌鸦蛋（未受精）","EggBluebirdFertilized":"蓝鸲蛋（已受精）","EggBluebirdUnfertilized":"蓝鸲蛋（未受精）","EggQuailFertilized":"鹌鹑蛋（已受精）","EggQuailUnfertilized":"鹌鹑蛋（未受精）","EggMacawFertilized":"金刚鹦鹉蛋（已受精）","EggMacawUnfertilized":"金刚鹦鹉蛋（未受精）","EggPeacockFertilized":"孔雀蛋（已受精）","EggPeacockUnfertilized":"孔雀蛋（未受精）","EggVultureFertilized":"秃鹫蛋（已受精）","EggVultureUnfertilized":"秃鹫蛋（未受精）","EggPenguinFertilized":"企鹅蛋（已受精）","EggPenguinUnfertilized":"企鹅蛋（未受精）","EggSeaTurtleFertilized":"海龟蛋（已受精）","EggSeaTurtleUnfertilized":"海龟蛋（未受精）","EggAlligatorFertilized":"短吻鳄蛋（已受精）","EggAlligatorUnfertilized":"短吻鳄蛋（未受精）","WoolMastodon":"乳齿象毛","WoolMuskox":"麝牛毛","Fish_Salmon":"三文鱼","Fish_Bass":"鲈鱼","Fish_Tilapia":"罗非鱼","Fish_Cod":"鳕鱼","Fish_Bluefish":"青鱼","Fish_Guppy":"孔雀鱼","Fish_Frostfish":"霜鱼","Fish_Catfish":"鲶鱼","Fish_Piranha":"食人鱼","Fish_Dogfish":"角鲨","Fish_Marlin":"马林鱼","Fish_Tuna":"金枪鱼","Fish_Flounder":"比目鱼","Fish_Toxfish":"毒鱼","Gravcore":"逆重核心","GravlitePanel":"逆重板","ShuttleEngine":"穿梭机引擎","Obsidian":"黑曜石","Leather_Mastodon":"乳齿象皮","Leather_Sealskin":"海豹皮","Leather_AlphaThrumbo":"阿尔法敲击兽皮","Leather_Mink":"水貂皮","Leather_Hippo":"河马皮","Leather_Armadillo":"犰狳皮","Gun_Revolver_Unique":"特化左轮手枪","Gun_BoltActionRifle_Unique":"特化栓动步枪","Gun_ChainShotgun_Unique":"特化链式霰弹枪","Gun_HeavySMG_Unique":"特化重型冲锋枪","Gun_LMG_Unique":"特化轻机枪","Gun_AssaultRifle_Unique":"特化突击步枪","Gun_SniperRifle_Unique":"特化狙击步枪","Gun_Minigun_Unique":"特化速射机枪","Bow_Great_Unique":"特化巨弓","Gun_ChargeRifle_Unique":"特化电荷步枪","Gun_ChargeLance_Unique":"特化电荷标枪","Gun_HellcatRifle_Unique":"特化地狱猫步枪","Gun_BeamRepeater_Unique":"特化脉冲射线炮","Apparel_VacsuitHelmet":"真空头盔","Apparel_PackHunter":"猎手背包","Grenade_HunterPack":"猎手背包胶囊","Apparel_CerebrexNode":"主脑节点","Apparel_Vacsuit":"真空服","Apparel_VacsuitChildren":"儿童真空服","LavaRockIncoming":"熔岩（下落中）","DropPodLeavingMechanoid":"机械运输舱（飞离中）","DropPodIncomingMechanoidSoft":"机械运输舱（下落中）","DropPodLeavingAncient":"远古运输舱（飞离中）","DropPodIncomingAncient":"远古运输舱（下落中）","PassengerShuttleIncoming":"载客穿梭机（下落中）","PassengerShuttleLeaving":"载客穿梭机（飞离中）","GravshipLandingMarker":"逆重飞船着陆区","Filth_VolcanicAsh":"火山灰","Filth_ChemfuelStain":"化合燃料污渍","Filth_ChippedIce":"碎冰","SolidIce":"冰岩","SmoothedSolidIce":"光滑的冰岩","Vacstone":"真空岩","SmoothedVacstone":"光滑的真空岩","ChunkVacstone":"真空岩块","BlocksVacstone":"真空岩砖","Gun_BeamRepeater":"脉冲射线炮","Bullet_BeamRepeater":"射线","Gun_Scattergun":"霰弹枪","Bullet_Scattergun":"霰弹","Plant_TreeArchean":"源壤古树","ChoppedStump_Archean":"砍断的源壤古树桩","SmashedStump_Archean":"粉碎的源壤古树桩","ArcheanSeed":"源壤古树种子","Plant_Reeds":"芦苇","Plant_LilyPad":"睡莲","Plant_Bulrush":"香蒲","Plant_Lotus":"荷花","Plant_Thornvine":"刺藤","Plant_TreeSnagroot":"棘根树","Plant_Berry_Leafless":"野山莓","Plant_Bush_Leafless":"灌木","Plant_Brambles_Leafless":"荆棘","Plant_MagmaCactus":"熔岩仙人掌","Plant_Nightgrass":"夜草","Boomshroom":"爆炸菇","Plant_Psilocap":"灵蕈","Plant_Willowgill":"柳鳃","Plant_NightRafflesia":"夜王花","Plant_YellowGrass":"黄草","Plant_YellowTallGrass":"高黄草","Plant_Fireweed":"火草","Plant_Cotton_Wild":"野生棉花","Plant_Psychoid_Wild":"野生精神叶","Plant_Smokeleaf_Wild":"野生大麻叶","Plant_Tinctoria_Wild":"野生七色花","Plant_Strawberry_Wild":"野生草莓","Plant_Fibercorn_Wild":"野生纤维秆","Plant_TreeCocoa_Wild":"野生可可树","BogHound":"沼泽猎犬","MonitorLizard":"巨蜥","PrairieDog":"土拨鼠","Porcupine":"豪猪","Mastodon":"乳齿象","Cat_Scimitar":"锯齿虎","Wolverine":"狼獾","Wolf_Great":"巨狼","Moose":"驼鹿","AlphaThrumbo":"阿尔法敲击兽","Muskox":"麝牛","Tiger":"老虎","Mink":"水貂","Gorilla":"大猩猩","Badger":"獾","Panda":"大熊猫","Hippo":"河马","Megavole":"巨鼬","Armadillo":"犰狳","Alligator":"短吻鳄","Bullfrog":"牛蛙","ColossusToad":"巨蟾","LavaSnail":"熔岩蜗牛","Sparrow":"麻雀","Crow":"乌鸦","Bluebird":"蓝鸲","Quail":"鹌鹑","Macaw":"金刚鹦鹉","Flamingo":"火烈鸟","Heron":"苍鹭","Swan":"天鹅","Peacock":"孔雀","Vulture":"秃鹫","Penguin":"企鹅","Walrus":"海象","SeaLion":"海狮","Seal":"海豹","HermitCrab":"寄居蟹","StoneCrab":"石蟹","SeaTurtle":"海龟","Otter":"水獭","Larva":"幼虫","HiveQueen":"虫后","Locust":"蝗虫","Drone_Hunter":"猎手无人机","Drone_Wasp":"胡蜂无人机","Drone_Sentry":"哨兵无人机","Mech_Cyclops":"机械炬瞳","Mote_CastPsycast":"尘埃","Mote_PsyfocusPulse":"心灵波","Mote_PsychicLinkLine":"尘埃","Mote_PsychicLinkPulse":"尘埃","Mote_ProximityScannerRadius":"尘埃","Mote_ProximityScannerActivated":"尘埃","Mote_WarmupWordOf":"震颤","Mote_WarmupNeuroquake":"震颤","Mote_Bestow":"赏赐","PsychicSensitizer":"心灵敏化装置","PsychicHarmonizer":"心灵同调装置","PsychicReader":"心灵阅读装置","Neurocalculator":"神经计算机","LearningAssistant":"学习助理","GastroAnalyzer":"美食分析装置","Immunoenhancer":"免疫增强装置","Coagulator":"凝血装置","HealingEnhancer":"愈合增强装置","ToughskinGland":"韧肤腺体","ArmorskinGland":"甲肤腺体","StoneskinGland":"石肤腺体","AestheticShaper":"美学塑形装置","AestheticNose":"美学鼻","LoveEnhancer":"情爱增强装置","DetoxifierStomach":"消毒胃","ReprocessorStomach":"预处理胃","NuclearStomach":"核能胃","CircadianAssistant":"生理助理","CircadianHalfCycler":"作息节律器","Mindscrew":"颅钉","DrillArm":"挖掘臂","FieldHand":"务农手","HandTalon":"手爪","ElbowBlade":"肘刀","KneeSpike":"膝钉","VenomFangs":"毒牙","VenomTalon":"毒爪","SunBlocker":"黑幕产生器","SmokeSpewer":"烟雾产生器","ToxicSpewer":"空气污染器","WeatherController":"气象操纵仪","ClimateAdjuster":"气候调节器","PsychicDroner":"心灵干扰器","PsychicSuppressor":"心灵抑制器","EMIDynamo":"电磁干扰器","BroadshieldProjector":"护盾投射仪","Drape":"屏风","Brazier":"火盆","DarklightBrazier":"微光火盆","Throne":"宝座","GrandThrone":"宏伟宝座","UnstablePowerCell":"不稳定能量电池","Defoliator":"蚀叶器","ActivatorCountdown":"定时激活器","ActivatorProximity":"探测激活器","ShieldGeneratorBullets":"机械低角护盾","ShieldGeneratorMortar":"机械高角护盾","MechCapsule":"机械舱","MechAssembler":"机械孕育器","MechDropBeacon":"机械空投信标","ShipLandingBeacon":"飞船着陆信标","MeditationSpot":"冥想点","NatureShrine_Small":"小型自然圣地","NatureShrine_Large":"大型自然圣地","AnimusStone":"法石","Harp":"竖琴","Harpsichord":"大键琴","UnfinishedPiano":"未完成的钢琴","Piano":"钢琴","Apparel_PackJump":"跳跃背包","Apparel_PackBroadshield":"便携护盾背包","Apparel_PsyfocusHelmet":"灵质头盔","Apparel_EltexSkullcap":"灵质头套","Apparel_PsyfocusShirt":"灵质衬衫","Apparel_PsyfocusVest":"灵质马甲","Apparel_PsyfocusRobe":"灵质长袍","Apparel_ShirtRuffle":"褶边礼服衬衫","Apparel_Corset":"紧身胸衣","Apparel_VestRoyal":"贵族马甲","Apparel_RobeRoyal":"皇家长袍","Apparel_HatLadies":"淑女帽","Apparel_HatTop":"高顶礼帽","Apparel_Coronet":"冠冕","Apparel_Crown":"皇冠","Apparel_CrownStellic":"星尘皇冠","Apparel_Beret":"贝雷帽","Apparel_ArmorReconPrestige":"圣装斥候装甲","Apparel_ArmorHelmetReconPrestige":"圣装斥候头盔","Apparel_ArmorMarinePrestige":"圣装海军装甲","Apparel_ArmorMarineHelmetPrestige":"圣装海军头盔","Apparel_ArmorCataphract":"骑士装甲","Apparel_ArmorHelmetCataphract":"骑士头盔","Apparel_ArmorCataphractPrestige":"圣装骑士装甲","Apparel_ArmorHelmetCataphractPrestige":"圣装骑士头盔","Apparel_ArmorLocust":"飞蝗装甲","Apparel_ArmorMarineGrenadier":"掷弹装甲","Proj_GrenadierGrenade":"破片弹","Apparel_ArmorCataphractPhoenix":"凤凰装甲","Proj_GrenadePhoenixFire":"燃烧弹","Apparel_Gunlink":"枪械联控器","ShuttleIncoming":"穿梭机（临近）","ShuttleLeaving":"穿梭机（离去）","MonumentMarker":"纪念碑标记","BulletShieldPsychic":"折跃护盾","Flashstorm":"闪电风暴","SolarPinhole":"恒星狭缝","BroadshieldCore":"护盾核心","MeleeWeapon_MonoSwordBladelink":"Δ'单分子剑","MeleeWeapon_ZeusHammerBladelink":"Δ'宙斯锤","MeleeWeapon_PlasmaSwordBladelink":"Δ'等离子剑","MeleeWeapon_Axe":"战斧","MeleeWeapon_Warhammer":"战锤","MeleeWeapon_MonoSword":"单分子剑","MeleeWeapon_Zeushammer":"宙斯锤","MeleeWeapon_PlasmaSword":"等离子剑","OrbitalTargeterMechCluster":"机械集群靶向器","MeleeWeapon_PsyfocusStaff":"灵质权杖","Plant_TreeAnima":"仙树","ChoppedStump_Anima":"砍断的仙树桩","SmashedStump_Anima":"粉碎的仙树桩","Plant_GrassAnima":"灵草"};
   if (g.console) g.console.log("[extract_defs] 精确更新 " + r.replaced + " 条，新增 " + r.added + " 条，共 " + r.total + " 条建筑");
 })(typeof window!=="undefined"?window:globalThis);
+
+</script>
+<script>
+/* ==== js/sprites.js ==== */
+/* 由 tools/extract_textures.py 自动生成，请勿手改。
+ * 内容：从「本机 RimWorld 安装目录」提取的建筑贴图清单（图片在 img/ 下）。
+ * 这些图片是游戏美术资源，仅供本机使用，**请勿随工具分发**。
+ * 生成时间：2026-10-18 18:50:01
+ */
+(function (g) {
+  g.RWSprites = {"base":"img/","atlas":{"cols":4,"rows":4,"inset":0.03125},"stuff":{"wood":"#856143","steel":"#696969","plasteel":"#a0b2b5","uranium":"#646464","silver":"#b4ad96","gold":"#ffeb7a","stone":"#695f61"},"byName":{"altargrand":"Altar_Grand","altarlarge":"Altar_Large","altarmedium":"Altar_Medium","altarsmall":"Altar_Small","altar":"Altar_Small","ancientblastdoor":"AncientBlastDoor","ancientfortifiedwall":"AncientFortifiedWall","animalbed":"AnimalBed","animalflap":"AnimalFlap","animalsleepingbox":"AnimalSleepingBox","animalsleepingspot":"AnimalSleepingSpot","animalistslabbroad":"AnimalistSlab_Broad","animalistslabmedium":"AnimalistSlab_Medium","armchair":"Armchair","atmosphericheater":"AtmosphericHeater","autobong":"Autobong","autodoor":"Autodoor","babydecoration":"BabyDecoration","babysleepingspot":"BabySleepingSpot","bandnode":"BandNode","barricade":"Barricade","basicrecharger":"BasicRecharger","battery":"Battery","bed":"Bed","bedroll":"Bedroll","bedrolldouble":"BedrollDouble","doublebedroll":"BedrollDouble","billiardstable":"BilliardsTable","bioferritegenerator":"BioferriteGenerator","bioferriteharvester":"BioferriteHarvester","bioferriteshaper":"BioferriteShaper","biofuelrefinery":"BiofuelRefinery","biosculpterpod":"BiosculpterPod","blackboard":"Blackboard","bookcase":"Bookcase","bookcasesmall":"BookcaseSmall","brazier":"Brazier","brewery":"Brewery","buildingkidoutfitstand":"Building_KidOutfitStand","buildingoutfitstand":"Building_OutfitStand","burnbong":"Burnbong","burnoutmechlinkbooster":"BurnoutMechlinkBooster","butcherspot":"ButcherSpot","campfire":"Campfire","cannibalplatter":"CannibalPlatter","caravanpackingspot":"CaravanPackingSpot","chemfuelpoweredgenerator":"ChemfuelPoweredGenerator","chemfuelgenerator":"ChemfuelPoweredGenerator","chemfueltank":"ChemfuelTank","chesstable":"ChessTable","christmastree":"ChristmasTree","column":"Column","commsconsole":"CommsConsole","cooler":"Cooler","couch":"Couch","craftingspot":"CraftingSpot","crib":"Crib","cryptosleepcasket":"CryptosleepCasket","darklightbrazier":"DarklightBrazier","darktorch":"Darktorch","darktorchfungus":"DarktorchFungus","deathrestaccelerator":"DeathrestAccelerator","deathrestcasket":"DeathrestCasket","deepdrill":"DeepDrill","diningchair":"DiningChair","door":"Door","doublebed":"DoubleBed","doublesleepingspot":"DoubleSleepingSpot","drape":"Drape","dresser":"Dresser","druglab":"DrugLab","drum":"Drum","effigy":"Effigy","eggbox":"EggBox","electriccrematorium":"ElectricCrematorium","electricinhibitor":"ElectricInhibitor","electricsmelter":"ElectricSmelter","electricsmithy":"ElectricSmithy","electricstove":"ElectricStove","electrictailoringbench":"ElectricTailoringBench","electroharvester":"Electroharvester","endtable":"EndTable","fabricationbench":"FabricationBench","fence":"Fence","fencegate":"FenceGate","fermentingbarrel":"FermentingBarrel","firefoampopper":"FirefoamPopper","flatscreentelevision":"FlatscreenTelevision","floodlight":"FloodLight","frenzyinducer":"FrenzyInducer","fueledsmithy":"FueledSmithy","fueledstove":"FueledStove","stovefuel":"FueledStove","gameofurboard":"GameOfUrBoard","geneassembler":"GeneAssembler","genebank":"GeneBank","geneextractor":"GeneExtractor","geneprocessor":"GeneProcessor","geothermalgenerator":"GeothermalGenerator","gibbetcage":"GibbetCage","glucosoidpump":"GlucosoidPump","grandthrone":"GrandThrone","grandmeditationthrone":"GrandThrone","gravanchor":"GravAnchor","gravfieldextender":"GravFieldExtender","gravcorepowercell":"GravcorePowerCell","grave":"Grave","gravshiphull":"GravshipHull","graydoor":"GrayDoor","graywall":"GrayWall","groundpenetratingscanner":"GroundPenetratingScanner","groundscanner":"GroundPenetratingScanner","growthvat":"GrowthVat","handtailoringbench":"HandTailoringBench","heater":"Heater","hemogenamplifier":"HemogenAmplifier","hemopump":"Hemopump","hitechresearchbench":"HiTechResearchBench","hiddenconduit":"HiddenConduit","holdingplatform":"HoldingPlatform","holdingspot":"HoldingSpot","hoopstonering":"HoopstoneRing","hopper":"Hopper","horseshoespin":"HorseshoesPin","hospitalbed":"HospitalBed","hunterdronetrap":"HunterDroneTrap","hydroponicsbasin":"HydroponicsBasin","hydroponics":"HydroponicsBasin","ideogram":"Ideogram","incenseshrine":"IncenseShrine","kneelpillow":"KneelPillow","kneelsheet":"KneelSheet","largechemfueltank":"LargeChemfuelTank","largemechgestator":"LargeMechGestator","largethruster":"LargeThruster","lectern":"Lectern","lightball":"LightBall","longrangemineralscanner":"LongRangeMineralScanner","loudspeaker":"Loudspeaker","marriagespot":"MarriageSpot","mechbooster":"MechBooster","mechgestator":"MechGestator","mechbanddish":"MechbandDish","meditationspot":"MeditationSpot","moisturepump":"MoisturePump","morbidslabbroad":"MorbidSlab_Broad","morbidslabmedium":"MorbidSlab_Medium","multianalyzer":"MultiAnalyzer","natureshrinelarge":"NatureShrine_Large","natureshrinesmall":"NatureShrine_Small","neuralsupercharger":"NeuralSupercharger","nutrientpastedispenser":"NutrientPasteDispenser","nutrientdispenser":"NutrientPasteDispenser","orbitalancientfortifiedwall":"OrbitalAncientFortifiedWall","orbitalscanner":"OrbitalScanner","orbitaltradebeacon":"OrbitalTradeBeacon","ornatedoor":"OrnateDoor","oxygenpump":"OxygenPump","partyspot":"PartySpot","passengershuttle":"PassengerShuttle","passivecooler":"PassiveCooler","penmarker":"PenMarker","pew":"Pew","pilotconsole":"PilotConsole","plantpot":"PlantPot","plantpotbonsai":"PlantPot_Bonsai","podlauncher":"PodLauncher","transportpodlauncher":"PodLauncher","pokertable":"PokerTable","pollutionpump":"PollutionPump","powerconduit":"PowerConduit","conduit":"PowerConduit","powerswitch":"PowerSwitch","proximitydetector":"ProximityDetector","psychicritualspot":"PsychicRitualSpot","psychofluidpump":"PsychofluidPump","pyre":"Pyre","reliquary":"Reliquary","ritualspot":"RitualSpot","royalbed":"RoyalBed","rusticrugbroad":"RusticRug_Broad","rusticrugmedium":"RusticRug_Medium","sacrificialflag":"SacrificialFlag","sandbags":"Sandbags","sanguphagemeetingtorch":"SanguphageMeetingTorch","sarcophagus":"Sarcophagus","schooldesk":"SchoolDesk","sculpturegrand":"SculptureGrand","sculpturelarge":"SculptureLarge","sculpturesmall":"SculptureSmall","securitydoor":"SecurityDoor","serumcentrifuge":"SerumCentrifuge","shardbeacon":"ShardBeacon","shardinhibitor":"ShardInhibitor","shelf":"Shelf","shelfsmall":"ShelfSmall","shiplandingbeacon":"ShipLandingBeacon","shipbeam":"Ship_Beam","shipcomputercore":"Ship_ComputerCore","shipcryptosleepcasket":"Ship_CryptosleepCasket","shipengine":"Ship_Engine","shipreactor":"Ship_Reactor","shipsensorcluster":"Ship_SensorCluster","signaljammer":"SignalJammer","simpleresearchbench":"SimpleResearchBench","skullspike":"Skullspike","slabbed":"SlabBed","slabdoublebed":"SlabDoubleBed","sleepaccelerator":"SleepAccelerator","sleepsuppressor":"SleepSuppressor","sleepingspot":"SleepingSpot","smallthruster":"SmallThruster","solargenerator":"SolarGenerator","spikecorefloorstarbroad":"SpikecoreFloorStar_Broad","spikecorefloorstarmedium":"SpikecoreFloorStar_Medium","standardrecharger":"StandardRecharger","standinglamp":"StandingLamp","stelegrand":"SteleGrand","stelelarge":"SteleLarge","stool":"Stool","stylingstation":"StylingStation","subcoreencoder":"SubcoreEncoder","subcoreripscanner":"SubcoreRipscanner","subcoresoftscanner":"SubcoreSoftscanner","sunlamp":"SunLamp","table1x2c":"Table1x2c","table1x2":"Table1x2c","table2x2c":"Table2x2c","table2x2":"Table2x2c","table2x4c":"Table2x4c","table2x4":"Table2x4c","table3x3c":"Table3x3c","table3x3":"Table3x3c","tablebutcher":"TableButcher","butchertable":"TableButcher","tablemachining":"TableMachining","machiningtable":"TableMachining","tablesculpting":"TableSculpting","sculptingtable":"TableSculpting","tablestonecutter":"TableStonecutter","stonecutter":"TableStonecutter","throne":"Throne","meditationthrone":"Throne","toolcabinet":"ToolCabinet","torchlamp":"TorchLamp","torchwalllamp":"TorchWallLamp","totemicslabbroad":"TotemicSlab_Broad","totemicslabmedium":"TotemicSlab_Medium","toxifiergenerator":"ToxifierGenerator","toybox":"ToyBox","transportpod":"TransportPod","trapiedantigrainwarhead":"TrapIED_AntigrainWarhead","trapieddeadlife":"TrapIED_Deadlife","trapiedemp":"TrapIED_EMP","trapiedfirefoam":"TrapIED_Firefoam","trapiedhighexplosive":"TrapIED_HighExplosive","trapiedincendiary":"TrapIED_Incendiary","trapiedsmoke":"TrapIED_Smoke","trapiedtoxgas":"TrapIED_ToxGas","trapspike":"TrapSpike","spiketrap":"TrapSpike","tubetelevision":"TubeTelevision","turretautocannon":"Turret_Autocannon","autocannonturret":"Turret_Autocannon","turretfoamturret":"Turret_FoamTurret","turretminiturret":"Turret_MiniTurret","miniturret":"Turret_MiniTurret","turretmortar":"Turret_Mortar","mortar":"Turret_Mortar","turretrocketswarmlauncher":"Turret_RocketswarmLauncher","turretsniper":"Turret_Sniper","uraniumturret":"Turret_Sniper","vacbarrier":"VacBarrier","vanometricpowercell":"VanometricPowerCell","vanometriccell":"VanometricPowerCell","vent":"Vent","vitalsmonitor":"VitalsMonitor","wall":"Wall","walllamp":"WallLamp","wastepackatomizer":"WastepackAtomizer","watermillgenerator":"WatermillGenerator","waterproofconduit":"WaterproofConduit","windturbine":"WindTurbine","woodfiredgenerator":"WoodFiredGenerator","woodgenerator":"WoodFiredGenerator"},"boxes":{"Altar_Grand__n.png":[0.0,0.0078,1.0,0.9922],"Altar_Large__e.png":[0.0781,0.0026,0.8438,0.9974],"Altar_Large__s.png":[0.0,0.0586,1.0,0.875],"Altar_Medium__e.png":[0.0859,0.0026,0.8281,0.9974],"Altar_Medium__s.png":[0.0,0.0312,1.0,0.9609],"Altar_Small__e.png":[0.0859,0.0,0.8281,1.0],"Altar_Small__s.png":[0.0,0.0312,1.0,0.9375],"AncientBlastDoor__n.png":[0.0,0.0,0.5156,1.0],"AnimalBed__n.png":[0.0,0.0078,0.9766,0.9922],"AnimalFlap__n.png":[0.0,0.1406,0.5312,0.75],"AnimalSleepingBox__n.png":[0.0469,0.0469,0.9062,0.9062],"Armchair__n.png":[0.3021,0.3854,0.3958,0.2865],"Armchair__e.png":[0.3177,0.3125,0.3594,0.375],"Armchair__s.png":[0.3073,0.3125,0.3906,0.3698],"AtmosphericHeater__n.png":[0.0156,0.0052,0.9635,0.9948],"Autobong__n.png":[0.0547,0.0,0.9453,1.0],"Autodoor__n.png":[0.0,0.1562,0.5312,0.6875],"BabyDecoration__n.png":[0.0,0.0312,1.0,0.8438],"BabySleepingSpot__n.png":[0.3047,0.2422,0.3984,0.5156],"BandNode__n.png":[0.129,0.0065,0.7419,0.8581],"Barricade__atlas.png":[0.0,0.0,1.0,0.9437],"BasicRecharger__n.png":[0.0,0.0,1.0,0.8636],"BasicRecharger__e.png":[0.1591,0.0,0.8295,1.0],"BasicRecharger__s.png":[0.0,0.1364,1.0,0.8523],"Battery__n.png":[0.25,0.1667,0.5,0.7135],"Battery__e.png":[0.1667,0.25,0.6667,0.5625],"Bed__n.png":[0.2422,0.0,0.5156,1.0],"Bed__e.png":[0.0,0.2031,1.0,0.5703],"Bed__s.png":[0.2422,0.0,0.5156,1.0],"Bedroll__n.png":[0.0,0.0156,1.0,0.9844],"Bedroll__e.png":[0.0156,0.0,0.9688,1.0],"Bedroll__s.png":[0.0,0.0234,1.0,0.9609],"BedrollDouble__n.png":[0.0,0.0156,1.0,0.9844],"BedrollDouble__e.png":[0.0234,0.0234,0.9609,0.9609],"BedrollDouble__s.png":[0.0,0.0,1.0,0.9844],"BilliardsTable__n.png":[0.2461,0.125,0.5039,0.8203],"BilliardsTable__e.png":[0.125,0.25,0.75,0.5703],"BioferriteGenerator__n.png":[0.0156,0.0156,0.9688,0.9792],"BioferriteShaper__n.png":[0.067,0.0,0.8571,0.9375],"BioferriteShaper__e.png":[0.1562,0.0312,0.6979,0.9107],"BioferriteShaper__s.png":[0.0536,0.0,0.8705,0.9375],"BioferriteShaper__w.png":[0.1562,0.0,0.6979,0.9241],"BiosculpterPod__n.png":[0.0,0.0078,1.0,0.9922],"BiosculpterPod__e.png":[0.0,0.0,0.9766,1.0],"Blackboard__n.png":[0.0391,0.3359,0.9219,0.4297],"Blackboard__e.png":[0.3281,0.0,0.2734,1.0],"Blackboard__s.png":[0.0391,0.2344,0.9219,0.5312],"Bookcase__n.png":[0.1719,0.2031,0.6562,0.5859],"Bookcase__e.png":[0.2422,0.1615,0.5156,0.724],"Bookcase__s.png":[0.1719,0.2031,0.6562,0.5859],"BookcaseSmall__n.png":[0.2422,0.2031,0.5156,0.5859],"BookcaseSmall__e.png":[0.2422,0.2031,0.5078,0.6484],"BookcaseSmall__s.png":[0.2422,0.2031,0.5156,0.5859],"Brazier__n.png":[0.0156,0.0625,0.9688,0.875],"Brewery__n.png":[0.058,0.0625,0.8973,0.8958],"Brewery__e.png":[0.1354,0.058,0.7604,0.9107],"Brewery__s.png":[0.058,0.0625,0.8973,0.8958],"Building_KidOutfitStand__n.png":[0.25,0.2031,0.4531,0.75],"Building_KidOutfitStand__e.png":[0.25,0.2031,0.4531,0.75],"Building_KidOutfitStand__s.png":[0.25,0.2031,0.4531,0.75],"Building_OutfitStand__n.png":[0.25,0.0781,0.4531,0.875],"Building_OutfitStand__e.png":[0.25,0.0469,0.4531,0.9062],"Building_OutfitStand__s.png":[0.25,0.0781,0.4531,0.875],"Burnbong__n.png":[0.0156,0.0,0.9688,1.0],"BurnoutMechlinkBooster__e.png":[0.0156,0.0,0.9688,1.0],"BurnoutMechlinkBooster__w.png":[0.0156,0.0078,0.9844,0.9922],"Campfire__n.png":[0.0781,0.3906,0.9219,0.6094],"CannibalPlatter__e.png":[0.026,0.0469,0.9688,0.9062],"CannibalPlatter__s.png":[0.0469,0.0104,0.9062,0.9688],"ChessTable__n.png":[0.0938,0.0,0.7969,1.0],"ChristmasTree__n.png":[0.1719,0.0078,0.6641,0.9922],"Column__n.png":[0.1875,0.0156,0.625,0.9688],"CommsConsole__n.png":[0.1906,0.25,0.6375,0.5078],"CommsConsole__e.png":[0.2422,0.0625,0.5117,0.7406],"CommsConsole__s.png":[0.1844,0.0547,0.625,0.7031],"Couch__n.png":[0.1458,0.3854,0.7083,0.2865],"Couch__e.png":[0.3177,0.0677,0.3594,0.776],"Couch__s.png":[0.151,0.3125,0.6875,0.3698],"Crib__n.png":[0.3125,0.2578,0.375,0.4922],"Crib__e.png":[0.25,0.2578,0.5,0.4688],"Crib__s.png":[0.3125,0.2422,0.375,0.5078],"CryptosleepCasket__n.png":[0.0078,0.0,0.9844,1.0],"DarklightBrazier__n.png":[0.0156,0.0469,0.9688,0.9062],"Darktorch__n.png":[0.3906,0.2656,0.2188,0.6094],"DarktorchFungus__n.png":[0.375,0.2812,0.25,0.5938],"DeathrestCasket__n.png":[0.1953,0.0,0.6094,1.0],"DeathrestCasket__e.png":[0.0,0.2109,1.0,0.5781],"DeathrestCasket__s.png":[0.2188,0.0,0.5625,1.0],"DeepDrill__n.png":[0.3203,0.1953,0.3594,0.5938],"DiningChair__n.png":[0.1719,0.2188,0.6562,0.7344],"DiningChair__e.png":[0.0781,0.0312,0.8125,0.9062],"DiningChair__s.png":[0.1719,0.0156,0.6562,0.9531],"Door__n.png":[0.0,0.1562,0.5312,0.6875],"DoubleSleepingSpot__n.png":[0.2422,0.2422,0.5156,0.5156],"DoubleSleepingSpot__e.png":[0.2422,0.2422,0.5156,0.5156],"DoubleSleepingSpot__s.png":[0.2422,0.2422,0.5156,0.5156],"Drape__e.png":[0.4297,0.1367,0.1406,0.6133],"Drape__s.png":[0.2227,0.2734,0.5547,0.3555],"DrugLab__n.png":[0.0714,0.0312,0.8571,0.8958],"DrugLab__e.png":[0.1667,0.0045,0.7083,0.9643],"DrugLab__s.png":[0.0714,0.0104,0.8571,0.9167],"Drum__n.png":[0.0781,0.0,0.8438,1.0],"Effigy__n.png":[0.2344,0.0,0.5469,1.0],"EggBox__n.png":[0.0469,0.0625,0.9062,0.8906],"ElectricCrematorium__n.png":[0.0052,0.0078,0.9896,0.9844],"ElectricCrematorium__e.png":[0.0078,0.0,0.9844,1.0],"ElectricCrematorium__s.png":[0.0052,0.0078,0.9896,0.9844],"ElectricInhibitor__n.png":[0.0,0.0078,1.0,0.9922],"ElectricSmelter__n.png":[0.0714,0.1667,0.8571,0.7604],"ElectricSmelter__e.png":[0.1667,0.0714,0.6667,0.8973],"ElectricSmelter__s.png":[0.0714,0.1667,0.8571,0.7604],"ElectricSmithy__n.png":[0.0714,0.0938,0.8571,0.8438],"ElectricSmithy__e.png":[0.1562,0.067,0.6875,0.8973],"ElectricSmithy__s.png":[0.0714,0.2188,0.8571,0.7083],"ElectricStove__n.png":[0.067,0.125,0.8616,0.8021],"ElectricStove__e.png":[0.1458,0.0714,0.6875,0.8973],"ElectricStove__s.png":[0.0714,0.125,0.8616,0.8021],"ElectricTailoringBench__n.png":[0.0714,0.1667,0.8571,0.7604],"ElectricTailoringBench__e.png":[0.1667,0.0714,0.6667,0.8973],"ElectricTailoringBench__s.png":[0.0714,0.0833,0.8571,0.8438],"Electroharvester__n.png":[0.151,0.125,0.6823,0.625],"Electroharvester__e.png":[0.2344,0.1406,0.5312,0.7083],"Electroharvester__s.png":[0.151,0.125,0.6823,0.625],"Electroharvester__w.png":[0.2344,0.099,0.5312,0.7396],"EndTable__n.png":[0.125,0.0469,0.7344,0.9531],"EndTable__e.png":[0.2344,0.0,0.5312,1.0],"EndTable__s.png":[0.125,0.0469,0.7344,0.9531],"FabricationBench__n.png":[0.1429,0.2109,0.7143,0.5742],"FabricationBench__e.png":[0.25,0.1429,0.5,0.7344],"FabricationBench__s.png":[0.1429,0.2227,0.7143,0.5625],"Fence__Metal.png":[0.0078,0.0,0.9922,0.9688],"Fence__Smooth.png":[0.0,0.0,1.0,0.9719],"FenceGate__e.png":[0.0,0.3281,0.5312,0.3281],"FenceGate__s.png":[0.0,0.1562,0.5312,0.7344],"FermentingBarrel__n.png":[0.0,0.0625,1.0,0.875],"FermentingBarrel__e.png":[0.0312,0.0,0.9531,1.0],"FirefoamPopper__n.png":[0.1875,0.0312,0.6406,0.875],"FlatscreenTelevision__n.png":[0.0078,0.0,0.9844,1.0],"FlatscreenTelevision__e.png":[0.1406,0.0312,0.6875,0.9688],"FlatscreenTelevision__s.png":[0.0078,0.0,0.9844,1.0],"FloodLight__n.png":[0.2422,0.1914,0.5195,0.5508],"FrenzyInducer__n.png":[0.1562,0.0234,0.6875,0.8047],"FueledSmithy__n.png":[0.0714,0.1354,0.8571,0.8021],"FueledSmithy__e.png":[0.125,0.067,0.7188,0.9018],"FueledSmithy__s.png":[0.0714,0.1354,0.8571,0.7917],"FueledStove__n.png":[0.0714,0.1354,0.8571,0.7917],"FueledStove__e.png":[0.125,0.0714,0.7083,0.8973],"FueledStove__s.png":[0.0714,0.1354,0.8571,0.7917],"GameOfUrBoard__n.png":[0.0312,0.2656,0.9375,0.4531],"GameOfUrBoard__e.png":[0.2969,0.0156,0.3906,0.9688],"GameOfUrBoard__s.png":[0.0312,0.2656,0.9375,0.4531],"GameOfUrBoard__w.png":[0.2969,0.0156,0.3906,0.9688],"GeneAssembler__n.png":[0.0,0.0156,1.0,0.9844],"GeneAssembler__e.png":[0.0391,0.0,0.9609,1.0],"GeneAssembler__s.png":[0.0,0.0078,1.0,0.9922],"GeneBank__n.png":[0.0,0.0128,1.0,0.9103],"GeneBank__e.png":[0.0641,0.0,0.8718,1.0],"GeneBank__s.png":[0.0,0.0128,1.0,0.9103],"GeneProcessor__n.png":[0.0234,0.0,0.9609,1.0],"GibbetCage__n.png":[0.1172,0.0078,0.7734,0.9688],"GlucosoidPump__s.png":[0.0156,0.0,0.9688,1.0],"GrandThrone__n.png":[0.1133,0.2422,0.7734,0.5586],"GrandThrone__e.png":[0.2188,0.1289,0.5586,0.7695],"GrandThrone__s.png":[0.1133,0.0742,0.7734,0.707],"GravAnchor__n.png":[0.0,0.0117,1.0,0.9766],"GravcorePowerCell__n.png":[0.0156,0.0,0.9531,1.0],"Grave__n.png":[0.3281,0.2461,0.3542,0.4961],"Grave__e.png":[0.2461,0.3073,0.5195,0.375],"Grave__s.png":[0.3281,0.2344,0.3542,0.5117],"GrayDoor__n.png":[0.0,0.1406,0.5312,0.7031],"GroundPenetratingScanner__n.png":[0.0078,0.0234,0.9766,0.9531],"HandTailoringBench__n.png":[0.0714,0.1667,0.8571,0.7604],"HandTailoringBench__e.png":[0.1667,0.0714,0.6667,0.8973],"HandTailoringBench__s.png":[0.0714,0.1667,0.8571,0.7604],"Heater__n.png":[0.2344,0.0156,0.5156,0.9844],"HemogenAmplifier__n.png":[0.0,0.0391,1.0,0.9297],"HemogenAmplifier__e.png":[0.0625,0.0,0.8906,1.0],"HemogenAmplifier__s.png":[0.0,0.0078,1.0,0.9609],"HemogenAmplifier__w.png":[0.0625,0.0,0.8906,1.0],"Hemopump__e.png":[0.0,0.0469,1.0,0.9219],"Hemopump__s.png":[0.0156,0.0,0.9688,1.0],"HiTechResearchBench__n.png":[0.1429,0.25,0.7143,0.5352],"HiTechResearchBench__e.png":[0.25,0.1429,0.5,0.7344],"HiTechResearchBench__s.png":[0.1429,0.25,0.7143,0.5352],"HiddenConduit__atlas.png":[0.0031,0.0,0.9969,0.9031],"HoldingSpot__n.png":[0.0,0.0104,1.0,0.9792],"HoopstoneRing__n.png":[0.1875,0.0,0.5156,1.0],"Hopper__n.png":[0.0625,0.0,0.875,1.0],"Hopper__s.png":[0.0469,0.0,0.9062,1.0],"HorseshoesPin__n.png":[0.3438,0.0469,0.3125,0.6406],"HospitalBed__n.png":[0.2109,0.0,0.5781,1.0],"HospitalBed__e.png":[0.0,0.1875,1.0,0.6094],"HospitalBed__s.png":[0.2109,0.0,0.5781,1.0],"HunterDroneTrap__n.png":[0.1094,0.125,0.7812,0.8281],"Ideogram__n.png":[0.026,0.0417,0.9479,0.9167],"IncenseShrine__n.png":[0.0156,0.0,0.9688,0.9922],"KneelPillow__n.png":[0.0156,0.2188,0.9688,0.5625],"KneelPillow__e.png":[0.2188,0.0156,0.5625,0.9688],"KneelPillow__s.png":[0.0156,0.2188,0.9688,0.5625],"KneelSheet__n.png":[0.0156,0.125,0.9688,0.75],"KneelSheet__e.png":[0.125,0.0156,0.75,0.9688],"KneelSheet__s.png":[0.0156,0.125,0.9688,0.75],"LargeMechGestator__n.png":[0.1602,0.1944,0.6797,0.6276],"LargeMechGestator__e.png":[0.192,0.1602,0.6159,0.6914],"LargeMechGestator__s.png":[0.1602,0.192,0.6797,0.6253],"Lectern__n.png":[0.1094,0.0,0.7812,1.0],"Lectern__e.png":[0.125,0.0,0.75,1.0],"Lectern__s.png":[0.1094,0.0,0.7812,1.0],"LightBall__n.png":[0.1562,0.0469,0.6875,0.8438],"LongRangeMineralScanner__n.png":[0.1875,0.1289,0.6367,0.7344],"LongRangeMineralScanner__s.png":[0.1875,0.1328,0.6367,0.7305],"LongRangeMineralScanner__w.png":[0.1875,0.1328,0.6367,0.7305],"Loudspeaker__n.png":[0.1279,0.0116,0.7442,0.9767],"Loudspeaker__e.png":[0.1279,0.0116,0.7442,0.9767],"Loudspeaker__s.png":[0.1279,0.0116,0.7442,0.9767],"MechBooster__n.png":[0.0938,0.0,0.8125,1.0],"MechGestator__n.png":[0.2324,0.2317,0.5371,0.5425],"MechGestator__e.png":[0.2229,0.2051,0.566,0.584],"MechGestator__s.png":[0.2305,0.2082,0.5391,0.563],"MechbandDish__n.png":[0.0625,0.0,0.8984,0.9688],"MechbandDish__e.png":[0.0391,0.0078,0.9531,0.9844],"MultiAnalyzer__n.png":[0.0949,0.0949,0.8101,0.9051],"NatureShrine_Large__n.png":[0.0023,0.0,0.9977,0.9793],"NatureShrine_Small__n.png":[0.0352,0.0234,0.9102,0.957],"OrbitalScanner__n.png":[0.1758,0.1133,0.6484,0.7461],"OrbitalScanner__e.png":[0.1758,0.168,0.6484,0.6914],"OrbitalScanner__s.png":[0.1758,0.1367,0.6484,0.7227],"OrbitalTradeBeacon__n.png":[0.1094,0.0156,0.8125,0.9219],"OrnateDoor__n.png":[0.0,0.0156,1.0,0.9688],"OxygenPump__n.png":[0.2812,0.3594,0.4375,0.5781],"OxygenPump__e.png":[0.0,0.0938,0.3906,0.5781],"OxygenPump__s.png":[0.2812,0.0,0.4375,0.2812],"PassengerShuttle__n.png":[0.0469,0.0063,0.8906,0.9875],"PassengerShuttle__s.png":[0.0312,0.0094,0.9375,0.9812],"PassiveCooler__n.png":[0.0156,0.0,0.9844,1.0],"PenMarker__n.png":[0.2333,0.0,0.5333,0.8333],"PilotConsole__n.png":[0.1094,0.1198,0.7695,0.7969],"PilotConsole__e.png":[0.1562,0.0898,0.6927,0.8008],"PilotConsole__s.png":[0.1172,0.1302,0.7656,0.7708],"PlantPot__n.png":[0.2031,0.2344,0.5938,0.7656],"PlantPot_Bonsai__n.png":[0.125,0.2031,0.75,0.7969],"PodLauncher__n.png":[0.2266,0.1302,0.6484,0.7344],"PodLauncher__e.png":[0.151,0.2109,0.6979,0.6484],"PodLauncher__s.png":[0.1016,0.1302,0.6484,0.7344],"PodLauncher__w.png":[0.151,0.0859,0.6979,0.6875],"PokerTable__n.png":[0.25,0.25,0.5,0.5586],"PollutionPump__n.png":[0.0,0.0469,1.0,0.9375],"PowerConduit__atlas.png":[0.0031,0.0,0.9969,0.9031],"ProximityDetector__n.png":[0.1094,0.0156,0.7812,0.9844],"PsychicRitualSpot__n.png":[0.0052,0.0052,0.9896,0.9896],"PsychofluidPump__n.png":[0.0,0.0078,1.0,0.9766],"PsychofluidPump__e.png":[0.0469,0.0,0.8984,1.0],"Pyre__n.png":[0.0,0.0156,1.0,0.9688],"Reliquary__n.png":[0.05,0.1845,0.8955,0.7917],"Reliquary__e.png":[0.1045,0.0069,0.7818,0.9514],"Reliquary__s.png":[0.05,0.0298,0.8955,0.9464],"RusticRug_Broad__n.png":[0.0039,0.0078,0.9922,0.9844],"RusticRug_Medium__n.png":[0.0104,0.0052,0.9792,0.9792],"SacrificialFlag__n.png":[0.2188,0.0,0.5625,1.0],"Sandbags__atlas.png":[0.0,0.0,1.0,0.9727],"SanguphageMeetingTorch__n.png":[0.3906,0.2656,0.2188,0.6094],"Sarcophagus__n.png":[0.3281,0.2227,0.3438,0.5352],"Sarcophagus__e.png":[0.2422,0.3021,0.5156,0.375],"SchoolDesk__n.png":[0.2461,0.3281,0.5039,0.4167],"SchoolDesk__e.png":[0.3281,0.25,0.3438,0.5586],"SchoolDesk__s.png":[0.2461,0.3281,0.5039,0.4167],"SchoolDesk__w.png":[0.3281,0.25,0.3438,0.5586],"SculptureGrand__n.png":[0.207,0.1406,0.5938,0.6094],"SculptureLarge__n.png":[0.3073,0.2604,0.3958,0.4375],"SculptureSmall__n.png":[0.1719,0.0,0.6719,1.0],"SecurityDoor__n.png":[0.0,0.0156,1.0,0.9688],"SerumCentrifuge__n.png":[0.1719,0.1354,0.6562,0.7031],"SerumCentrifuge__e.png":[0.151,0.125,0.6771,0.7083],"SerumCentrifuge__s.png":[0.1719,0.1198,0.6562,0.7135],"ShardBeacon__n.png":[0.1562,0.0625,0.6719,0.8906],"ShardInhibitor__n.png":[0.0,0.0156,1.0,0.9688],"Shelf__n.png":[0.1615,0.2031,0.6771,0.5859],"Shelf__e.png":[0.2422,0.1354,0.5156,0.724],"Shelf__s.png":[0.1615,0.2031,0.6771,0.5859],"ShelfSmall__n.png":[0.2422,0.2031,0.5156,0.5859],"ShelfSmall__e.png":[0.2422,0.2109,0.5156,0.6172],"ShelfSmall__s.png":[0.2422,0.2031,0.5156,0.5859],"ShipLandingBeacon__n.png":[0.1719,0.1875,0.6406,0.6406],"Ship_Beam__n.png":[0.0,0.125,1.0,0.75],"Ship_Beam__e.png":[0.1211,0.0,0.7578,1.0],"Ship_CryptosleepCasket__n.png":[0.0078,0.0,0.9844,1.0],"Ship_Engine__n.png":[0.1035,0.0,0.793,1.0],"Ship_Engine__e.png":[0.002,0.1172,0.998,0.7598],"Ship_Engine__s.png":[0.0977,0.0,0.8105,1.0],"Ship_Reactor__n.png":[0.123,0.0625,0.7539,0.877],"Ship_Reactor__e.png":[0.0625,0.123,0.877,0.752],"SimpleResearchBench__n.png":[0.2031,0.2188,0.5938,0.5664],"SimpleResearchBench__e.png":[0.25,0.1969,0.5,0.6312],"SimpleResearchBench__s.png":[0.2031,0.25,0.5938,0.5352],"Skullspike__n.png":[0.3118,0.0108,0.3763,0.8387],"SlabBed__n.png":[0.2422,0.0,0.5156,1.0],"SlabBed__e.png":[0.0,0.2344,1.0,0.6328],"SlabBed__s.png":[0.2422,0.0,0.5156,1.0],"SleepAccelerator__n.png":[0.0156,0.0312,0.9688,0.9688],"SleepAccelerator__e.png":[0.0625,0.0,0.7969,1.0],"SleepAccelerator__s.png":[0.0156,0.0,0.9688,1.0],"SleepSuppressor__n.png":[0.0,0.1328,1.0,0.6641],"SleepSuppressor__e.png":[0.2656,0.0,0.4844,1.0],"SleepSuppressor__s.png":[0.0,0.0938,1.0,0.6641],"SleepSuppressor__w.png":[0.2656,0.0,0.4844,1.0],"SleepingSpot__n.png":[0.3229,0.2422,0.3542,0.5156],"SleepingSpot__e.png":[0.2422,0.3229,0.5156,0.3542],"SleepingSpot__s.png":[0.3229,0.2422,0.3542,0.5156],"SpikecoreFloorStar_Broad__n.png":[0.0078,0.0117,0.9844,0.9805],"SpikecoreFloorStar_Medium__n.png":[0.0312,0.0573,0.9375,0.8958],"StandardRecharger__n.png":[0.1211,0.026,0.7578,0.8073],"StandardRecharger__e.png":[0.1667,0.125,0.8333,0.7539],"StandardRecharger__s.png":[0.1211,0.1771,0.7578,0.7917],"StandingLamp__n.png":[0.2188,0.1094,0.5312,0.7344],"SteleGrand__n.png":[0.209,0.1113,0.582,0.7285],"SteleLarge__n.png":[0.25,0.1641,0.5,0.582],"Stool__n.png":[0.125,0.2812,0.7344,0.7188],"Stool__e.png":[0.2344,0.1406,0.5,0.8594],"StylingStation__n.png":[0.0714,0.0,0.8571,0.9167],"StylingStation__e.png":[0.1667,0.0714,0.6667,0.8973],"StylingStation__s.png":[0.0714,0.1458,0.8571,0.7708],"SubcoreRipscanner__n.png":[0.0104,0.0,0.9792,1.0],"SubcoreRipscanner__e.png":[0.0,0.0208,0.9922,0.974],"SubcoreRipscanner__s.png":[0.0156,0.0,0.9792,1.0],"SubcoreSoftscanner__e.png":[0.0234,0.0104,0.9688,0.9896],"SubcoreSoftscanner__s.png":[0.0052,0.0156,0.9896,0.9844],"SunLamp__n.png":[0.2031,0.0625,0.5625,0.7812],"Table1x2c__n.png":[0.3333,0.25,0.3333,0.5586],"Table1x2c__e.png":[0.25,0.3333,0.5,0.4115],"Table2x2c__n.png":[0.25,0.25,0.5,0.5586],"Table2x4c__n.png":[0.25,0.1667,0.5,0.7057],"Table2x4c__e.png":[0.1667,0.25,0.6667,0.5586],"Table3x3c__n.png":[0.2,0.2,0.6,0.6469],"TableButcher__n.png":[0.0714,0.1667,0.8571,0.7604],"TableButcher__e.png":[0.1667,0.0714,0.6667,0.8973],"TableButcher__s.png":[0.0714,0.1667,0.8571,0.7604],"TableMachining__n.png":[0.0714,0.1667,0.8571,0.7604],"TableMachining__e.png":[0.1667,0.0714,0.6667,0.8973],"TableMachining__s.png":[0.0714,0.1667,0.8571,0.7604],"TableSculpting__n.png":[0.0491,0.0417,0.8795,0.8854],"TableSculpting__e.png":[0.0729,0.0402,0.8021,0.9286],"TableSculpting__s.png":[0.0714,0.1667,0.8929,0.7604],"TableStonecutter__n.png":[0.0714,0.1667,0.8571,0.75],"TableStonecutter__e.png":[0.1562,0.0714,0.6771,0.8973],"TableStonecutter__s.png":[0.0714,0.0938,0.8571,0.8229],"Throne__n.png":[0.2812,0.1797,0.4336,0.5586],"Throne__e.png":[0.3242,0.0547,0.3359,0.6523],"Throne__s.png":[0.2812,0.1445,0.4336,0.5938],"TorchLamp__n.png":[0.3906,0.2656,0.2188,0.5938],"TorchWallLamp__n.png":[0.3906,0.4844,0.2188,0.4062],"TorchWallLamp__e.png":[0.0,0.1719,0.2656,0.3906],"TorchWallLamp__s.png":[0.3906,0.0,0.2188,0.1562],"ToyBox__n.png":[0.0312,0.0312,0.9375,0.9375],"TransportPod__n.png":[0.1406,0.0938,0.7188,0.7969],"TrapIED_AntigrainWarhead__n.png":[0.0625,0.4375,0.8438,0.5312],"TrapIED_Deadlife__n.png":[0.0469,0.375,0.8594,0.5312],"TrapIED_EMP__n.png":[0.0625,0.4375,0.8438,0.4688],"TrapIED_Firefoam__n.png":[0.0938,0.5156,0.8125,0.3906],"TrapIED_HighExplosive__n.png":[0.0625,0.4375,0.8438,0.4688],"TrapIED_Incendiary__n.png":[0.0938,0.5156,0.8125,0.3906],"TrapIED_Smoke__n.png":[0.0938,0.4531,0.8125,0.4531],"TrapIED_ToxGas__n.png":[0.0469,0.3906,0.8594,0.5156],"TubeTelevision__n.png":[0.0625,0.0938,0.8594,0.9062],"TubeTelevision__e.png":[0.1406,0.0469,0.7344,0.9531],"TubeTelevision__s.png":[0.0625,0.0156,0.8594,0.9844],"Turret_Autocannon__n.png":[0.0156,0.0078,0.9688,0.9766],"Turret_Autocannon__top.png":[0.276,0.3281,0.6094,0.3438],"Turret_FoamTurret__n.png":[0.3021,0.3438,0.3906,0.3646],"Turret_FoamTurret__top.png":[0.3438,0.3828,0.4375,0.2344],"Turret_MiniTurret__n.png":[0.3021,0.3438,0.3906,0.3646],"Turret_MiniTurret__top.png":[0.3672,0.4375,0.4062,0.1172],"Turret_Mortar__n.png":[0.3021,0.2969,0.3958,0.4115],"Turret_Mortar__top.png":[0.3672,0.375,0.3906,0.2734],"Turret_RocketswarmLauncher__n.png":[0.0156,0.0078,0.9688,0.9766],"Turret_RocketswarmLauncher__top.png":[0.276,0.2031,0.4479,0.5938],"Turret_Sniper__n.png":[0.0156,0.0078,0.9688,0.9766],"Turret_Sniper__top.png":[0.099,0.3802,0.901,0.2396],"VacBarrier__s.png":[0.2578,0.375,0.4922,0.2969],"VanometricPowerCell__n.png":[0.2188,0.0885,0.5625,0.7865],"VanometricPowerCell__e.png":[0.1354,0.1719,0.7292,0.6484],"VitalsMonitor__n.png":[0.0781,0.0,0.8594,1.0],"VitalsMonitor__s.png":[0.0781,0.0,0.8594,1.0],"VitalsMonitor__w.png":[0.1406,0.0,0.7188,1.0],"WallLamp__n.png":[0.2188,0.5781,0.5625,0.2656],"WallLamp__e.png":[0.0156,0.0781,0.2344,0.5625],"WallLamp__s.png":[0.2344,0.0,0.5312,0.125],"WastepackAtomizer__e.png":[0.0,0.0104,1.0,0.9844],"WatermillGenerator__n.png":[0.0312,0.0104,0.9406,0.987],"WatermillGenerator__e.png":[0.0104,0.0187,0.9792,0.8969],"WatermillGenerator__s.png":[0.0312,0.0,0.9406,0.9896],"WaterproofConduit__atlas.png":[0.0031,0.0,0.9969,0.9031],"WindTurbine__n.png":[0.0586,0.0078,0.8828,0.9766],"WindTurbine__e.png":[0.0078,0.0859,0.9688,0.8984],"WindTurbine__s.png":[0.0586,0.0078,0.9297,0.9688]},"items":{"Altar_Grand":{"ds":[3.0,3.0],"kind":"multi","imgs":{"n":"Altar_Grand__n.png"},"tint":"stuff"},"Altar_Large":{"ds":[3.0,2.0],"kind":"multi","imgs":{"e":"Altar_Large__e.png","s":"Altar_Large__s.png"},"tint":"stuff"},"Altar_Medium":{"ds":[3.0,1.0],"kind":"multi","imgs":{"e":"Altar_Medium__e.png","s":"Altar_Medium__s.png"},"tint":"stuff"},"Altar_Small":{"ds":[1.0,1.0],"kind":"multi","imgs":{"e":"Altar_Small__e.png","s":"Altar_Small__s.png"},"tint":"stuff"},"AncientBlastDoor":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"AncientBlastDoor__n.png"},"tint":"stuff"},"AncientFortifiedWall":{"ds":[1.0,1.0],"kind":"linked","link":"corner","sheets":{"default":"AncientFortifiedWall__atlas.png"},"lf":["Wall","Rock"],"tint":"#7f877f"},"AnimalBed":{"ds":[1.2,1.2],"kind":"single","imgs":{"n":"AnimalBed__n.png"},"tint":"stuff"},"AnimalFlap":{"ds":[1.0,1.0],"kind":"multi","imgs":{"n":"AnimalFlap__n.png"},"tint":"stuff","mir":1},"AnimalSleepingBox":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"AnimalSleepingBox__n.png"},"tint":"stuff"},"AnimalSleepingSpot":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"AnimalSleepingSpot__n.png"}},"AnimalistSlab_Broad":{"ds":[4.0,4.0],"kind":"single","imgs":{"n":"AnimalistSlab_Broad__n.png"},"tint":"stuff"},"AnimalistSlab_Medium":{"ds":[3.0,3.0],"kind":"single","imgs":{"n":"AnimalistSlab_Medium__n.png"},"tint":"stuff"},"Armchair":{"ds":[3.0,3.0],"kind":"multi","imgs":{"n":"Armchair__n.png","e":"Armchair__e.png","s":"Armchair__s.png"},"tint":"stuff"},"AtmosphericHeater":{"ds":[3.0,3.0],"kind":"single","imgs":{"n":"AtmosphericHeater__n.png"}},"Autobong":{"ds":[2.0,2.0],"kind":"single","imgs":{"n":"Autobong__n.png"},"tint":"stuff"},"Autodoor":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"Autodoor__n.png"},"tint":"stuff","mir":1},"BabyDecoration":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"BabyDecoration__n.png"},"tint":"stuff"},"BabySleepingSpot":{"ds":[2.0,2.0],"kind":"single","imgs":{"n":"BabySleepingSpot__n.png"}},"BandNode":{"ds":[2.0,2.0],"kind":"single","imgs":{"n":"BandNode__n.png"}},"Barricade":{"ds":[1.0,1.0],"kind":"linked","link":"basic","sheets":{"default":"Barricade__atlas.png"},"lf":["Barricades"],"tint":"#8b7a57"},"BasicRecharger":{"ds":[2.9,1.25],"kind":"multi","imgs":{"n":"BasicRecharger__n.png","e":"BasicRecharger__e.png","s":"BasicRecharger__s.png"}},"Battery":{"ds":[2.0,3.0],"kind":"multi","imgs":{"n":"Battery__n.png","e":"Battery__e.png"}},"Bed":{"ds":[2.0,2.0],"kind":"multi","imgs":{"n":"Bed__n.png","e":"Bed__e.png","s":"Bed__s.png"},"tint":"stuff"},"Bedroll":{"ds":[1.0,2.0],"kind":"multi","imgs":{"n":"Bedroll__n.png","e":"Bedroll__e.png","s":"Bedroll__s.png"},"tint":"stuff"},"BedrollDouble":{"ds":[2.0,2.0],"kind":"multi","imgs":{"n":"BedrollDouble__n.png","e":"BedrollDouble__e.png","s":"BedrollDouble__s.png"},"tint":"stuff"},"BilliardsTable":{"ds":[4.0,4.0],"kind":"multi","imgs":{"n":"BilliardsTable__n.png","e":"BilliardsTable__e.png"}},"BioferriteGenerator":{"ds":[3.0,2.0],"kind":"single","imgs":{"n":"BioferriteGenerator__n.png"}},"BioferriteHarvester":{"ds":[2.0,3.0],"kind":"single","imgs":{"n":"BioferriteHarvester__n.png"}},"BioferriteShaper":{"ds":[3.5,1.5],"kind":"multi","imgs":{"n":"BioferriteShaper__n.png","e":"BioferriteShaper__e.png","s":"BioferriteShaper__s.png","w":"BioferriteShaper__w.png"}},"BiofuelRefinery":{"ds":[3.0,2.0],"kind":"multi","imgs":{"n":"BiofuelRefinery__n.png","e":"BiofuelRefinery__e.png","s":"BiofuelRefinery__s.png"}},"BiosculpterPod":{"ds":[3.0,2.0],"kind":"multi","imgs":{"n":"BiosculpterPod__n.png","e":"BiosculpterPod__e.png","s":"BiosculpterPod__s.png"}},"Blackboard":{"ds":[1.9,1.9],"kind":"multi","imgs":{"n":"Blackboard__n.png","e":"Blackboard__e.png","s":"Blackboard__s.png"},"tint":"stuff"},"Bookcase":{"ds":[3.0,2.0],"kind":"multi","imgs":{"n":"Bookcase__n.png","e":"Bookcase__e.png","s":"Bookcase__s.png"},"tint":"stuff"},"BookcaseSmall":{"ds":[2.0,2.0],"kind":"multi","imgs":{"n":"BookcaseSmall__n.png","e":"BookcaseSmall__e.png","s":"BookcaseSmall__s.png"},"tint":"stuff"},"Brazier":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"Brazier__n.png"}},"Brewery":{"ds":[3.5,1.5],"kind":"multi","imgs":{"n":"Brewery__n.png","e":"Brewery__e.png","s":"Brewery__s.png"}},"Building_KidOutfitStand":{"ds":[1.3,1.3],"kind":"multi","imgs":{"n":"Building_KidOutfitStand__n.png","e":"Building_KidOutfitStand__e.png","s":"Building_KidOutfitStand__s.png"},"tint":"stuff"},"Building_OutfitStand":{"ds":[1.3,1.3],"kind":"multi","imgs":{"n":"Building_OutfitStand__n.png","e":"Building_OutfitStand__e.png","s":"Building_OutfitStand__s.png"},"tint":"stuff"},"Burnbong":{"ds":[1.2,1.2],"kind":"single","imgs":{"n":"Burnbong__n.png"}},"BurnoutMechlinkBooster":{"ds":[2.0,1.0],"kind":"multi","imgs":{"n":"BurnoutMechlinkBooster__n.png","e":"BurnoutMechlinkBooster__e.png","s":"BurnoutMechlinkBooster__s.png","w":"BurnoutMechlinkBooster__w.png"}},"ButcherSpot":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"ButcherSpot__n.png"}},"Campfire":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"Campfire__n.png"}},"CannibalPlatter":{"ds":[2.2,3.3],"kind":"multi","imgs":{"e":"CannibalPlatter__e.png","s":"CannibalPlatter__s.png"}},"CaravanPackingSpot":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"CaravanPackingSpot__n.png"}},"ChemfuelPoweredGenerator":{"ds":[2.0,2.0],"kind":"single","imgs":{"n":"ChemfuelPoweredGenerator__n.png"}},"ChemfuelTank":{"ds":[2.0,2.0],"kind":"multi","imgs":{"n":"ChemfuelTank__n.png","e":"ChemfuelTank__e.png","s":"ChemfuelTank__s.png"}},"ChessTable":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"ChessTable__n.png"},"tint":"stuff"},"ChristmasTree":{"ds":[2.2,2.2],"off":{"g":[0.0,0.75]},"kind":"single","imgs":{"n":"ChristmasTree__n.png"}},"Column":{"ds":[0.5,1.25],"off":{"g":[0.0,0.2]},"kind":"single","imgs":{"n":"Column__n.png"},"tint":"stuff"},"CommsConsole":{"ds":[5.0,4.0],"kind":"multi","imgs":{"n":"CommsConsole__n.png","e":"CommsConsole__e.png","s":"CommsConsole__s.png"}},"Cooler":{"ds":[1.0,1.0],"kind":"multi","imgs":{"n":"Cooler__n.png","e":"Cooler__e.png","s":"Cooler__s.png"}},"Couch":{"ds":[3.0,3.0],"kind":"multi","imgs":{"n":"Couch__n.png","e":"Couch__e.png","s":"Couch__s.png"},"tint":"stuff"},"CraftingSpot":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"CraftingSpot__n.png"}},"Crib":{"ds":[2.2,2.2],"kind":"multi","imgs":{"n":"Crib__n.png","e":"Crib__e.png","s":"Crib__s.png"},"tint":"stuff"},"CryptosleepCasket":{"ds":[1.0,2.0],"kind":"multi","imgs":{"n":"CryptosleepCasket__n.png","e":"CryptosleepCasket__e.png","s":"CryptosleepCasket__s.png"}},"DarklightBrazier":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"DarklightBrazier__n.png"},"tint":"stuff"},"Darktorch":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"Darktorch__n.png"}},"DarktorchFungus":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"DarktorchFungus__n.png"}},"DeathrestAccelerator":{"ds":[1.0,2.0],"kind":"multi","imgs":{"n":"DeathrestAccelerator__n.png","e":"DeathrestAccelerator__e.png","s":"DeathrestAccelerator__s.png"}},"DeathrestCasket":{"ds":[2.0,2.0],"kind":"multi","imgs":{"n":"DeathrestCasket__n.png","e":"DeathrestCasket__e.png","s":"DeathrestCasket__s.png"}},"DeepDrill":{"ds":[2.0,2.0],"kind":"single","imgs":{"n":"DeepDrill__n.png"}},"DiningChair":{"ds":[1.0,1.0],"kind":"multi","imgs":{"n":"DiningChair__n.png","e":"DiningChair__e.png","s":"DiningChair__s.png"},"tint":"stuff"},"Door":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"Door__n.png"},"tint":"stuff","mir":1},"DoubleBed":{"ds":[2.05,2.05],"kind":"multi","imgs":{"n":"DoubleBed__n.png","e":"DoubleBed__e.png","s":"DoubleBed__s.png"},"tint":"stuff"},"DoubleSleepingSpot":{"ds":[4.0,4.0],"kind":"multi","imgs":{"n":"DoubleSleepingSpot__n.png","e":"DoubleSleepingSpot__e.png","s":"DoubleSleepingSpot__s.png"}},"Drape":{"ds":[4.2,4.2],"kind":"multi","imgs":{"e":"Drape__e.png","s":"Drape__s.png"},"tint":"stuff"},"Dresser":{"ds":[2.0,1.0],"kind":"multi","imgs":{"n":"Dresser__n.png","e":"Dresser__e.png","s":"Dresser__s.png"},"tint":"stuff"},"DrugLab":{"ds":[3.5,1.5],"kind":"multi","imgs":{"n":"DrugLab__n.png","e":"DrugLab__e.png","s":"DrugLab__s.png"},"tint":"stuff"},"Drum":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"Drum__n.png"},"tint":"stuff"},"Effigy":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"Effigy__n.png"}},"EggBox":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"EggBox__n.png"},"tint":"stuff"},"ElectricCrematorium":{"ds":[3.0,2.0],"kind":"multi","imgs":{"n":"ElectricCrematorium__n.png","e":"ElectricCrematorium__e.png","s":"ElectricCrematorium__s.png"},"tint":"stuff"},"ElectricInhibitor":{"ds":[1.0,2.0],"kind":"multi","imgs":{"n":"ElectricInhibitor__n.png","e":"ElectricInhibitor__e.png","s":"ElectricInhibitor__s.png","w":"ElectricInhibitor__w.png"}},"ElectricSmelter":{"ds":[3.5,1.5],"kind":"multi","imgs":{"n":"ElectricSmelter__n.png","e":"ElectricSmelter__e.png","s":"ElectricSmelter__s.png"}},"ElectricSmithy":{"ds":[3.5,1.5],"kind":"multi","imgs":{"n":"ElectricSmithy__n.png","e":"ElectricSmithy__e.png","s":"ElectricSmithy__s.png"}},"ElectricStove":{"ds":[3.5,1.5],"kind":"multi","imgs":{"n":"ElectricStove__n.png","e":"ElectricStove__e.png","s":"ElectricStove__s.png"}},"ElectricTailoringBench":{"ds":[3.5,1.5],"kind":"multi","imgs":{"n":"ElectricTailoringBench__n.png","e":"ElectricTailoringBench__e.png","s":"ElectricTailoringBench__s.png"},"tint":"stuff"},"Electroharvester":{"ds":[3.0,2.0],"off":{"g":[0.0,1.5]},"kind":"multi","imgs":{"n":"Electroharvester__n.png","e":"Electroharvester__e.png","s":"Electroharvester__s.png","w":"Electroharvester__w.png"}},"EndTable":{"ds":[1.0,1.0],"kind":"multi","imgs":{"n":"EndTable__n.png","e":"EndTable__e.png","s":"EndTable__s.png"},"tint":"stuff"},"FabricationBench":{"ds":[7.0,4.0],"kind":"multi","imgs":{"n":"FabricationBench__n.png","e":"FabricationBench__e.png","s":"FabricationBench__s.png"}},"Fence":{"ds":[1.0,1.0],"kind":"linked","link":"basic","sheets":{"Metal":"Fence__Metal.png","Smooth":"Fence__Smooth.png"},"lf":["Fences"],"tint":"stuff"},"FenceGate":{"ds":[1.0,1.0],"kind":"multi","imgs":{"e":"FenceGate__e.png","s":"FenceGate__s.png"},"tint":"stuff","mir":1},"FermentingBarrel":{"ds":[1.0,1.0],"kind":"multi","imgs":{"n":"FermentingBarrel__n.png","e":"FermentingBarrel__e.png"}},"FirefoamPopper":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"FirefoamPopper__n.png"}},"FlatscreenTelevision":{"ds":[2.0,1.0],"kind":"multi","imgs":{"n":"FlatscreenTelevision__n.png","e":"FlatscreenTelevision__e.png","s":"FlatscreenTelevision__s.png"}},"FloodLight":{"ds":[2.5,2.5],"kind":"single","imgs":{"n":"FloodLight__n.png"}},"FrenzyInducer":{"ds":[1.5,1.5],"kind":"single","imgs":{"n":"FrenzyInducer__n.png"}},"FueledSmithy":{"ds":[3.5,1.5],"kind":"multi","imgs":{"n":"FueledSmithy__n.png","e":"FueledSmithy__e.png","s":"FueledSmithy__s.png"}},"FueledStove":{"ds":[3.5,1.5],"kind":"multi","imgs":{"n":"FueledStove__n.png","e":"FueledStove__e.png","s":"FueledStove__s.png"}},"GameOfUrBoard":{"ds":[1.0,1.0],"kind":"multi","imgs":{"n":"GameOfUrBoard__n.png","e":"GameOfUrBoard__e.png","s":"GameOfUrBoard__s.png","w":"GameOfUrBoard__w.png"},"tint":"stuff"},"GeneAssembler":{"ds":[3.0,2.0],"kind":"multi","imgs":{"n":"GeneAssembler__n.png","e":"GeneAssembler__e.png","s":"GeneAssembler__s.png"}},"GeneBank":{"ds":[2.0,1.0],"kind":"multi","imgs":{"n":"GeneBank__n.png","e":"GeneBank__e.png","s":"GeneBank__s.png"}},"GeneExtractor":{"ds":[2.0,2.0],"kind":"multi","imgs":{"n":"GeneExtractor__n.png","e":"GeneExtractor__e.png","s":"GeneExtractor__s.png","w":"GeneExtractor__w.png"}},"GeneProcessor":{"ds":[2.0,2.0],"kind":"single","imgs":{"n":"GeneProcessor__n.png"}},"GeothermalGenerator":{"ds":[6.0,6.0],"kind":"single","imgs":{"n":"GeothermalGenerator__n.png"}},"GibbetCage":{"ds":[1.3,1.3],"kind":"single","imgs":{"n":"GibbetCage__n.png"},"tint":"stuff"},"GlucosoidPump":{"ds":[1.0,2.0],"kind":"multi","imgs":{"e":"GlucosoidPump__e.png","s":"GlucosoidPump__s.png"}},"GrandThrone":{"ds":[4.0,4.0],"kind":"multi","imgs":{"n":"GrandThrone__n.png","e":"GrandThrone__e.png","s":"GrandThrone__s.png"}},"GravAnchor":{"ds":[4.0,4.0],"kind":"single","imgs":{"n":"GravAnchor__n.png"}},"GravFieldExtender":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"GravFieldExtender__n.png"}},"GravcorePowerCell":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"GravcorePowerCell__n.png"}},"Grave":{"ds":[3.0,4.0],"kind":"multi","imgs":{"n":"Grave__n.png","e":"Grave__e.png","s":"Grave__s.png"}},"GravshipHull":{"ds":[1.0,1.0],"kind":"linked","link":"corner","sheets":{"default":"GravshipHull__atlas.png"},"lf":["Wall","Rock"],"tint":"stuff"},"GrayDoor":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"GrayDoor__n.png"},"tint":"stuff"},"GrayWall":{"ds":[1.0,1.0],"kind":"linked","link":"corner","sheets":{"default":"GrayWall__atlas.png"},"lf":["Wall","Rock"],"tint":"stuff"},"GroundPenetratingScanner":{"ds":[2.65,2.65],"off":{"g":[0.0,-0.05]},"kind":"single","imgs":{"n":"GroundPenetratingScanner__n.png"}},"GrowthVat":{"ds":[1.0,2.0],"kind":"multi","imgs":{"e":"GrowthVat__e.png","s":"GrowthVat__s.png"}},"HandTailoringBench":{"ds":[3.5,1.5],"kind":"multi","imgs":{"n":"HandTailoringBench__n.png","e":"HandTailoringBench__e.png","s":"HandTailoringBench__s.png"},"tint":"stuff"},"Heater":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"Heater__n.png"}},"HemogenAmplifier":{"ds":[1.0,2.0],"kind":"multi","imgs":{"n":"HemogenAmplifier__n.png","e":"HemogenAmplifier__e.png","s":"HemogenAmplifier__s.png","w":"HemogenAmplifier__w.png"}},"Hemopump":{"ds":[1.0,2.0],"kind":"multi","imgs":{"e":"Hemopump__e.png","s":"Hemopump__s.png"}},"HiTechResearchBench":{"ds":[7.0,4.0],"kind":"multi","imgs":{"n":"HiTechResearchBench__n.png","e":"HiTechResearchBench__e.png","s":"HiTechResearchBench__s.png"},"tint":"stuff"},"HiddenConduit":{"ds":[1.0,1.0],"kind":"linked","link":"transmitter","sheets":{"default":"HiddenConduit__atlas.png"},"lf":["PowerConduit"],"tint":"#000000"},"HoldingPlatform":{"ds":[3.0,3.0],"kind":"single","imgs":{"n":"HoldingPlatform__n.png"}},"HoldingSpot":{"ds":[3.0,3.0],"kind":"single","imgs":{"n":"HoldingSpot__n.png"}},"HoopstoneRing":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"HoopstoneRing__n.png"},"tint":"stuff"},"Hopper":{"ds":[1.0,1.0],"kind":"multi","imgs":{"n":"Hopper__n.png","e":"Hopper__e.png","s":"Hopper__s.png"}},"HorseshoesPin":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"HorseshoesPin__n.png"},"tint":"stuff"},"HospitalBed":{"ds":[2.0,2.0],"kind":"multi","imgs":{"n":"HospitalBed__n.png","e":"HospitalBed__e.png","s":"HospitalBed__s.png"},"tint":"stuff"},"HunterDroneTrap":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"HunterDroneTrap__n.png"}},"HydroponicsBasin":{"ds":[1.0,4.0],"kind":"multi","imgs":{"n":"HydroponicsBasin__n.png","e":"HydroponicsBasin__e.png"}},"Ideogram":{"ds":[3.0,3.0],"kind":"single","imgs":{"n":"Ideogram__n.png"},"tint":"#696969"},"IncenseShrine":{"ds":[2.0,2.0],"kind":"single","imgs":{"n":"IncenseShrine__n.png"}},"KneelPillow":{"ds":[1.0,1.0],"kind":"multi","imgs":{"n":"KneelPillow__n.png","e":"KneelPillow__e.png","s":"KneelPillow__s.png"},"tint":"stuff"},"KneelSheet":{"ds":[2.0,2.0],"kind":"multi","imgs":{"n":"KneelSheet__n.png","e":"KneelSheet__e.png","s":"KneelSheet__s.png"},"tint":"stuff"},"LargeChemfuelTank":{"ds":[3.0,3.0],"kind":"multi","imgs":{"n":"LargeChemfuelTank__n.png","e":"LargeChemfuelTank__e.png","s":"LargeChemfuelTank__s.png"}},"LargeMechGestator":{"ds":[6.0,5.0],"kind":"multi","imgs":{"n":"LargeMechGestator__n.png","e":"LargeMechGestator__e.png","s":"LargeMechGestator__s.png"}},"LargeThruster":{"ds":[2.2,2.2],"kind":"multi","imgs":{"n":"LargeThruster__n.png","e":"LargeThruster__e.png","s":"LargeThruster__s.png"}},"Lectern":{"ds":[1.0,1.0],"kind":"multi","imgs":{"n":"Lectern__n.png","e":"Lectern__e.png","s":"Lectern__s.png"},"tint":"stuff"},"LightBall":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"LightBall__n.png"}},"LongRangeMineralScanner":{"ds":[4.0,4.0],"kind":"multi","imgs":{"n":"LongRangeMineralScanner__n.png","s":"LongRangeMineralScanner__s.png","w":"LongRangeMineralScanner__w.png"}},"Loudspeaker":{"ds":[1.32,1.32],"off":{"g":[0.0,0.18]},"kind":"multi","imgs":{"n":"Loudspeaker__n.png","e":"Loudspeaker__e.png","s":"Loudspeaker__s.png"}},"MarriageSpot":{"ds":[2.0,1.0],"kind":"single","imgs":{"n":"MarriageSpot__n.png"}},"MechBooster":{"ds":[2.0,2.0],"kind":"single","imgs":{"n":"MechBooster__n.png"}},"MechGestator":{"ds":[5.6,4.0],"kind":"multi","imgs":{"n":"MechGestator__n.png","e":"MechGestator__e.png","s":"MechGestator__s.png"}},"MechbandDish":{"ds":[2.0,2.0],"kind":"multi","imgs":{"n":"MechbandDish__n.png","e":"MechbandDish__e.png"}},"MeditationSpot":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"MeditationSpot__n.png"}},"MoisturePump":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"MoisturePump__n.png"}},"MorbidSlab_Broad":{"ds":[4.0,4.0],"kind":"single","imgs":{"n":"MorbidSlab_Broad__n.png"},"tint":"stuff"},"MorbidSlab_Medium":{"ds":[3.0,3.0],"kind":"single","imgs":{"n":"MorbidSlab_Medium__n.png"},"tint":"stuff"},"MultiAnalyzer":{"ds":[2.4688,2.4688],"kind":"single","imgs":{"n":"MultiAnalyzer__n.png"}},"NatureShrine_Large":{"ds":[3.0,3.0],"kind":"single","imgs":{"n":"NatureShrine_Large__n.png"}},"NatureShrine_Small":{"ds":[2.0,2.0],"kind":"single","imgs":{"n":"NatureShrine_Small__n.png"}},"NeuralSupercharger":{"ds":[1.05,3.0],"kind":"multi","imgs":{"n":"NeuralSupercharger__n.png","e":"NeuralSupercharger__e.png","s":"NeuralSupercharger__s.png"}},"NutrientPasteDispenser":{"ds":[3.0,4.0],"kind":"multi","imgs":{"n":"NutrientPasteDispenser__n.png","e":"NutrientPasteDispenser__e.png","s":"NutrientPasteDispenser__s.png"},"tint":"#e8ffbf"},"OrbitalAncientFortifiedWall":{"ds":[1.0,1.0],"kind":"linked","link":"corner","sheets":{"default":"OrbitalAncientFortifiedWall__atlas.png"},"lf":["Wall","Rock"],"tint":"#848c8c"},"OrbitalScanner":{"ds":[3.0,3.0],"kind":"multi","imgs":{"n":"OrbitalScanner__n.png","e":"OrbitalScanner__e.png","s":"OrbitalScanner__s.png"}},"OrbitalTradeBeacon":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"OrbitalTradeBeacon__n.png"}},"OrnateDoor":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"OrnateDoor__n.png"}},"OxygenPump":{"ds":[1.0,1.0],"off":{"n":[0.0,0.9],"e":[0.9,0.0],"s":[0.0,-0.9],"w":[-0.9,0.0]},"kind":"multi","imgs":{"n":"OxygenPump__n.png","e":"OxygenPump__e.png","s":"OxygenPump__s.png"}},"PartySpot":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"PartySpot__n.png"}},"PassengerShuttle":{"ds":[3.0,5.0],"kind":"multi","imgs":{"n":"PassengerShuttle__n.png","e":"PassengerShuttle__e.png","s":"PassengerShuttle__s.png"}},"PassiveCooler":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"PassiveCooler__n.png"}},"PenMarker":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"PenMarker__n.png"},"tint":"stuff"},"Pew":{"ds":[3.0,1.0],"kind":"multi","imgs":{"n":"Pew__n.png","e":"Pew__e.png","s":"Pew__s.png"},"tint":"stuff"},"PilotConsole":{"ds":[3.7,2.6],"kind":"multi","imgs":{"n":"PilotConsole__n.png","e":"PilotConsole__e.png","s":"PilotConsole__s.png"}},"PlantPot":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"PlantPot__n.png"},"tint":"stuff"},"PlantPot_Bonsai":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"PlantPot_Bonsai__n.png"},"tint":"stuff"},"PodLauncher":{"ds":[2.0,3.0],"kind":"multi","imgs":{"n":"PodLauncher__n.png","e":"PodLauncher__e.png","s":"PodLauncher__s.png","w":"PodLauncher__w.png"}},"PokerTable":{"ds":[4.0,4.0],"kind":"single","imgs":{"n":"PokerTable__n.png"}},"PollutionPump":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"PollutionPump__n.png"}},"PowerConduit":{"ds":[1.0,1.0],"kind":"linked","link":"transmitter","sheets":{"default":"PowerConduit__atlas.png"},"lf":["PowerConduit"]},"PowerSwitch":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"PowerSwitch__n.png"}},"ProximityDetector":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"ProximityDetector__n.png"}},"PsychicRitualSpot":{"ds":[3.0,3.0],"kind":"single","imgs":{"n":"PsychicRitualSpot__n.png"}},"PsychofluidPump":{"ds":[1.0,2.0],"kind":"multi","imgs":{"n":"PsychofluidPump__n.png","e":"PsychofluidPump__e.png"}},"Pyre":{"ds":[2.0,2.0],"kind":"single","imgs":{"n":"Pyre__n.png"}},"Reliquary":{"ds":[3.2,2.4],"off":{"n":[0.0,0.2],"s":[0.0,0.2]},"kind":"multi","imgs":{"n":"Reliquary__n.png","e":"Reliquary__e.png","s":"Reliquary__s.png"}},"RitualSpot":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"RitualSpot__n.png"}},"RoyalBed":{"ds":[2.05,2.05],"kind":"multi","imgs":{"n":"RoyalBed__n.png","e":"RoyalBed__e.png","s":"RoyalBed__s.png"},"tint":"stuff"},"RusticRug_Broad":{"ds":[4.0,4.0],"kind":"single","imgs":{"n":"RusticRug_Broad__n.png"}},"RusticRug_Medium":{"ds":[3.0,3.0],"kind":"single","imgs":{"n":"RusticRug_Medium__n.png"}},"SacrificialFlag":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"SacrificialFlag__n.png"}},"Sandbags":{"ds":[1.0,1.0],"kind":"linked","link":"basic","sheets":{"default":"Sandbags__atlas.png"},"lf":["Sandbags"],"tint":"stuff"},"SanguphageMeetingTorch":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"SanguphageMeetingTorch__n.png"}},"Sarcophagus":{"ds":[3.0,4.0],"kind":"multi","imgs":{"n":"Sarcophagus__n.png","e":"Sarcophagus__e.png"},"tint":"stuff"},"SchoolDesk":{"ds":[4.0,3.0],"kind":"multi","imgs":{"n":"SchoolDesk__n.png","e":"SchoolDesk__e.png","s":"SchoolDesk__s.png","w":"SchoolDesk__w.png"},"tint":"stuff"},"SculptureGrand":{"ds":[4.0,4.0],"kind":"single","imgs":{"n":"SculptureGrand__n.png"},"tint":"stuff"},"SculptureLarge":{"ds":[3.0,3.0],"kind":"single","imgs":{"n":"SculptureLarge__n.png"},"tint":"stuff"},"SculptureSmall":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"SculptureSmall__n.png"},"tint":"stuff"},"SecurityDoor":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"SecurityDoor__n.png"},"tint":"#696969"},"SerumCentrifuge":{"ds":[3.0,3.0],"kind":"multi","imgs":{"n":"SerumCentrifuge__n.png","e":"SerumCentrifuge__e.png","s":"SerumCentrifuge__s.png"}},"ShardBeacon":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"ShardBeacon__n.png"}},"ShardInhibitor":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"ShardInhibitor__n.png"}},"Shelf":{"ds":[3.0,2.0],"kind":"multi","imgs":{"n":"Shelf__n.png","e":"Shelf__e.png","s":"Shelf__s.png"},"tint":"stuff"},"ShelfSmall":{"ds":[2.0,2.0],"kind":"multi","imgs":{"n":"ShelfSmall__n.png","e":"ShelfSmall__e.png","s":"ShelfSmall__s.png"},"tint":"stuff"},"ShipLandingBeacon":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"ShipLandingBeacon__n.png"}},"Ship_Beam":{"ds":[2.0,8.0],"kind":"multi","imgs":{"n":"Ship_Beam__n.png","e":"Ship_Beam__e.png"}},"Ship_ComputerCore":{"ds":[2.0,2.0],"kind":"multi","imgs":{"n":"Ship_ComputerCore__n.png"}},"Ship_CryptosleepCasket":{"ds":[1.0,2.0],"kind":"multi","imgs":{"n":"Ship_CryptosleepCasket__n.png","e":"Ship_CryptosleepCasket__e.png","s":"Ship_CryptosleepCasket__s.png"}},"Ship_Engine":{"ds":[4.25,4.25],"kind":"multi","imgs":{"n":"Ship_Engine__n.png","e":"Ship_Engine__e.png","s":"Ship_Engine__s.png"}},"Ship_Reactor":{"ds":[8.0,8.0],"kind":"multi","imgs":{"n":"Ship_Reactor__n.png","e":"Ship_Reactor__e.png"}},"Ship_SensorCluster":{"ds":[2.0,2.0],"kind":"multi","imgs":{"n":"Ship_SensorCluster__n.png"}},"SignalJammer":{"ds":[2.0,2.0],"kind":"multi","imgs":{"n":"SignalJammer__n.png","e":"SignalJammer__e.png","s":"SignalJammer__s.png"}},"SimpleResearchBench":{"ds":[5.0,4.0],"kind":"multi","imgs":{"n":"SimpleResearchBench__n.png","e":"SimpleResearchBench__e.png","s":"SimpleResearchBench__s.png"},"tint":"stuff"},"Skullspike":{"ds":[1.3,1.3],"kind":"single","imgs":{"n":"Skullspike__n.png"},"tint":"stuff"},"SlabBed":{"ds":[2.0,2.0],"kind":"multi","imgs":{"n":"SlabBed__n.png","e":"SlabBed__e.png","s":"SlabBed__s.png"},"tint":"stuff"},"SlabDoubleBed":{"ds":[2.0,2.0],"kind":"multi","imgs":{"n":"SlabDoubleBed__n.png","e":"SlabDoubleBed__e.png","s":"SlabDoubleBed__s.png"},"tint":"stuff"},"SleepAccelerator":{"ds":[1.0,1.0],"kind":"multi","imgs":{"n":"SleepAccelerator__n.png","e":"SleepAccelerator__e.png","s":"SleepAccelerator__s.png"}},"SleepSuppressor":{"ds":[2.0,2.0],"kind":"multi","imgs":{"n":"SleepSuppressor__n.png","e":"SleepSuppressor__e.png","s":"SleepSuppressor__s.png","w":"SleepSuppressor__w.png"}},"SleepingSpot":{"ds":[3.0,4.0],"kind":"multi","imgs":{"n":"SleepingSpot__n.png","e":"SleepingSpot__e.png","s":"SleepingSpot__s.png"}},"SmallThruster":{"ds":[1.1,2.2],"kind":"multi","imgs":{"n":"SmallThruster__n.png","e":"SmallThruster__e.png","s":"SmallThruster__s.png"}},"SolarGenerator":{"ds":[4.0,4.0],"kind":"single","imgs":{"n":"SolarGenerator__n.png"}},"SpikecoreFloorStar_Broad":{"ds":[4.0,4.0],"kind":"single","imgs":{"n":"SpikecoreFloorStar_Broad__n.png"},"tint":"#696969"},"SpikecoreFloorStar_Medium":{"ds":[3.0,3.0],"kind":"single","imgs":{"n":"SpikecoreFloorStar_Medium__n.png"},"tint":"#696969"},"StandardRecharger":{"ds":[3.8,2.8],"kind":"multi","imgs":{"n":"StandardRecharger__n.png","e":"StandardRecharger__e.png","s":"StandardRecharger__s.png"}},"StandingLamp":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"StandingLamp__n.png"}},"SteleGrand":{"ds":[5.0,5.0],"off":{"g":[0.0,0.25]},"kind":"single","imgs":{"n":"SteleGrand__n.png"},"tint":"stuff"},"SteleLarge":{"ds":[4.0,4.0],"off":{"g":[0.0,0.05]},"kind":"single","imgs":{"n":"SteleLarge__n.png"},"tint":"stuff"},"Stool":{"ds":[1.0,1.0],"kind":"multi","imgs":{"n":"Stool__n.png","e":"Stool__e.png"},"tint":"stuff"},"StylingStation":{"ds":[3.5,1.5],"kind":"multi","imgs":{"n":"StylingStation__n.png","e":"StylingStation__e.png","s":"StylingStation__s.png"},"tint":"stuff"},"SubcoreEncoder":{"ds":[3.0,2.0],"kind":"multi","imgs":{"n":"SubcoreEncoder__n.png","e":"SubcoreEncoder__e.png","s":"SubcoreEncoder__s.png"}},"SubcoreRipscanner":{"ds":[3.0,2.0],"kind":"multi","imgs":{"n":"SubcoreRipscanner__n.png","e":"SubcoreRipscanner__e.png","s":"SubcoreRipscanner__s.png"}},"SubcoreSoftscanner":{"ds":[3.0,2.0],"kind":"multi","imgs":{"n":"SubcoreSoftscanner__n.png","e":"SubcoreSoftscanner__e.png","s":"SubcoreSoftscanner__s.png"}},"SunLamp":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"SunLamp__n.png"}},"Table1x2c":{"ds":[3.0,4.0],"kind":"multi","imgs":{"n":"Table1x2c__n.png","e":"Table1x2c__e.png"},"tint":"stuff"},"Table2x2c":{"ds":[4.0,4.0],"kind":"multi","imgs":{"n":"Table2x2c__n.png"},"tint":"stuff"},"Table2x4c":{"ds":[4.0,6.0],"kind":"multi","imgs":{"n":"Table2x4c__n.png","e":"Table2x4c__e.png"},"tint":"stuff"},"Table3x3c":{"ds":[5.0,5.0],"kind":"multi","imgs":{"n":"Table3x3c__n.png"},"tint":"stuff"},"TableButcher":{"ds":[3.5,1.5],"kind":"multi","imgs":{"n":"TableButcher__n.png","e":"TableButcher__e.png","s":"TableButcher__s.png"},"tint":"stuff"},"TableMachining":{"ds":[3.5,1.5],"kind":"multi","imgs":{"n":"TableMachining__n.png","e":"TableMachining__e.png","s":"TableMachining__s.png"}},"TableSculpting":{"ds":[3.5,1.5],"kind":"multi","imgs":{"n":"TableSculpting__n.png","e":"TableSculpting__e.png","s":"TableSculpting__s.png"},"tint":"stuff"},"TableStonecutter":{"ds":[3.5,1.5],"kind":"multi","imgs":{"n":"TableStonecutter__n.png","e":"TableStonecutter__e.png","s":"TableStonecutter__s.png"},"tint":"stuff"},"Throne":{"ds":[2.4,2.4],"kind":"multi","imgs":{"n":"Throne__n.png","e":"Throne__e.png","s":"Throne__s.png"},"tint":"stuff"},"ToolCabinet":{"ds":[2.0,1.0],"kind":"multi","imgs":{"n":"ToolCabinet__n.png","e":"ToolCabinet__e.png"},"tint":"#60725f"},"TorchLamp":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"TorchLamp__n.png"}},"TorchWallLamp":{"ds":[1.0,1.0],"off":{"n":[0.0,0.9],"e":[0.9,0.0],"s":[0.0,-0.9],"w":[-0.9,0.0]},"kind":"multi","imgs":{"n":"TorchWallLamp__n.png","e":"TorchWallLamp__e.png","s":"TorchWallLamp__s.png"}},"TotemicSlab_Broad":{"ds":[4.0,4.0],"kind":"single","imgs":{"n":"TotemicSlab_Broad__n.png"},"tint":"stuff"},"TotemicSlab_Medium":{"ds":[3.0,3.0],"kind":"single","imgs":{"n":"TotemicSlab_Medium__n.png"},"tint":"stuff"},"ToxifierGenerator":{"ds":[2.0,2.0],"kind":"single","imgs":{"n":"ToxifierGenerator__n.png"}},"ToyBox":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"ToyBox__n.png"},"tint":"stuff"},"TransportPod":{"ds":[2.0,2.0],"kind":"single","imgs":{"n":"TransportPod__n.png"}},"TrapIED_AntigrainWarhead":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"TrapIED_AntigrainWarhead__n.png"}},"TrapIED_Deadlife":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"TrapIED_Deadlife__n.png"}},"TrapIED_EMP":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"TrapIED_EMP__n.png"}},"TrapIED_Firefoam":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"TrapIED_Firefoam__n.png"}},"TrapIED_HighExplosive":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"TrapIED_HighExplosive__n.png"}},"TrapIED_Incendiary":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"TrapIED_Incendiary__n.png"}},"TrapIED_Smoke":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"TrapIED_Smoke__n.png"}},"TrapIED_ToxGas":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"TrapIED_ToxGas__n.png"}},"TrapSpike":{"ds":[1.0,1.0],"kind":"single","imgs":{"n":"TrapSpike__n.png"},"tint":"stuff"},"TubeTelevision":{"ds":[1.0,1.0],"kind":"multi","imgs":{"n":"TubeTelevision__n.png","e":"TubeTelevision__e.png","s":"TubeTelevision__s.png"}},"Turret_Autocannon":{"ds":[1.5,1.5],"off":{"g":[0.0,-0.1]},"kind":"single","imgs":{"n":"Turret_Autocannon__n.png"},"ov":{"ds":[1.0,1.0],"imgs":{"n":"Turret_Autocannon__top.png"}}},"Turret_FoamTurret":{"ds":[3.0,3.0],"kind":"single","imgs":{"n":"Turret_FoamTurret__n.png"},"tint":"stuff","ov":{"ds":[1.0,1.0],"imgs":{"n":"Turret_FoamTurret__top.png"}}},"Turret_MiniTurret":{"ds":[3.0,3.0],"kind":"single","imgs":{"n":"Turret_MiniTurret__n.png"},"tint":"stuff","ov":{"ds":[1.0,1.0],"imgs":{"n":"Turret_MiniTurret__top.png"}}},"Turret_Mortar":{"ds":[4.0,4.0],"kind":"single","imgs":{"n":"Turret_Mortar__n.png"},"tint":"stuff","ov":{"ds":[1.0,1.0],"imgs":{"n":"Turret_Mortar__top.png"}}},"Turret_RocketswarmLauncher":{"ds":[1.5,1.5],"off":{"g":[0.0,-0.1]},"kind":"single","imgs":{"n":"Turret_RocketswarmLauncher__n.png"},"ov":{"ds":[1.0,1.0],"imgs":{"n":"Turret_RocketswarmLauncher__top.png"}}},"Turret_Sniper":{"ds":[1.5,1.5],"off":{"g":[0.0,-0.1]},"kind":"single","imgs":{"n":"Turret_Sniper__n.png"},"ov":{"ds":[1.0,1.0],"imgs":{"n":"Turret_Sniper__top.png"}}},"VacBarrier":{"ds":[1.5,1.5],"kind":"multi","imgs":{"s":"VacBarrier__s.png"}},"VanometricPowerCell":{"ds":[2.0,3.0],"kind":"multi","imgs":{"n":"VanometricPowerCell__n.png","e":"VanometricPowerCell__e.png"}},"Vent":{"ds":[1.0,1.0],"kind":"multi","imgs":{"n":"Vent__n.png","e":"Vent__e.png"}},"VitalsMonitor":{"ds":[1.0,1.0],"kind":"multi","imgs":{"n":"VitalsMonitor__n.png","s":"VitalsMonitor__s.png","w":"VitalsMonitor__w.png"}},"Wall":{"ds":[1.0,1.0],"kind":"linked","link":"corner","sheets":{"Planks":"Wall__Planks.png","Bricks":"Wall__Bricks.png","Smooth":"Wall__Smooth.png"},"lf":["Wall","Rock"],"tint":"stuff"},"WallLamp":{"ds":[1.0,1.0],"off":{"n":[0.0,0.9],"e":[0.9,0.0],"s":[0.0,-0.9],"w":[-0.9,0.0]},"kind":"multi","imgs":{"n":"WallLamp__n.png","e":"WallLamp__e.png","s":"WallLamp__s.png"}},"WastepackAtomizer":{"ds":[3.0,2.0],"kind":"multi","imgs":{"n":"WastepackAtomizer__n.png","e":"WastepackAtomizer__e.png","s":"WastepackAtomizer__s.png"}},"WatermillGenerator":{"ds":[5.0,6.0],"kind":"multi","imgs":{"n":"WatermillGenerator__n.png","e":"WatermillGenerator__e.png","s":"WatermillGenerator__s.png"}},"WaterproofConduit":{"ds":[1.0,1.0],"kind":"linked","link":"transmitter","sheets":{"default":"WaterproofConduit__atlas.png"},"lf":["PowerConduit"]},"WindTurbine":{"ds":[5.0,2.0],"kind":"multi","imgs":{"n":"WindTurbine__n.png","e":"WindTurbine__e.png","s":"WindTurbine__s.png"}},"WoodFiredGenerator":{"ds":[2.0,2.0],"kind":"single","imgs":{"n":"WoodFiredGenerator__n.png"}}},"floors":{"none":{"img":"floor__none.png"},"wood":{"img":"floor__wood.png","tint":"#6c4e37"},"stone":{"img":"floor__stone.png","tint":"#695f61"},"tileSandstone":{"img":"floor__tileSandstone.png","tint":"#7e685e"},"tileGranite":{"img":"floor__tileGranite.png","tint":"#695f61"},"tileLimestone":{"img":"floor__tileLimestone.png","tint":"#9e9987"},"tileSlate":{"img":"floor__tileSlate.png","tint":"#646464"},"tileMarble":{"img":"floor__tileMarble.png","tint":"#848784"},"tileAncient":{"img":"floor__tileAncient.png"},"metalTile":{"img":"floor__metalTile.png","tint":"#5e5e5e"},"goldTile":{"img":"floor__goldTile.png","tint":"#a6a659"},"silverTile":{"img":"floor__silverTile.png","tint":"#737373"},"concrete":{"img":"floor__concrete.png","tint":"#8c8c8c"},"steel":{"img":"floor__steel.png","tint":"#5e5e5e"},"sterile":{"img":"floor__sterile.png","tint":"#b5b5b5"},"carpet":{"img":"floor__carpet.png"},"paved":{"img":"floor__paved.png","tint":"#8c8c8c"},"water":{"img":"floor__water.png"},"bridge":{"img":"floor__bridge.png","tint":"#6c4e37"}}};
+})(typeof window !== "undefined" ? window : globalThis);
 
 </script>
 <script>
@@ -4638,7 +4673,7 @@ kbd {
     nextUid: 1,
     selection: {},       // uid -> true（建筑）
     floorSelection: {},  // "x,z" -> true（地板，框选后可整片删）
-    tool: 'place',       // place | select | erase | move | pan
+    tool: 'place',       // place | select | erase | brief | move | pan
     drawMode: 'brush',   // brush(自由) | rect(方框) | rectFill(填充)
     brush: null,         // {kind:'building'|'floor', id, stuff}
     lastStuff: {},       // defId -> 上次选的材质（和游戏一样记住）
@@ -5436,7 +5471,9 @@ kbd {
     ok: '#15b01a',                       // ColorLibrary.Green
     bad: '#e50000',                      // ColorLibrary.Red
     select: '#fff080',                   // TexUI.HighlightSelectedTex（游戏里的选中暖黄）
-    marquee: 'rgba(255,240,128,0.16)'
+    marquee: 'rgba(255,240,128,0.16)',
+    briefFill: 'rgba(51,205,217,0.06)',
+    briefLine: '#33CDD9'
   };
 
   function drawGrid(v) {
@@ -5891,7 +5928,7 @@ kbd {
     }
 
     if (!state.hover) return;
-    if (state.tool === 'select' || state.tool === 'pan' || state.tool === 'erase') return;
+    if (state.tool === 'select' || state.tool === 'pan' || state.tool === 'erase' || state.tool === 'brief') return;
     if (!state.brush) return;
     var hx = state.hover.x, hz = state.hover.z;
 
@@ -5935,10 +5972,48 @@ kbd {
     // 框选是按「格子」算的：起点和终点两格都要包含进去，所以宽高 +1。
     // 少这个 +1，反向拖（右下→左上 / 右上→左下）时会看起来和鼠标差一格。
     var w = Math.abs(b.x - a.x) + 1, h = Math.abs(b.z - a.z) + 1;
-    ctx.fillStyle = COLORS.marquee;
+    var isBrief = state.marquee.mode === 'brief';
+    ctx.fillStyle = isBrief ? COLORS.briefFill : COLORS.marquee;
     ctx.fillRect(x, z, w, h);
-    ctx.strokeStyle = COLORS.select; ctx.lineWidth = 1 / state.cam.cell;
+    ctx.strokeStyle = isBrief ? COLORS.briefLine : COLORS.select;
+    ctx.lineWidth = (isBrief ? 2 : 1) / state.cam.cell;
     ctx.strokeRect(x, z, w, h);
+  }
+
+  /**
+   * 持久显示「AI 简报区域」。
+   * 框选结束后 state.briefRect 会留着，这里画成青色虚线框，避免玩家分不清
+   * 「刚框过」和「什么都没框」。正在重新框选时先不画旧的，免得两层叠在一起。
+   */
+  function drawBriefRect() {
+    var r = state.briefRect;
+    if (!r || state.marquee) return;
+    var x = r.x0, z = r.z0;
+    var w = r.x1 - r.x0 + 1, h = r.z1 - r.z0 + 1;
+    if (w <= 0 || h <= 0) return;
+    var cell = state.cam.cell;
+    ctx.save();
+    ctx.fillStyle = COLORS.briefFill;
+    ctx.fillRect(x, z, w, h);
+    ctx.strokeStyle = COLORS.briefLine;
+    ctx.lineWidth = 2 / cell;
+    if (ctx.setLineDash) ctx.setLineDash([6 / cell, 4 / cell]);
+    ctx.strokeRect(x + 1 / cell, z + 1 / cell, Math.max(0, w - 2 / cell), Math.max(0, h - 2 / cell));
+    if (ctx.setLineDash) ctx.setLineDash([]);
+
+    if (w * cell > 84 && h * cell > 22) {
+      var pad = 4 / cell;
+      var fs2 = 11 / cell;
+      ctx.textBaseline = 'top';
+      ctx.font = 'bold ' + fs2 + 'px Arial, sans-serif';
+      var label = 'AI 简报区域';
+      var tw = (ctx.measureText ? ctx.measureText(label).width : label.length * fs2 * 0.7) + pad * 2;
+      ctx.fillStyle = 'rgba(10,14,16,0.78)';
+      ctx.fillRect(x + pad, z + pad, tw, fs2 + pad * 1.6);
+      ctx.fillStyle = COLORS.briefLine;
+      ctx.fillText(label, x + pad * 2, z + pad * 1.8);
+    }
+    ctx.restore();
   }
 
   /** 存档地形 / 山体（离屏 1px/格画布，按格缩放贴上去） */
@@ -6012,6 +6087,7 @@ kbd {
     drawOverlays(v);
     if (state.layers.blocked) drawBlockedOverlay(v);
     drawMarquee();
+    drawBriefRect();
     drawBrushPreview(v);
     ctx.restore();
   }
@@ -6157,6 +6233,12 @@ kbd {
         emit('change'); return;
       }
 
+      if (state.tool === 'brief') {
+        var cb = cellAt(sx, sy);
+        state.marquee = { a: cb, b: cb, mode: 'brief' };
+        render();
+        return;
+      }
       if (state.tool === 'select') {
         var c1 = cellAt(sx, sy);
         // 拖已经选中的东西 = 移动；拖空白 = 框选（两个功能合一）
@@ -6236,8 +6318,15 @@ kbd {
         var m = state.marquee;
         var x0 = Math.min(m.a.x, m.b.x), z0 = Math.min(m.a.z, m.b.z);
         var x1 = Math.max(m.a.x, m.b.x), z1 = Math.max(m.a.z, m.b.z);
-        var hit = {};
         var single = (x1 - x0 < 0.5 && z1 - z0 < 0.5);
+        if (m.mode === 'brief') {
+          // 只定义 AI 简报的范围，不碰选中；单击不算
+          if (!single) state.briefRect = { x0: x0, z0: z0, x1: x1, z1: z1 };
+          state.marquee = null;
+          emit('change'); render();
+          return;
+        }
+        var hit = {};
         state.buildings.forEach(function (b) {
           var def = defOf(b); if (!def) return;
           var fp = footprint(def, b.rot);
@@ -6509,8 +6598,8 @@ kbd {
   }
   function setTool(t) {
     state.tool = t;
-    if (t === 'select' || t === 'pan') state.brush = null;
-    if (t === 'select' || t === 'pan') state.paste = null;
+    if (t === 'select' || t === 'pan' || t === 'brief') state.brush = null;
+    if (t === 'select' || t === 'pan' || t === 'brief') state.paste = null;
     // 橡皮默认「拖框填充删除」（拖一个矩形整片删掉，含地板）
     if (t === 'erase') state.drawMode = 'rectFill';
     render(); emit('change');
@@ -7519,7 +7608,7 @@ kbd {
 
     // ---------- 1.5 地形 / 山体（导入了存档才有数据）----------
     if (global.RWSite && (state.terrain || state.rocks) && state.respectTerrain !== false) {
-      var rockCells = [], terrainCells = [], rockDefs = {}, terrainDefs = {};
+      var rockCells = [], terrainCells = [], rockDefs = {}, terrainDefs = {}, terrainWhy = {};
       state.buildings.forEach(function (b) {
         if (b.locked) return;                     // 存档原有建筑不报地形问题
         var def = Data.byId[b.defId]; if (!def) return;
@@ -7534,6 +7623,7 @@ kbd {
           terrainCells.push(c);
           var t = global.RWSite.terrainAt(c[0], c[1]);
           if (t) terrainDefs[t.name] = (terrainDefs[t.name] || 0) + 1;
+          if (chk.why) terrainWhy[chk.why] = (terrainWhy[chk.why] || 0) + 1;
         });
       });
       // 新铺的地板
@@ -7556,9 +7646,13 @@ kbd {
       }
       if (terrainCells.length) {
         var tList = Object.keys(terrainDefs).map(function (n) { return n + '×' + terrainDefs[n]; }).join('、');
+        var whys = Object.keys(terrainWhy);
+        var detail = whys.length
+          ? whys.slice(0, 3).join('；') + (whys.length > 3 ? '；…' : '')
+          : '地形不满足这些建筑的要求（换材质 / 垫地基 / 铺桥）';
         issues.push({
           kind: 'terrain', level: 'error',
-          msg: '有 ' + terrainCells.length + ' 格地形撑不住蓝图（' + tList + '）：沼泽/软沙/水面需要先垫地基或改成桥',
+          msg: '有 ' + terrainCells.length + ' 格地形撑不住蓝图（' + tList + '）：' + detail,
           cells: terrainCells
         });
       }
@@ -7597,6 +7691,9 @@ kbd {
       });
     });
 
+    // ---------- 2.8 门 ----------
+    issues = issues.concat(analyseDoors(state, cellMap, key));
+
     // ---------- 3&4. 房间 / 连通 ----------
     var rooms = analyseRooms(state, cellMap);
     state.roomInfo = rooms.rooms;
@@ -7606,8 +7703,8 @@ kbd {
         // 天然岩洞 / 远古遗迹本来就没门，玩家忘了开门也可能。属于提示，不是错误。
         issues.push({
           kind: 'sealed', level: 'info', approx: true,
-          msg: '房间 #' + (idx + 1) + '（' + r.area + ' 格）是封闭的、没有门' +
-            (r.ancient ? '（天然/遗迹结构，通常不用管）' : '（天然岩洞、遗迹，或你还没装门）'),
+          msg: '房间 #' + (idx + 1) + '（' + r.area + ' 格）是封闭的、没有能通行的门' +
+            (r.ancient ? '（天然/遗迹结构，通常不用管）' : '（天然岩洞、遗迹，或门没装对位置）'),
           cells: r.cells
         });
       } else if (!r.reachable) {
@@ -7687,10 +7784,30 @@ kbd {
       rooms.regions.forEach(function (rg) {
         rg.cells.forEach(function (c) { rgOf[key(c[0], c[1])] = rg; });
       });
+      // 新规划的建筑格：房间如果是用 plan 的墙围出来的，存档里当然没有屋顶数据，
+      // 不能因此把它当成「室外」——游戏里盖好墙会自动封顶。
+      var planCells = {};
+      state.buildings.forEach(function (b) {
+        if (b.src !== 'plan') return;
+        var d = Data.byId[b.defId]; if (!d) return;
+        var fp = RW.footprint(d, b.rot);
+        for (var i = 0; i < fp[0]; i++) for (var j = 0; j < fp[1]; j++) {
+          planCells[key(b.x + i, b.z + j)] = true;
+        }
+      });
+      function roomIsPlanned(rg) {
+        if (!rg || !rg.cells) return false;
+        for (var i = 0; i < rg.cells.length; i++) {
+          var c = rg.cells[i];
+          if (planCells[key(c[0] + 1, c[1])] || planCells[key(c[0] - 1, c[1])] ||
+              planCells[key(c[0], c[1] + 1)] || planCells[key(c[0], c[1] - 1)]) return true;
+        }
+        return false;
+      }
       function indoorSide(cell) {
         var rg = rgOf[key(cell[0], cell[1])] || null;
         if (!rg || prefabIds[rg.id]) return null;
-        if (state.roofs && state.roofs.cells && global.RWSite && global.RWSite.roofAt) {
+        if (state.roofs && state.roofs.cells && global.RWSite && global.RWSite.roofAt && !roomIsPlanned(rg)) {
           // 有屋顶数据：没屋顶的格子按室外算（院子 / 露天平台）
           return global.RWSite.roofAt(cell[0], cell[1]) > 0 ? rg : null;
         }
@@ -7727,6 +7844,26 @@ kbd {
         }
       });
     })();
+
+    // 标注问题来自新规划还是存档原有（贴边、遗迹门这类多半不是玩家的锅）
+    var oldCells = {}, newCells = {};
+    state.buildings.forEach(function (b) {
+      var def = Data.byId[b.defId]; if (!def) return;
+      var fp = RW.footprint(def, b.rot);
+      for (var i = 0; i < fp[0]; i++) for (var j = 0; j < fp[1]; j++) {
+        (b.locked ? oldCells : newCells)[key(b.x + i, b.z + j)] = true;
+      }
+    });
+    issues.forEach(function (it) {
+      if (!it.cells || !it.cells.length) return;
+      var o = 0, n = 0;
+      it.cells.forEach(function (c) {
+        var k = key(c[0], c[1]);
+        if (oldCells[k]) o++;
+        if (newCells[k]) n++;
+      });
+      it.source = (!n && o) ? 'existing' : (!o && n) ? 'plan' : 'mixed';
+    });
 
     state.issues = issues;
     state.powerInfo = power;
@@ -7879,6 +8016,76 @@ kbd {
     });
 
     return { nets: netList, links: links, problems: problems };
+  }
+
+  // -------------------------------------------------- 门
+  /**
+   * 门要真的能过人。
+   *
+   * 门的通行轴由 rot 决定：0/2 = 南北，1/3 = 东西；两侧都必须是可通行格。
+   * 最常见的错法是把门放在墙角：墙在南边+东边，开口在北边+西边，任何一轴都
+   * 凑不出一对通行格 —— 游戏里就是堵死的。但房间 flood-fill 仍把门当围合，
+   * 所以以前只会报「房间没有门」，看不出是门摆错了。
+   */
+  function analyseDoors(state, cellMap, key) {
+    var issues = [];
+    var Site = global.RWSite;
+
+    // 对外一律报游戏坐标（和 plan.json / get_area 一致），别把画布坐标漏出去
+    function gameCell(x, z) {
+      return {
+        x: state.flipX ? state.cols - 1 - x : x,
+        z: state.flipZ !== false ? state.rows - 1 - z : z
+      };
+    }
+
+    function blockedCell(x, z) {
+      if (x < 0 || z < 0 || x >= state.cols || z >= state.rows) return true;
+      var list = cellMap[key(x, z)] || [];
+      for (var i = 0; i < list.length; i++) {
+        var d = Data.byId[list[i].defId];
+        if (d && blocksWalk(d)) return true;
+      }
+      if (Site) {
+        if (Site.rockAt(x, z)) return true;
+        var t = Site.terrainAt(x, z);
+        if (t && t.aff && t.aff.indexOf('Walkable') < 0) return true;
+      }
+      return false;
+    }
+
+    state.buildings.forEach(function (b) {
+      var def = Data.byId[b.defId];
+      if (!def || !isDoor(def)) return;
+      var rot = ((Math.round((b.rot || 0) / 90) % 4) + 4) % 4;
+      var ns = !blockedCell(b.x, b.z - 1) && !blockedCell(b.x, b.z + 1);
+      var ew = !blockedCell(b.x - 1, b.z) && !blockedCell(b.x + 1, b.z);
+      var g = gameCell(b.x, b.z);
+      var at = '门在 (' + g.x + ',' + g.z + ')';
+      var level = b.locked ? 'info' : 'error';
+      var tag = b.locked ? '（存档原有的）' : '';
+
+      if (!ns && !ew) {
+        issues.push({
+          kind: 'door', level: level,
+          msg: at + tag + ' 过不去：上下和左右都凑不出一对可通行的格子（常见是放在墙角 / 贴着两面墙）',
+          cells: [[b.x, b.z]]
+        });
+      } else if (rot % 2 === 0 && !ns && ew) {
+        issues.push({
+          kind: 'door', level: b.locked ? 'info' : 'warn', approx: true,
+          msg: at + tag + ' 的方向和墙线垂直：这面墙是东西向，门应该转 90°（rot=' + ((rot + 1) % 4) + '）',
+          cells: [[b.x, b.z]]
+        });
+      } else if (rot % 2 === 1 && !ew && ns) {
+        issues.push({
+          kind: 'door', level: b.locked ? 'info' : 'warn', approx: true,
+          msg: at + tag + ' 的方向和墙线垂直：这面墙是南北向，门应该转 90°（rot=' + ((rot + 1) % 4) + '）',
+          cells: [[b.x, b.z]]
+        });
+      }
+    });
+    return issues;
   }
 
   // -------------------------------------------------- 房间 + 连通
@@ -8474,7 +8681,17 @@ kbd {
    *     <Name/><Category/><Size/></Blueprint></Blueprint>
    * Rotation 总是写出（整数 0-3），Size 是二维 (w, h)。
    */
-  function toBlueprintsXML(state, opts) {
+  /**
+   * 把工程换算成「游戏坐标 + 朝向」的条目（蓝图 XML 和 build-ops 共用）。
+   *
+   * 坐标换算只在这里做一次：编辑器 z 向下、游戏 +z 向北，所以要翻；
+   * 多格建筑再按 GenAdj.OccupiedRect 从「最小角」换成游戏里的 Position。
+   * 两条导出路径都吃这份结果，避免哪天改了一边、另一边忘了。
+   *
+   * @returns {{entries:Array, skipped:Object, lockedSkipped:number}}
+   *          entries[i] = {terrain} 或 {defName, stuff, x, z, rot}（全是游戏坐标）
+   */
+  function blueprintEntries(state, opts) {
     opts = opts || {};
     var stuff = STUFF_DEF[opts.stuff || 'stone'] || null;
     var entries = [], skipped = {}, lockedSkipped = 0;
@@ -8516,6 +8733,14 @@ kbd {
         rot: rot
       });
     });
+
+    return { entries: entries, skipped: skipped, lockedSkipped: lockedSkipped };
+  }
+
+  function toBlueprintsXML(state, opts) {
+    opts = opts || {};
+    var packed = blueprintEntries(state, opts);
+    var entries = packed.entries, skipped = packed.skipped, lockedSkipped = packed.lockedSkipped;
 
     if (!entries.length) return { xml: '', count: 0, skipped: skipped, lockedSkipped: lockedSkipped };
 
@@ -8578,9 +8803,1161 @@ kbd {
   }
 
   global.RWExport = {
-    toBlueprintsXML: toBlueprintsXML, gameDefName: gameDefName,
+    toBlueprintsXML: toBlueprintsXML, blueprintEntries: blueprintEntries, gameDefName: gameDefName,
     download: download, readFile: readFile
   };
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+/* ==== js/buildops.js ==== */
+/*
+ * buildops.js —— 把规划转成「游戏侧建造调用」列表
+ *
+ * 为什么需要它：planning 工具的输出最终要落到游戏里。两种落地方式：
+ *   1. 蓝图 .xml（Blueprints 模组，人手动放进文件夹）
+ *   2. 直接调用游戏侧的 build(def, x, z, rot, stuff) —— 比如 RimMolt 这类 MCP
+ *
+ * 第 2 种不需要模组、也不需要人工搬文件，但它有一个硬约束：一次调用只能放一个
+ * def。整座基地几百个格子，逐格调用既慢又烧上下文。所以这里把「同 def / 同材质 /
+ * 同朝向」的相邻单格合并成矩形（游戏的拖拽放置本来就支持矩形填充），
+ * 一面墙、一片地板通常就是一次调用。
+ *
+ * 坐标不在这里换算 —— 直接用 RWExport.blueprintEntries 的结果（已经是游戏坐标），
+ * 免得和蓝图导出算出两套坐标。
+ */
+(function (global) {
+  'use strict';
+
+  var Data = global.RWData;
+
+  var byGameName = null;
+  var byGameNameStamp = -1;
+
+  /** 游戏 defName → 建筑定义（数据库可能在导入游戏资源后被替换，所以要检查） */
+  function defByGameName(name) {
+    var stamp = Data.byId ? Object.keys(Data.byId).length : 0;
+    if (!byGameName || byGameNameStamp !== stamp) {
+      byGameName = {};
+      var ids = Object.keys(Data.byId || {});
+      for (var i = 0; i < ids.length; i++) {
+        var d = Data.byId[ids[i]];
+        var g = global.RWExport.gameDefName(d);
+        if (g && !byGameName[g]) byGameName[g] = d;
+      }
+      byGameNameStamp = stamp;
+    }
+    return byGameName[name] || null;
+  }
+
+  /**
+   * 把一堆格子拆成尽可能少的矩形（贪心：先向右拉，再整行向下扩）。
+   * cells: [[x,z], ...] → [[x0,z0,x1,z1], ...]
+   */
+  function toRects(cells) {
+    var set = {}, list = [];
+    for (var i = 0; i < cells.length; i++) {
+      var k = cells[i][0] + ',' + cells[i][1];
+      if (!set[k]) { set[k] = 1; list.push([cells[i][0], cells[i][1]]); }
+    }
+    list.sort(function (a, b) { return a[1] - b[1] || a[0] - b[0]; });
+
+    var used = {}, out = [];
+    for (var n = 0; n < list.length; n++) {
+      var x0 = list[n][0], z0 = list[n][1];
+      if (used[x0 + ',' + z0]) continue;
+
+      var x1 = x0;
+      while (set[(x1 + 1) + ',' + z0] && !used[(x1 + 1) + ',' + z0]) x1++;
+
+      var z1 = z0;
+      for (;;) {
+        var ok = true;
+        for (var x = x0; x <= x1; x++) {
+          var kk = x + ',' + (z1 + 1);
+          if (!set[kk] || used[kk]) { ok = false; break; }
+        }
+        if (!ok) break;
+        z1++;
+      }
+
+      for (var xx = x0; xx <= x1; xx++) {
+        for (var zz = z0; zz <= z1; zz++) used[xx + ',' + zz] = 1;
+      }
+      out.push([x0, z0, x1, z1]);
+    }
+    return out;
+  }
+
+  /** 电缆这类「可以埋在墙下」的东西必须在墙之前放，否则墙会挡住它 */
+  function layerOf(def) {
+    if (!def) return 2;
+    var tags = def.tags || [];
+    if (tags.indexOf('under') >= 0 || /conduit/i.test(def.id || '')) return 0;
+    if (tags.indexOf('door') >= 0) return 3;
+    return 2;
+  }
+
+  /**
+   * @param {object} state   RW.state
+   * @param {object} [opts]  {excludeLocked, floors, stuff}
+   * @returns {{ops:Array, stats:Object}}
+   *   ops[i] 单格:  {def, x, z, rot?, stuff?}
+   *   ops[i] 矩形:  {def, minX, minZ, maxX, maxZ, fill:'filled', stuff?}
+   *   可直接展开成游戏侧 build(...) 的参数。
+   */
+  function toBuildOps(state, opts) {
+    opts = opts || {};
+    var packed = global.RWExport.blueprintEntries(state, opts);
+
+    var floorsByDef = {};   // defName -> [[x,z]]
+    var thingsByKey = {};   // defName|stuff|rot -> {def, stuff, rot, cells:[]}
+    var singles = [];       // 多格建筑：只能逐件放，保持游戏 Position
+
+    packed.entries.forEach(function (e) {
+      if (e.terrain) {
+        (floorsByDef[e.terrain] = floorsByDef[e.terrain] || []).push([e.x, e.z]);
+        return;
+      }
+      var def = defByGameName(e.defName);
+      var fp = def ? global.RW.footprint(def, (e.rot || 0) * 90) : [1, 1];
+      if (fp[0] === 1 && fp[1] === 1) {
+        var key = e.defName + '|' + (e.stuff || '') + '|' + (e.rot || 0);
+        var box = thingsByKey[key];
+        if (!box) box = thingsByKey[key] = { def: e.defName, stuff: e.stuff, rot: e.rot || 0, cells: [] };
+        box.cells.push([e.x, e.z]);
+      } else {
+        singles.push({ kind: layerOf(def), op: withStuff({ def: e.defName, x: e.x, z: e.z, rot: e.rot || 0 }, e.stuff) });
+      }
+    });
+
+    function withStuff(op, stuff) {
+      if (stuff) op.stuff = stuff;
+      return op;
+    }
+
+    var ops = [];
+
+    // 1) 地板：整片地板合并成矩形
+    Object.keys(floorsByDef).forEach(function (name) {
+      toRects(floorsByDef[name]).forEach(function (r) {
+        if (r[0] === r[2] && r[1] === r[3]) ops.push({ def: name, x: r[0], z: r[1] });
+        else ops.push({ def: name, fill: 'filled', minX: r[0], minZ: r[1], maxX: r[2], maxZ: r[3] });
+      });
+    });
+
+    // 2) 单格建筑：按层排序（电缆 → 其他 → 门），同层内按 def 合并
+    var groups = Object.keys(thingsByKey).map(function (k) { return thingsByKey[k]; });
+    groups.sort(function (a, b) {
+      return layerOf(defByGameName(a.def)) - layerOf(defByGameName(b.def)) ||
+        (a.def < b.def ? -1 : a.def > b.def ? 1 : 0);
+    });
+    groups.forEach(function (g) {
+      toRects(g.cells).forEach(function (r) {
+        var op;
+        if (r[0] === r[2] && r[1] === r[3]) {
+          op = withStuff({ def: g.def, x: r[0], z: r[1] }, g.stuff);
+        } else {
+          op = withStuff({ def: g.def, fill: 'filled', minX: r[0], minZ: r[1], maxX: r[2], maxZ: r[3] }, g.stuff);
+        }
+        if (g.rot) op.rot = g.rot;
+        ops.push(op);
+      });
+    });
+
+    // 3) 多格建筑（床/桌子/装配台）：一件一次调用
+    singles.sort(function (a, b) { return a.kind - b.kind; });
+    singles.forEach(function (s) { ops.push(s.op); });
+
+    var cellCount = 0;
+    ops.forEach(function (op) {
+      if (op.fill) cellCount += (op.maxX - op.minX + 1) * (op.maxZ - op.minZ + 1);
+      else cellCount += 1;
+    });
+
+    return {
+      ops: ops,
+      stats: {
+        ops: ops.length,
+        cells: cellCount,
+        floors: packed.entries.filter(function (e) { return !!e.terrain; }).length,
+        things: packed.entries.filter(function (e) { return !e.terrain; }).length,
+        lockedSkipped: packed.lockedSkipped,
+        skipped: packed.skipped
+      }
+    };
+  }
+
+  global.RWBuild = { toBuildOps: toBuildOps, toRects: toRects, defByGameName: defByGameName };
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+/* ==== js/planimport.js ==== */
+/*
+ * planimport.js —— 把 AI 写的 plan.json 合并到当前工程
+ *
+ * 命令行（tools/plan.js apply）和网页（顶栏「导入 AI 规划」）走的是**同一个函数**。
+ * 这一层必须只有一份实现：坐标翻转、多格建筑锚点、材质、房间温度、撞车检测，
+ * 任何一处两边写法不同，AI 就会在网页里看到和 CLI 不一样的结果。
+ *
+ * 坐标约定：plan.json 里的一切都是**游戏坐标**（x 向右、z 向上），
+ * 内部画布坐标（z 向下）的换算只在这个文件里发生。
+ */
+(function (global) {
+  'use strict';
+
+  var Data = global.RWData;
+
+  function gameDefName(def) { return global.RWExport.gameDefName(def); }
+
+  /** 游戏 defName / 内部 id / 中文名 → 建筑定义 */
+  function resolveDef(name) {
+    if (!name) return null;
+    var byId = Data.byId || {};
+    if (byId[name]) return byId[name];
+    var lower = String(name).toLowerCase();
+    if (byId[lower]) return byId[lower];
+    var hit = null;
+    var ids = Object.keys(byId);
+    for (var i = 0; i < ids.length; i++) {
+      var d = byId[ids[i]];
+      var g = gameDefName(d);
+      if (g && g.toLowerCase() === lower) { hit = d; break; }
+      if (d.name === name) { hit = d; break; }
+    }
+    return hit;
+  }
+
+  /** TerrainDef / 内部地板 id / 中文名 → 地板 id */
+  function resolveFloor(name) {
+    var floors = Data.floorsById || {};
+    if (floors[name]) return name;
+    var lower = String(name).toLowerCase();
+    var ids = Object.keys(floors);
+    for (var i = 0; i < ids.length; i++) {
+      var f = floors[ids[i]];
+      if (String(f.def || '').toLowerCase() === lower) return ids[i];
+      if (String(f.name || '') === name) return ids[i];
+    }
+    return null;
+  }
+
+  // ---------------------------------------------------------------- 宽松 JSON
+  // AI 写的 plan.json 经常带 // 注释或最后多一个逗号。标准 JSON 不允许，
+  // 但这对工作文件没什么意义 —— 先按严格 JSON 读，失败再宽容一次，并给出警告。
+  function stripComments(src) {
+    var out = '', i = 0, inStr = false, esc = false;
+    while (i < src.length) {
+      var c = src.charAt(i), n = src.charAt(i + 1);
+      if (inStr) {
+        out += c;
+        if (esc) esc = false;
+        else if (c === '\\') esc = true;
+        else if (c === '"') inStr = false;
+        i++;
+        continue;
+      }
+      if (c === '"') { inStr = true; out += c; i++; continue; }
+      if (c === '/' && n === '/') {
+        while (i < src.length && src.charAt(i) !== '\n') i++;
+        continue;
+      }
+      if (c === '/' && n === '*') {
+        i += 2;
+        while (i < src.length && !(src.charAt(i) === '*' && src.charAt(i + 1) === '/')) i++;
+        i += 2;
+        continue;
+      }
+      out += c;
+      i++;
+    }
+    return out;
+  }
+
+  function stripTrailingCommas(src) {
+    var out = '', i = 0, inStr = false, esc = false;
+    while (i < src.length) {
+      var c = src.charAt(i);
+      if (inStr) {
+        out += c;
+        if (esc) esc = false;
+        else if (c === '\\') esc = true;
+        else if (c === '"') inStr = false;
+        i++;
+        continue;
+      }
+      if (c === '"') { inStr = true; out += c; i++; continue; }
+      if (c === ',') {
+        var j = i + 1;
+        while (j < src.length && /\s/.test(src.charAt(j))) j++;
+        var nx = src.charAt(j);
+        if (nx === '}' || nx === ']') { i++; continue; }   // 丢掉尾逗号
+      }
+      out += c;
+      i++;
+    }
+    return out;
+  }
+
+  /** @returns {{plan:object, warnings:string[]}} */
+  function parsePlan(text) {
+    var warnings = [];
+    try {
+      return { plan: JSON.parse(text), warnings: warnings };
+    } catch (strictErr) {
+      var cleaned = stripTrailingCommas(stripComments(String(text)));
+      try {
+        var plan = JSON.parse(cleaned);
+        warnings.push('plan.json 不是严格 JSON（有 // 注释或多余的尾逗号），已按宽松模式读取；标准 JSON 不允许这些写法');
+        return { plan: plan, warnings: warnings };
+      } catch (looseErr) {
+        throw new Error('plan.json 解析失败：' + looseErr.message);
+      }
+    }
+  }
+
+  /** 游戏 Position + 朝向 → 画布坐标里多格建筑的最小角 */
+  function gameThingToEditor(state, def, rotDeg, gx, gz) {
+    var RW = global.RW;
+    var fp = RW.footprint(def, rotDeg);
+    var w = fp[0], h = fp[1];
+    var off = RW.anchorOffset((Math.round(rotDeg / 90) % 4 + 4) % 4, w, h);
+    var minX = gx - off.x, minZ = gz - off.z;
+    return {
+      x: state.flipX ? state.cols - 1 - (minX + w - 1) : minX,
+      z: state.flipZ !== false ? state.rows - 1 - (minZ + h - 1) : minZ,
+      w: w, h: h
+    };
+  }
+
+  /** 画布里的建筑 → 游戏 Position（gameThingToEditor 的逆运算） */
+  function editorThingToGame(state, def, rotDeg, ex, ez) {
+    var RW = global.RW;
+    var fp = RW.footprint(def, rotDeg);
+    var w = fp[0], h = fp[1];
+    var minX = state.flipX ? state.cols - 1 - (ex + w - 1) : ex;
+    var minZ = state.flipZ !== false ? state.rows - 1 - (ez + h - 1) : ez;
+    var off = RW.anchorOffset((Math.round(rotDeg / 90) % 4 + 4) % 4, w, h);
+    return { x: minX + off.x, z: minZ + off.z };
+  }
+
+  /** 画布单元格 → 游戏坐标 */
+  function cellToGame(state, x, z) {
+    return {
+      x: state.flipX ? state.cols - 1 - x : x,
+      z: state.flipZ !== false ? state.rows - 1 - z : z
+    };
+  }
+
+  /** 游戏坐标 → 画布单元格（和 cellToGame 同一个公式，互为反函数） */
+  function gameCellToEditor(state, x, z) {
+    return cellToGame(state, x, z);
+  }
+
+  /** 画布矩形 → 游戏坐标矩形（翻转后仍是矩形） */
+  function rectToGame(state, r) {
+    var xa = state.flipX ? state.cols - 1 - r[2] : r[0];
+    var xb = state.flipX ? state.cols - 1 - r[0] : r[2];
+    var za = state.flipZ !== false ? state.rows - 1 - r[3] : r[1];
+    var zb = state.flipZ !== false ? state.rows - 1 - r[1] : r[3];
+    return [Math.min(xa, xb), Math.min(za, zb), Math.max(xa, xb), Math.max(za, zb)];
+  }
+
+  /**
+   * 没指定材质时从库存里挑一个。优先木头/布料，钢和稀有金属留着急用。
+   * 挑不到库存里的，就退回该 def 能接受的最常见材质。
+   */
+  function pickStuff(def, stock) {
+    if (!def || !def.stuffCats || !def.stuffCats.length) return null;
+    var list = Data.stuffsFor ? Data.stuffsFor(def) : [];
+    if (!list || !list.length) return null;
+    var PREF = ['WoodLog', 'Cloth', 'Leather_Plain',
+      'BlocksSandstone', 'BlocksGranite', 'BlocksLimestone', 'BlocksSlate', 'BlocksMarble',
+      'Steel', 'Plasteel', 'Silver', 'Gold', 'Uranium', 'Jade'];
+    function rank(s) {
+      var i = PREF.indexOf(s.def);
+      return i < 0 ? PREF.length + 1 : i;
+    }
+    var owned = list.filter(function (s) { return (stock[s.def] || 0) > 0; })
+      .sort(function (a, b) { return rank(a) - rank(b) || (stock[b.def] || 0) - (stock[a.def] || 0); });
+    if (owned.length) return owned[0].def;
+    var any = list.slice().sort(function (a, b) { return rank(a) - rank(b); });
+    return any[0] ? any[0].def : null;
+  }
+
+  /** 新规划压到了哪些「存档原有」建筑（扩建时最常见：已标拆除但还没拆完） */
+  function findLockedOverlaps(state) {
+    var planCells = {};
+    state.buildings.forEach(function (b) {
+      if (b.src !== 'plan') return;
+      var def = Data.byId[b.defId]; if (!def) return;
+      var fp = global.RW.footprint(def, b.rot);
+      for (var i = 0; i < fp[0]; i++) for (var j = 0; j < fp[1]; j++) {
+        planCells[(b.x + i) + ',' + (b.z + j)] = true;
+      }
+    });
+
+    var out = [];
+    state.buildings.forEach(function (b) {
+      if (!b.locked) return;
+      var def = Data.byId[b.defId]; if (!def) return;
+      var fp = global.RW.footprint(def, b.rot);
+      var hits = 0, cells = 0, i, j;
+      for (i = 0; i < fp[0]; i++) for (j = 0; j < fp[1]; j++) {
+        cells++;
+        if (planCells[(b.x + i) + ',' + (b.z + j)]) hits++;
+      }
+      if (!hits) return;
+      var gp = editorThingToGame(state, def, b.rot, b.x, b.z);
+      out.push({
+        uid: b.uid,
+        def: gameDefName(def) || def.id,
+        name: def.name, x: gp.x, z: gp.z,
+        rot: (Math.round(b.rot / 90) % 4 + 4) % 4,
+        cells: cells, covered: hits
+      });
+    });
+    return out;
+  }
+
+  /**
+   * 把 plan.json 合并进 state。
+   *
+   * 规则（和 CLI 完全一致）：
+   *   - 先撤掉上一次 src === 'plan' 的东西，再重放（幂等，可反复改同一份 plan）
+   *   - 存档带来的建筑带 locked，永远不动；除非 opts.clear 且确实被新规划压到
+   *   - 地板：未锁定的会被重写（lockedFloors 才是存档原有的）
+   *   - roomTemp: [{at:[x,z], c:-10}] 或 { "x,z": -10 }，按游戏坐标给整间房设温度
+   *
+   * @returns {{errors:Array, warnings:Array, replaced:Object, applied:Object,
+   *            stuffAssumed:Object, demolish:Array, cleared:number, roomTemp:Array}}
+   */
+  function apply(state, plan, opts) {
+    opts = opts || {};
+    var autoStuff = opts.autoStuff !== false;
+    var stock = (state.saveInfo && state.saveInfo.resources) || {};
+
+    var errors = [], warnings = [], stuffAssumed = {};
+
+    var before = state.buildings.length;
+    state.buildings = state.buildings.filter(function (b) { return b.src !== 'plan'; });
+    var removed = before - state.buildings.length;
+
+    var removedFloors = 0;
+    Object.keys(state.floors).forEach(function (k) {
+      if (!(state.lockedFloors && state.lockedFloors[k])) { delete state.floors[k]; removedFloors++; }
+    });
+
+    var materials = plan.materials || {};
+    var usedMat = {};
+    var usedDefs = {};
+    var matWarned = {};
+    var added = 0;
+
+    (plan.buildings || []).forEach(function (b, i) {
+      var name = b.def || b.defId;
+      var def = resolveDef(name);
+      if (!def) {
+        errors.push({ at: 'buildings[' + i + ']', msg: '不认识的建筑：' + name });
+        return;
+      }
+      var rot = b.rot == null ? 0 : (((b.rot | 0) % 4) + 4) % 4;
+      var rotDeg = def.rotatable === false ? 0 : rot * 90;
+      var gx = b.x, gz = b.z;
+      if (!Number.isFinite(gx) || !Number.isFinite(gz)) {
+        errors.push({ at: 'buildings[' + i + ']', msg: 'x/z 必须是数字' });
+        return;
+      }
+      var ed = gameThingToEditor(state, def, rotDeg, gx, gz);
+      if (ed.x < 0 || ed.z < 0 || ed.x + ed.w > state.cols || ed.z + ed.h > state.rows) {
+        errors.push({ at: 'buildings[' + i + ']', msg: name + ' 在 (' + gx + ',' + gz + ') 超出地图范围' });
+        return;
+      }
+      var matKey = null;
+      var stuff = b.stuff || null;
+      if (!stuff && materials[name] != null) { stuff = materials[name]; matKey = name; }
+      else if (!stuff && materials[def.id] != null) { stuff = materials[def.id]; matKey = def.id; }
+      if (matKey) {
+        usedMat[matKey] = true;
+        if ((!def.stuffCats || !def.stuffCats.length) && !matWarned[matKey]) {
+          matWarned[matKey] = true;
+          warnings.push('"' + matKey + '" 不能换材质（' + def.name + '），materials 里给它的材质会被忽略');
+        }
+      }
+      usedDefs[gameDefName(def) || name] = true;
+      if (!stuff && autoStuff) {
+        stuff = pickStuff(def, stock);
+        if (stuff) stuffAssumed[gameDefName(def) || name] = stuff;
+      }
+      state.buildings.push({
+        uid: state.nextUid++, defId: def.id, x: ed.x, z: ed.z, rot: rotDeg,
+        color: null, stuff: stuff, bedMode: b.bedMode || null, src: 'plan'
+      });
+      added++;
+    });
+
+    Object.keys(plan.floors || {}).forEach(function (key) {
+      var p = key.split(',');
+      var gx = +p[0], gz = +p[1];
+      var floorId = resolveFloor(plan.floors[key]);
+      if (!floorId) { errors.push({ at: 'floors["' + key + '"]', msg: '不认识的地板：' + plan.floors[key] }); return; }
+      var ed = gameCellToEditor(state, gx, gz);
+      var ex = ed.x, ez = ed.z;
+      if (ex < 0 || ez < 0 || ex >= state.cols || ez >= state.rows) {
+        errors.push({ at: 'floors["' + key + '"]', msg: '超出地图范围' });
+        return;
+      }
+      var ek = ex + ',' + ez;
+      if (state.lockedFloors && state.lockedFloors[ek]) { warnings.push('地板 ' + key + ' 是存档原有的（锁定），跳过'); return; }
+      state.floors[ek] = floorId;
+    });
+
+    // ---- 和存档原有建筑撞车 ----
+    var demolish = findLockedOverlaps(state);
+    var clearUids = {};
+    demolish.forEach(function (d) { clearUids[d.uid] = true; delete d.uid; });
+
+    var cleared = 0;
+    if (opts.clear && demolish.length) {
+      state.buildings = state.buildings.filter(function (b) { return !clearUids[b.uid]; });
+      cleared = demolish.length;
+    } else if (demolish.length) {
+      warnings.push('新规划和 ' + demolish.length + ' 个存档原有建筑重叠：先拆掉它们，或选择「无视旧建筑」');
+    }
+
+    // ---- 房间目标温度 ----
+    var tempSpecs = [];
+    if (Array.isArray(plan.roomTemp)) {
+      plan.roomTemp.forEach(function (t, i) {
+        var at = t.at || [t.x, t.z];
+        if (!Array.isArray(at) || at.length < 2) { errors.push({ at: 'roomTemp[' + i + ']', msg: '要写 at:[x,z]' }); return; }
+        tempSpecs.push({ at: [+at[0], +at[1]], c: t.c != null ? Number(t.c) : (t.temp != null ? Number(t.temp) : null) });
+      });
+    } else if (plan.roomTemp && typeof plan.roomTemp === 'object') {
+      Object.keys(plan.roomTemp).forEach(function (k) {
+        var p = k.split(',');
+        tempSpecs.push({ at: [+p[0], +p[1]], c: Number(plan.roomTemp[k]) });
+      });
+    }
+
+    var roomsApplied = [];
+    if (tempSpecs.length) {
+      var rooms = (global.RWChecks.analyse(state).rooms) || [];
+      tempSpecs.forEach(function (spec) {
+        var ed = cellToGame(state, spec.at[0], spec.at[1]);
+        var room = rooms.filter(function (r) {
+          return Array.isArray(r.cells) && r.cells.some(function (c) { return c[0] === ed.x && c[1] === ed.z; });
+        })[0];
+        if (!room) {
+          warnings.push('目标温度：(' + spec.at[0] + ',' + spec.at[1] + ') 不在任何封闭房间里（还没围起来？）');
+          return;
+        }
+        var c = (spec.c == null || !isFinite(spec.c) || spec.c === 21) ? null
+          : Math.max(-60, Math.min(60, Math.round(spec.c)));
+        room.cells.forEach(function (cell) {
+          var k = cell[0] + ',' + cell[1];
+          if (c == null) delete state.roomTemp[k]; else state.roomTemp[k] = c;
+        });
+        roomsApplied.push({ at: spec.at, c: c, area: room.area });
+      });
+    }
+
+    // materials 的 key 写错（比如用了 GrayWall 却写 "Wall"）时不会报错，只会静默退回自动选材。
+    // 这会让「我明明指定了木头」和实际材质对不上，所以明确提示。
+    var unusedMat = Object.keys(materials).filter(function (k) { return !usedMat[k]; });
+    if (unusedMat.length) {
+      warnings.push('materials 里的 ' + unusedMat.map(function (k) { return '"' + k + '"'; }).join('、') +
+        ' 没有对应的建筑（这次用的是 ' + Object.keys(usedDefs).join('、') +
+        '）。material 的 key 要写建筑的 defName');
+    }
+
+    state.mapName = plan.name || state.mapName;
+
+    return {
+      errors: errors, warnings: warnings,
+      replaced: { buildings: removed, floors: removedFloors },
+      applied: { buildings: added, floors: Object.keys(plan.floors || {}).length },
+      stuffAssumed: stuffAssumed,
+      demolish: demolish,
+      cleared: cleared,
+      roomTemp: roomsApplied
+    };
+  }
+
+  global.RWPlanImport = {
+    apply: apply,
+    parsePlan: parsePlan,
+    resolveDef: resolveDef,
+    resolveFloor: resolveFloor,
+    gameThingToEditor: gameThingToEditor,
+    editorThingToGame: editorThingToGame,
+    cellToGame: cellToGame,
+    gameCellToEditor: gameCellToEditor,
+    rectToGame: rectToGame,
+    pickStuff: pickStuff,
+    findLockedOverlaps: findLockedOverlaps
+  };
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+/* ==== js/brief.js ==== */
+/*
+ * brief.js —— 「基地简报」：给没有存档访问权的 AI 看的一份精确快照
+ *
+ * 用途：玩家在网页里点「导出 AI 简报」，把文件贴给聊天 AI；AI 据此写 plan.json，
+ * 玩家再「导入 AI 规划」合并回来。
+ *
+ * 精确度原则：
+ *   1. 全部用**游戏坐标**（x 右、z 上），和存档 / build(x,z) / plan.json 一致。
+ *   2. 玩家正在看的区域给**逐格**数据（默认 1 格 1 字符）＋ 精确的障碍矩形；
+ *      区域外用粗粒度总览，明确标注「这里只是统计，别在这里下细活」。
+ *   3. 地形按游戏 affordance 分五类，写清楚每一类能干什么：
+ *        heavy  可承重（墙、家具、任何东西）
+ *        light  只能铺地板/轻建筑，墙会倒
+ *        water  没有可建造 affordance，要先铺桥
+ *        rock   山体/矿石，要先开采
+ *        none   其他（不可建）
+ *   4. 库存写明范围（玩家区域 / 全地图），科技写清「已完成」和「当前研究」。
+ *   5. 带 tick：AI 和玩家都能知道这份简报基于哪一版存档。
+ */
+(function (global) {
+  'use strict';
+
+  var Data = global.RWData;
+  var PI = global.RWPlanImport;
+
+  var RANK = { ' ': 0, '.': 1, ',': 1, ':': 1, o: 2, '0': 2, '+': 3, '&': 3, '#': 4, '%': 4, '~': 5, '^': 6 };
+
+  var CLASS_DEF = {
+    heavy: '可承重：墙 / 家具 / 任何建筑',
+    light: '只吃 Light：木墙/木家具可以，石头/钢/玻璃钢要 Heavy；浅水要铺桥，沼泽要垫地基（看 def 列）',
+    water: '深水：没有任何可建造 affordance，要先铺桥',
+    rock: '山体 / 矿石：要先开采',
+    none: '其他不可建格'
+  };
+
+  function clampRect(state, r) {
+    var x0 = Math.max(0, Math.min(state.cols - 1, Math.floor(r[0])));
+    var z0 = Math.max(0, Math.min(state.rows - 1, Math.floor(r[1])));
+    var x1 = Math.max(0, Math.min(state.cols - 1, Math.floor(r[2])));
+    var z1 = Math.max(0, Math.min(state.rows - 1, Math.floor(r[3])));
+    if (x1 < x0) { var t = x0; x0 = x1; x1 = t; }
+    if (z1 < z0) { t = z0; z0 = z1; z1 = t; }
+    return [x0, z0, x1, z1];
+  }
+
+  /**
+   * 编辑器坐标 → {cls, def}
+   * 先看游戏的 terrainAffordance，再看 isWater：
+   * 沼泽也标着 isWater，但它有 Light —— 应该算「撑不住墙的软地」，不是「要铺桥的水面」。
+   */
+  function terrainInfoAt(editorX, editorZ) {
+    var Site = global.RWSite;
+    var rk = Site.rockAt(editorX, editorZ);
+    if (rk) return { cls: 'rock', def: rk.def };
+    var t = Site.terrainAt(editorX, editorZ);
+    if (!t) return { cls: 'none', def: null };
+    var aff = t.aff || [];
+    if (aff.indexOf('Heavy') >= 0) return { cls: 'heavy', def: t.def };
+    if (aff.indexOf('Light') >= 0) return { cls: 'light', def: t.def };
+    if (t.isWater) return { cls: 'water', def: t.def };
+    return { cls: 'none', def: t.def };
+  }
+
+  function terrainClassAt(editorX, editorZ) { return terrainInfoAt(editorX, editorZ).cls; }
+
+  /** 玩家区域包围盒（编辑器坐标）。没有就返回 null */
+  function homeBBox(state) {
+    var home = state.home;
+    if (!home || !home.cells || !home.w || !home.h) return null;
+    var w = home.w, h = home.h, cells = home.cells;
+    var minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity;
+    for (var z = 0; z < h; z++) {
+      for (var x = 0; x < w; x++) {
+        if (!cells[z * w + x]) continue;
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (z < minZ) minZ = z;
+        if (z > maxZ) maxZ = z;
+      }
+    }
+    return isFinite(minX) ? [minX, minZ, maxX, maxZ] : null;
+  }
+
+  /** 编辑器包围盒 → 游戏坐标包围盒 */
+  function bboxToGame(state, b) {
+    var a = PI.cellToGame(state, b[0], b[1]);
+    var c = PI.cellToGame(state, b[2], b[3]);
+    return [Math.min(a.x, c.x), Math.min(a.z, c.z), Math.max(a.x, c.x), Math.max(a.z, c.z)];
+  }
+
+  /** 每格的建筑字符（游戏坐标），一次遍历，避免逐格换算 */
+  function buildingLayer(state) {
+    var map = {};
+    state.buildings.forEach(function (b) {
+      var def = Data.byId[b.defId]; if (!def) return;
+      var fp = global.RW.footprint(def, b.rot);
+      var set = b.locked ? { wall: '%', door: '&', thing: '0' } : { wall: '#', door: '+', thing: 'o' };
+      var tags = def.tags || [];
+      var ch = tags.indexOf('door') >= 0 ? set.door : (tags.indexOf('solid') >= 0 ? set.wall : set.thing);
+      for (var i = 0; i < fp[0]; i++) for (var j = 0; j < fp[1]; j++) {
+        var g = PI.cellToGame(state, b.x + i, b.z + j);
+        map[g.x + ',' + g.z] = { ch: ch, locked: !!b.locked, name: def.name };
+      }
+    });
+    Object.keys(state.floors).forEach(function (k) {
+      var p = k.split(',');
+      var g = PI.cellToGame(state, +p[0], +p[1]);
+      var locked = !!(state.lockedFloors && state.lockedFloors[k]);
+      var cell = map[g.x + ',' + g.z];
+      if (!cell) map[g.x + ',' + g.z] = { ch: locked ? ',' : '.', locked: locked };
+    });
+    return map;
+  }
+
+  /**
+   * 游戏坐标矩形内，逐类障碍的精确矩形。
+   * 只收集 region 里的格子，所以结果天然被裁剪在区域内。
+   */
+  function blockersInRegion(state, region) {
+    var groups = {};   // "kind|def" -> {kind, def, cells}
+    for (var gz = region[1]; gz <= region[3]; gz++) {
+      for (var gx = region[0]; gx <= region[2]; gx++) {
+        var e = PI.gameCellToEditor(state, gx, gz);
+        var info = terrainInfoAt(e.x, e.z);
+        if (info.cls === 'heavy') continue;
+        var key = info.cls + '|' + (info.def || '');
+        var g = groups[key] || (groups[key] = { kind: info.cls, def: info.def, cells: [] });
+        g.cells.push([e.x, e.z]);
+      }
+    }
+    var out = [];
+    Object.keys(groups).forEach(function (key) {
+      var g = groups[key];
+      global.RWBuild.toRects(g.cells).forEach(function (r) {
+        var gg = PI.rectToGame(state, r);
+        out.push({ kind: g.kind, def: g.def, x0: gg[0], z0: gg[1], x1: gg[2], z1: gg[3] });
+      });
+    });
+    return out;
+  }
+
+  /** 全区统计（分类计数） */
+  function wholeCounts(state) {
+    var counts = { heavy: 0, light: 0, water: 0, rock: 0, none: 0 };
+    for (var z = 0; z < state.rows; z++) {
+      for (var x = 0; x < state.cols; x++) counts[terrainClassAt(x, z)]++;
+    }
+    return counts;
+  }
+
+  /**
+   * 区域 ASCII（游戏坐标）。
+   * step > 1 时块内取优先级最高的字符（岩 > 水 > 墙 > 门 > 建筑 > 地板），偏保守。
+   */
+  function regionAscii(state, region, step, bLayer) {
+    step = Math.max(1, step | 0);
+    var lines = [];
+    var width = region[2] - region[0] + 1;
+
+    for (var gz = region[3]; gz >= region[1]; gz -= step) {
+      var line = '';
+      for (var gx = region[0]; gx <= region[2]; gx += step) {
+        var best = ' ', bestRank = -1;
+        for (var dz = 0; dz < step; dz++) {
+          for (var dx = 0; dx < step; dx++) {
+            var x = gx + dx, z = gz - dz;
+            if (z < region[1] || x > region[2]) continue;
+            var cell = bLayer[x + ',' + z];
+            var ch = cell ? cell.ch : null;
+            if (!ch) {
+              var e = PI.gameCellToEditor(state, x, z);
+              var info = terrainInfoAt(e.x, e.z);
+              ch = info.cls === 'rock' ? '^' : info.cls === 'water' ? '~' : info.cls === 'light' ? ':' : info.cls === 'none' ? '!' : ' ';
+            }
+            var rk = RANK[ch] == null ? 0 : RANK[ch];
+            if (rk > bestRank) { best = ch; bestRank = rk; }
+          }
+        }
+        line += best;
+      }
+      lines.push(line.replace(/\s+$/, ''));
+    }
+
+    // 坐标标尺：左边 z，上方 x
+    var gutter = String(region[3]).length + 1;
+    var tickEvery = Math.max(1, Math.round(10 / step));
+    var head = ' '.repeat(gutter);
+    for (var c = 0; c < Math.ceil(width / step); c++) head += (c % tickEvery === 0) ? '|' : ' ';
+    var nums = ' '.repeat(gutter) + Array.from({ length: Math.ceil(width / step) }, function (_, i) {
+      if (i % tickEvery) return ' ';
+      var label = String(region[0] + i * step);
+      return label.length <= tickEvery ? label.padEnd(tickEvery, ' ') : label.slice(0, tickEvery);
+    }).join('').replace(/\s+$/, '');
+    var body = lines.map(function (line, i) {
+      var z = region[3] - i * step;
+      return String(z).padStart(gutter - 1, ' ') + ' ' + line;
+    });
+    return [head.replace(/\s+$/, ''), nums].concat(body);
+  }
+
+  function defRow(def) {
+    var g = global.RWExport.gameDefName(def);
+    if (!g) return null;
+    var size = Array.isArray(def.size) ? def.size.join('×') : '1×1';
+    var cost = '';
+    if (def.cost) {
+      cost = Object.keys(def.cost).map(function (k) { return k + ':' + def.cost[k]; }).join(',');
+    }
+    if (def.costStuff) cost += (cost ? ',' : '') + 'stuff×' + def.costStuff;
+    var power = '';
+    if (def.powerUse) power = '-' + def.powerUse;
+    else if (def.powerGen) power = '+' + def.powerGen;
+    else if (def.powerStore) power = '=' + def.powerStore;
+    return {
+      def: g, name: def.name, cat: def.cat, size: size,
+      rot: def.rotatable === false ? 'no' : 'yes',
+      stuff: (def.stuffCats || []).join('/'),
+      terrain: def.aff || '',
+      power: power,
+      cost: cost,
+      research: (def.research || []).join(',')
+    };
+  }
+
+  /**
+   * @param {object} state
+   * @param {object} [opts] {rect:[x0,z0,x1,z1] 游戏坐标, pad:8, maxWidth:160}
+   */
+  function build(state, opts) {
+    opts = opts || {};
+    var pad = opts.pad == null ? 8 : opts.pad;
+    var maxWidth = opts.maxWidth || 160;
+
+    // ---- 区域：优先用调用方给的（网页传当前视口），否则玩家区域 + pad，再否则全图 ----
+    var rect = null;
+    var regionSource = opts.source || 'viewport';
+    if (opts.rect) {
+      rect = clampRect(state, opts.rect);
+      regionSource = 'viewport';
+    } else {
+      var home = homeBBox(state);
+      if (home) {
+        rect = clampRect(state, [home[0] - pad, home[1] - pad, home[2] + pad, home[3] + pad]);
+        var g = bboxToGame(state, rect);
+        rect = clampRect(state, g);
+        regionSource = 'home';
+      } else {
+        rect = [0, 0, state.cols - 1, state.rows - 1];
+        regionSource = 'whole-map';
+      }
+    }
+
+    var width = rect[2] - rect[0] + 1;
+    var step = Math.max(1, Math.ceil(width / maxWidth));
+
+    var bLayer = buildingLayer(state);
+    var regionCounts = { heavy: 0, light: 0, water: 0, rock: 0, none: 0 };
+    for (var gz = rect[1]; gz <= rect[3]; gz++) {
+      for (var gx = rect[0]; gx <= rect[2]; gx++) {
+        var e = PI.gameCellToEditor(state, gx, gz);
+        regionCounts[terrainClassAt(e.x, e.z)]++;
+      }
+    }
+
+    var lockedCount = 0, lockedInRegion = 0;
+    var eb = [Infinity, Infinity, -Infinity, -Infinity];
+    state.buildings.forEach(function (b) {
+      if (!b.locked) return;
+      lockedCount++;
+      var def = Data.byId[b.defId]; if (!def) return;
+      var fp = global.RW.footprint(def, b.rot);
+      var a = PI.cellToGame(state, b.x, b.z);
+      var c = PI.cellToGame(state, b.x + fp[0] - 1, b.z + fp[1] - 1);
+      var x0 = Math.min(a.x, c.x), x1 = Math.max(a.x, c.x);
+      var z0 = Math.min(a.z, c.z), z1 = Math.max(a.z, c.z);
+      eb[0] = Math.min(eb[0], x0); eb[1] = Math.min(eb[1], z0);
+      eb[2] = Math.max(eb[2], x1); eb[3] = Math.max(eb[3], z1);
+      if (!(x1 < rect[0] || x0 > rect[2] || z1 < rect[1] || z0 > rect[3])) lockedInRegion++;
+    });
+
+    var colonists = ((state.saveInfo && state.saveInfo.pawns) || [])
+      .filter(function (p) { return !p.dead; })
+      .map(function (p) {
+        var s = p.skills || {};
+        function lv(k) { return s[k] ? s[k].level : null; }
+        return { name: p.name, construction: lv('Construction'), mining: lv('Mining'), intellectual: lv('Intellectual') };
+      });
+
+    var research = (state.saveInfo && state.saveInfo.research) || null;
+    var completed = [];
+    if (research && research.progress) {
+      completed = Object.keys(research.progress).filter(function (d) {
+        return Data.researchDone ? Data.researchDone(research, d) : false;
+      }).map(function (d) {
+        var r = Data.research ? Data.research(d) : null;
+        return r ? (r.name || d) : d;
+      });
+    }
+
+    var stockObj = (state.saveInfo && state.saveInfo.resources) || {};
+    var stock = Object.keys(stockObj)
+      .sort(function (a, b) { return stockObj[b] - stockObj[a]; })
+      .map(function (k) { return { def: k, n: stockObj[k] }; });
+
+    var defs = [];
+    Object.keys(Data.byId).sort().forEach(function (id) {
+      var row = defRow(Data.byId[id]);
+      if (row) defs.push(row);
+    });
+
+    return {
+      briefVersion: 1,
+      planFormat: 1,
+      tool: 'rimworld-planner',
+      generatedAt: new Date().toISOString(),
+      save: {
+        colony: (state.saveInfo && state.saveInfo.colonyName) || '',
+        project: state.mapName || '',
+        tick: (state.saveInfo && state.saveInfo.tick) || 0,
+        gameVersion: (state.saveInfo && state.saveInfo.version) || '',
+        difficulty: (state.saveInfo && state.saveInfo.difficulty) || ''
+      },
+      map: {
+        w: state.cols, h: state.rows,
+        coord: 'x 向右为 +x，z 向上为 +z；和存档 / build(x,z) / plan.json 完全一致'
+      },
+      region: {
+        source: regionSource,
+        rect: rect,
+        step: step,
+        note: step > 1
+          ? '每字符代表 ' + step + '×' + step + ' 格；块内任一是岩/水/墙就按那个标（偏保守），下笔前用 rects 精确核对'
+          : '逐格：1 字符 = 1 格'
+      },
+      terrain: {
+        classDef: CLASS_DEF,
+        regionCounts: regionCounts,
+        wholeCounts: wholeCounts(state),
+        rects: blockersInRegion(state, rect)
+      },
+      ascii: {
+        legend: {
+          ' ': '可承重空地', ':': 'Light 地形（软地/沼泽/浅水，看 rects 的 def）', '^': '山体/矿石（要挖）',
+          '~': '水（要桥）', '!': '不可建',
+          '#': '新规划·墙', '+': '新规划·门', 'o': '新规划·其他建筑', '.': '新规划·地板',
+          '%': '存档原有·墙', '&': '存档原有·门', '0': '存档原有·建筑', ',': '存档原有·地板'
+        },
+        lines: regionAscii(state, rect, step, bLayer)
+      },
+      existing: {
+        count: lockedCount,
+        inRegion: lockedInRegion,
+        bbox: isFinite(eb[0]) ? eb : null
+      },
+      colonists: colonists,
+      research: {
+        current: research ? research.current : null,
+        currentProgress: research && research.current ? (research.progress[research.current] || 0) : 0,
+        currentCost: research && research.current && Data.research(research.current)
+          ? Data.research(research.current).cost : null,
+        completed: completed
+      },
+      stock: {
+        scope: state.useHomeStock === false ? 'all' : 'home',
+        note: state.useHomeStock === false ? '全地图库存' : '玩家区域内库存（默认）',
+        items: stock
+      },
+      defs: defs,
+      rules: [
+        '门要留在墙的缺口里，不要和墙同一格',
+        '地图最外圈 1 格不可建造（x=0 / x=' + (state.cols - 1) + ' / z=0 / z=' + (state.rows - 1) +
+          '）。这是**地图边界**，不是本简报的区域边界，别混',
+        '地形要求由**材质**决定：木墙/木家具只要 light 就够；石头/钢/玻璃钢要 heavy。' +
+          'light 里的浅水要铺桥、沼泽要垫地基；water（深水）什么墙都放不了；rock 要先开采',
+        '跨格建筑不能重叠。例外：电缆可埋墙下；壁灯 / 壁挂火把可以贴墙共存；' +
+          '制冷机、通风格栅、被动散热器会**占掉**那格墙',
+        '房间必须能走进去，否则房间判定 / 温控 / 空间评分都不成立',
+        '电力按 6 格连接，但至少一端要是输电建筑（电缆/开关/发电机/电池）；两个纯用电器不会自动连',
+        '制冷机台数 ≈ ceil(面积 × 温差 ÷ 630)；冷冻库要在 plan.json 里写 roomTemp',
+        'planner 不校验交互格 / 使用区 / 风道，见下面的「摆放注意」'
+      ],
+      placement: [
+        '制冷机 / 加热器：rot 决定冷端朝向；冷端朝室内，冷热两端格都不能堵。制冷机自己就是那格墙',
+        '壁灯 / 壁挂火把：真正贴在墙上，不占墙格',
+        '马蹄铁 / 电视 / 台球桌：要有使用区（watch area），至少一侧留空；电视要椅子或床朝向它',
+        '象棋桌 / 餐桌：要配套座位（椅子/凳子），座位朝桌子，别把座位堵死',
+        '风力发电机：前后风道不能有建筑、山体或高墙遮挡',
+        '太阳能板：不能有屋顶或遮挡，别贴着高墙',
+        '工作台 / 研究台：交互格（通常正面一格）要留空；高级研究台旁边要留多分析仪的位置',
+        '医疗床：旁边要留生命维持仪的位置；床两侧要能走',
+        '门：两侧都要能通行，别对着墙；自动门还要接电',
+        '陷阱：放在敌人必经的通道，别放在殖民者每天必经的路上',
+        '电池：接进同一张电网，别孤网空转',
+        '冷库：制冷机热端朝室外或大空间，否则等于给隔壁房间加热',
+        '地板不是必须的：不保温，只影响美观 / 清洁 / 移速。冷库、工坊可以不铺；木地板还会烧'
+      ],
+      questions: [
+        '这个空间给谁用？住几个人、要几张床（单人还是双人）？',
+        '需要哪些功能间：卧室 / 厨房+冷库 / 工坊 / 研究室 / 餐厅 / 娱乐 / 医务 / 监狱 / 畜栏？',
+        '预算和材料：木头、石头、钢各有多少？优先用哪种？要不要铺地板（不保温，只影响美观/清洁）？',
+        '科技到哪一步：有没有电力、自动门、太阳能、空调、机枪塔？',
+        '防御要做到什么程度：围墙 / 沙袋 / 陷阱 / 机枪塔 / 逃生通道？',
+        '位置偏好：贴着现有基地扩建、靠山、靠水，还是独立新建？',
+        '温控要求：卧室 21°C？冷库 -10°C？有没有需要无菌的房间？',
+        '最多占多少格？有没有不能动的东西（电缆、矿脉、遗迹、树）？'
+      ]
+    };
+  }
+
+  // ---------------------------------------------------------------- markdown
+  function md(b) {
+    var L = [];
+    function p(s) { L.push(s == null ? '' : s); }
+
+    p('# RimWorld 基地简报（给 AI）');
+    p('');
+    p('> 这是玩家存档的一份**精确快照**。请据此输出 `plan.json`，不要凭空猜地形或库存。');
+    p('> 生成时间：' + b.generatedAt + '　存档 tick：' + b.save.tick +
+      '　殖民地名：' + (b.save.colony || '（存档没记）') +
+      '　工程名：' + (b.save.project || '（未命名）') +
+      '　版本：' + (b.save.gameVersion || '?'));
+    p('');
+    p('## 0. 开工前先问清楚（不要直接开干）');
+    p('');
+    p('如果玩家只说了「造个房子 / 造个基地」这种程度，**先问完下面这几条再写 plan.json**。');
+    p('问的时候一次问 3–4 条，别一口气甩 8 个问题。');
+    p('');
+    b.questions.forEach(function (q, i) { p((i + 1) + '. ' + q); });
+    p('');
+    p('拿不准就按保守值做，并在方案里标出「这里我假设了 X」。');
+    p('');
+    p('## 1. 坐标与区域');
+    p('');
+    p('- 地图：' + b.map.w + ' × ' + b.map.h + '　' + b.map.coord);
+    p('- 本简报的细区：`[' + b.region.rect.join(', ') + ']`（x0,z0,x1,z1，含端点），来源：' +
+      (b.region.source === 'selection' ? '**玩家框选的区域**' :
+       b.region.source === 'rect' ? '命令行指定的区域' :
+       b.region.source === 'home' ? '玩家活动区域 + 边距' :
+       b.region.source === 'viewport' ? '玩家当前视口' : '整张地图'));
+    p('- 这个矩形就是本简报的**全部细粒度数据范围**；边界和地图边界无关。' +
+      '地图最外圈 1 格（x=0 / x=' + (b.map.w - 1) + ' / z=0 / z=' + (b.map.h - 1) + '）才不可建造。');
+    p('- ' + b.region.note);
+    p('- 已有的建筑（存档里的）共 **' + b.existing.count + '** 件，其中 **' + b.existing.inRegion +
+      '** 件在本区域里：图上是 `% & 0 ,`，**不要覆盖它们**；区域外的没画。');
+    p('');
+    p('## 2. 地图（游戏坐标，上行是 +z）');
+    p('');
+    p('```');
+    b.ascii.lines.forEach(function (l) { p(l); });
+    p('```');
+    p('');
+    p('图例：' + Object.keys(b.ascii.legend).map(function (k) {
+      return '`' + (k === ' ' ? '␠' : k) + '` ' + b.ascii.legend[k];
+    }).join(' · '));
+    p('');
+    p('## 3. 地形分类（精确）');
+    p('');
+    p('| 类别 | 含义 | 本区域 | 全图 |');
+    p('| --- | --- | ---: | ---: |');
+    ['heavy', 'light', 'water', 'rock', 'none'].forEach(function (k) {
+      p('| `' + k + '` | ' + b.terrain.classDef[k] + ' | ' + b.terrain.regionCounts[k] + ' | ' + b.terrain.wholeCounts[k] + ' |');
+    });
+    p('');
+    p('**区域内障碍的精确矩形**（x0,z0,x1,z1，含端点）。下笔前用这个核对，别只看图：');
+    p('');
+    p('| 类别 | 地形 def | x0 | z0 | x1 | z1 |');
+    p('| --- | --- | ---: | ---: | ---: | ---: |');
+    if (!b.terrain.rects.length) p('| — | | | | | |');
+    b.terrain.rects.forEach(function (r) {
+      p('| `' + r.kind + '` | `' + (r.def || '?') + '` | ' + r.x0 + ' | ' + r.z0 + ' | ' + r.x1 + ' | ' + r.z1 + ' |');
+    });
+    p('');
+    p('## 4. 殖民者与科技');
+    p('');
+    p('| 名字 | 建造 | 采矿 | 智识 |');
+    p('| --- | ---: | ---: | ---: |');
+    b.colonists.forEach(function (c) {
+      p('| ' + c.name + ' | ' + (c.construction == null ? '?' : c.construction) + ' | ' +
+        (c.mining == null ? '?' : c.mining) + ' | ' + (c.intellectual == null ? '?' : c.intellectual) + ' |');
+    });
+    p('');
+    p('- 当前研究：' + (b.research.current
+      ? b.research.current + '（' + Math.round(b.research.currentProgress || 0) + '/' + (b.research.currentCost || '?') + '）'
+      : '无'));
+    p('- 已完成（' + b.research.completed.length + '）：' + (b.research.completed.join('、') || '无'));
+    p('');
+    p('## 5. 库存（精确数量）');
+    p('');
+    p('范围：' + b.stock.note + '。');
+    p('');
+    p('| 物品 | 数量 | 物品 | 数量 |');
+    p('| --- | ---: | --- | ---: |');
+    for (var i = 0; i < b.stock.items.length; i += 2) {
+      var a = b.stock.items[i], c2 = b.stock.items[i + 1];
+      p('| `' + a.def + '` | ' + a.n + ' | ' + (c2 ? '`' + c2.def + '` | ' + c2.n : ' | ') + ' |');
+    }
+    p('');
+    p('## 6. 建筑表（写 plan.json 只能用这里的 def）');
+    p('');
+    p('| def | 名称 | 尺寸 | 可旋转 | 可换材质 | 地形要求 | 电 | 造价 | 科技前置 |');
+    p('| --- | --- | --- | --- | --- | --- | ---: | --- | --- |');
+    b.defs.forEach(function (d) {
+      p('| `' + d.def + '` | ' + d.name + ' | ' + d.size + ' | ' + d.rot + ' | ' +
+        (d.stuff || '—') + ' | ' + (d.terrain || '—') + ' | ' + (d.power || '—') + ' | ' +
+        (d.cost || '—') + ' | ' + (d.research || '—') + ' |');
+    });
+    p('');
+    p('> 「地形要求」是不指定材质时的要求。**有材质时按材质算**：木头 = Light，');
+    p('> 钢 = Medium，石头 = Heavy。所以木墙能建在沼泽/软地上，石墙不行。');
+    p('> 像 `WaterproofConduit` 这种要求特殊 affordance 的，只能放在对应地形上（水里）。');
+    p('');
+    p('## 7. plan.json 格式');
+    p('');
+    p('```json');
+    p('{');
+    p('  "name": "基地 v1",');
+    p('  "materials": { "Wall": "WoodLog", "Bed": "Cloth" },');
+    p('  "buildings": [');
+    p('    { "def": "Wall", "x": 100, "z": 100 },');
+    p('    { "def": "Door", "x": 110, "z": 100 },');
+    p('    { "def": "Bed",  "x": 104, "z": 104, "rot": 1 }');
+    p('  ],');
+    p('  "floors": { "100,100": "WoodPlankFloor" },');
+    p('  "roomTemp": [ { "at": [105,105], "c": -10 } ]');
+    p('}');
+    p('```');
+    p('');
+    p('- `def` / `stuff` / 地板名都用**游戏 defName**（上表第一列）。');
+    p('- `rot`：0 北 / 1 东 / 2 南 / 3 西。多格建筑只给 Position（中心锚点，不是左下角）。');
+    p('- `floors` 的 key 是 `"x,z"`，value 是 TerrainDef（如 `WoodPlankFloor`）。**可以为空**：地板不保温，');
+    p('  只影响美观 / 清洁 / 移速；冷库、工坊可以不铺，木地板还会烧。');
+    p('- `materials` 的 key 必须是**你实际用的 defName**（用 `GrayWall` 就写 `GrayWall`）。');
+    p('  写成 `Wall` 不会生效，会静默退回自动选材 —— 导入时会给出警告。');
+    p('- 冷冻库写 `roomTemp`，否则规划器按 21°C 算，不会给数制冷机。');
+    p('- 不写 `stuff` 时，导入会从库存里自动挑（木头/布料优先）；想指定就写 `materials`。');
+    p('');
+    p('## 8. 摆放注意（planner 不校验，放的时候看游戏里的范围提示）');
+    p('');
+    b.placement.forEach(function (x) { p('- ' + x); });
+    p('');
+    p('> 游戏侧的 `list_architect` 会给出每件建筑的 `placement`（交互格、watch area、排烟口、射程）；');
+    p('> 能查就查，查不到就按上面这几条保守留空。');
+    p('');
+    p('## 9. 硬规则');
+    p('');
+    b.rules.forEach(function (r) { p('- ' + r); });
+    p('');
+    p('> 玩家会把你的 plan.json 导入网页，那里会跑一遍校验。带着 `error` 的方案会被退回，');
+    p('> 所以宁可保守：拿不准的格子不要放墙，多留一格通道。');
+    p('');
+
+    return L.join('\n');
+  }
+
+  global.RWBrief = { build: build, toMarkdown: md, terrainClassAt: terrainClassAt };
 })(typeof window !== 'undefined' ? window : globalThis);
 
 </script>
@@ -9208,11 +10585,16 @@ kbd {
     var stEl = doc.getElementsByTagName('storyteller')[0];
     if (stEl) difficulty = textOf(stEl, 'difficulty') || '';
 
+    // 游戏内已过 tick：和 RimMolt 的 get_status.tick 对比就能判断存档新不新
+    var tick = 0;
+    var tickEl = doc.getElementsByTagName('ticksGame')[0];
+    if (tickEl) tick = parseInt((tickEl.textContent || '0').trim(), 10) || 0;
+
     return {
       buildings: found, floors: floors, unknown: unknown, skipped: skipped, onOtherMap: onOtherMap,
       mapSize: mapSize, mapSizes: mapSizes, mapIndex: curIdx, version: version, meta: metaInfo,
       layers: layers, pawns: pawns, research: research, resources: resources,
-      home: home, colonyName: faction.name || '',
+      home: home, colonyName: faction.name || '', tick: tick,
       difficulty: difficulty, factionRefs: Object.keys(faction.refs)
     };
   }
@@ -9320,6 +10702,7 @@ kbd {
       resourcesHome: res.home || {}, resourcesAll: res.all || {},
       hasHome: !!res.hasHome,
       colonyName: result.colonyName || '',
+      tick: result.tick || 0,
       factionRefs: result.factionRefs || []
     };
     if (result.colonyName && (!RW.state.mapName || /未命名/.test(RW.state.mapName))) {
@@ -10169,6 +11552,189 @@ kbd {
   }
   function safeName(s) { return String(s).replace(/[\\/:*?"<>|]/g, '_').slice(0, 60) || 'layout'; }
 
+  /** 当前选中的建筑 + 地板，在画布坐标里的包围盒。没选中返回 null */
+  function selectionBoxEditor() {
+    var minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity;
+    function add(x, z) {
+      if (x < minX) minX = x; if (x > maxX) maxX = x;
+      if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+    }
+    RW.selectedBuildings().forEach(function (b) {
+      var def = Data.byId[b.defId]; if (!def) return;
+      var fp = RW.footprint(def, b.rot);
+      for (var i = 0; i < fp[0]; i++) for (var j = 0; j < fp[1]; j++) add(b.x + i, b.z + j);
+    });
+    RW.selectedFloors().forEach(function (f) {
+      var p = String(f.key).split(',');
+      add(+p[0], +p[1]);
+    });
+    return isFinite(minX) ? [minX, minZ, maxX, maxZ] : null;
+  }
+
+  /**
+   * 导出「基地简报」：优先用**框选区域**（边界明确），没框选就用当前视口。
+   * 不额外加边距 —— 玩家框到哪，简报就到哪。
+   */
+  function doExportBrief() {
+    var PI = global.RWPlanImport, Brief = global.RWBrief;
+    if (!PI || !Brief) { toast('简报模块没加载', true); return; }
+
+    // 优先用「最后一次框选的矩形」——框空地也算；没有再退回选中物体的包围盒
+    var box = null;
+    var br = state.briefRect;
+    if (br) box = [br.x0, br.z0, br.x1, br.z1];
+    else box = selectionBoxEditor();
+
+    var rect, source;
+    if (box) {
+      var a0 = PI.cellToGame(state, box[0], box[1]);
+      var c0 = PI.cellToGame(state, box[2], box[3]);
+      rect = [Math.min(a0.x, c0.x), Math.min(a0.z, c0.z), Math.max(a0.x, c0.x), Math.max(a0.z, c0.z)];
+      source = 'selection';
+    } else {
+      var v = RW.visibleRange();
+      var a = PI.cellToGame(state, v.x0, v.z0);
+      var c = PI.cellToGame(state, Math.max(v.x0, v.x1 - 1), Math.max(v.z0, v.z1 - 1));
+      rect = [Math.min(a.x, c.x), Math.min(a.z, c.z), Math.max(a.x, c.x), Math.max(a.z, c.z)];
+      source = 'viewport';
+    }
+
+    var brief = Brief.build(state, { rect: rect, source: source });
+    var text = Brief.toMarkdown(brief);
+    X.download(safeName(currentName()) + '.brief.md', text, 'text/markdown;charset=utf-8');
+
+    var size = (rect[2] - rect[0] + 1) + '×' + (rect[3] - rect[1] + 1);
+    toast((source === 'selection'
+      ? '已导出简报：框选 ' + size + ' 格'
+      : '未框选，已按当前视口导出 ' + size + ' 格') +
+      '（x ' + rect[0] + '–' + rect[2] + '，z ' + rect[1] + '–' + rect[3] + '），' +
+      Math.round(text.length / 1024) + ' KB');
+  }
+
+  function doImportPlan() { $('filePlan').click(); }
+
+  /** 复制到剪贴板（file:// 下 navigator.clipboard 可能不可用，退回 textarea） */
+  function copyText(text) {
+    function fallback() {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); } catch (e) {}
+      document.body.removeChild(ta);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text).catch(fallback);
+    }
+    fallback();
+    return Promise.resolve();
+  }
+
+  function gameCellsText(cells) {
+    var PI = global.RWPlanImport;
+    var shown = cells.slice(0, 10).map(function (c) {
+      var g = PI.cellToGame(state, c[0], c[1]);
+      return '(' + g.x + ',' + g.z + ')';
+    }).join(' ');
+    return shown + (cells.length > 10 ? ' …共 ' + cells.length + ' 格' : '');
+  }
+
+  /** 生成一段可以直接发回给 AI 的报告 */
+  function buildImportReport(planName, r, issues) {
+    var errs = r.errors.map(function (e) { return e.at + '：' + e.msg; });
+    (issues || []).forEach(function (it) {
+      if (it.level !== 'error' || it.source === 'existing') return;
+      errs.push(it.msg + (it.cells && it.cells.length ? '\n   格子：' + gameCellsText(it.cells) : ''));
+    });
+    var warns = r.warnings.slice();
+    (issues || []).forEach(function (it) {
+      if (it.level === 'warn' && it.source !== 'existing' && warns.length < 8) warns.push(it.msg);
+    });
+
+    var L = [];
+    L.push('【RimWorld planner 导入报告】');
+    L.push('方案：' + (planName || state.mapName || '未命名'));
+    L.push('结果：' + errs.length + ' 个 error' + (warns.length ? ' / ' + warns.length + ' 条 warning' : ''));
+    L.push('');
+    L.push('错误（必须改）：');
+    if (!errs.length) L.push('（无）');
+    errs.forEach(function (e, i) { L.push((i + 1) + '. ' + e); });
+    if (warns.length) {
+      L.push('');
+      L.push('警告（能建但会不舒服，尽量一起改）：');
+      warns.forEach(function (w) { L.push('- ' + w); });
+    }
+    L.push('');
+    L.push('请按上面的错误修改，重新输出**完整**的 plan.json：');
+    L.push('- 标准 JSON：不要 // 注释、不要尾逗号');
+    L.push('- 坐标用游戏坐标；def 用游戏 defName');
+    L.push('- 不要只给改动片段');
+    return L.join('\n');
+  }
+
+  /** 从剪贴板/文本粘贴 plan.json */
+  function doPastePlan() {
+    if (!global.RWPlanImport) { toast('导入模块没加载', true); return; }
+    openText('粘贴 AI 规划', '', function (v) {
+      if (!v || !v.trim()) { toast('还没有内容', true); return; }
+      importPlanText(v);
+    }, '把 AI 回复的 plan.json 整段粘进来（Ctrl+V），然后点「导入」', '导入');
+    try {
+      if (navigator.clipboard && navigator.clipboard.readText) {
+        navigator.clipboard.readText().then(function (txt) {
+          if (txt && !$('ioText').value) $('ioText').value = txt;
+        }).catch(function () {});
+      }
+    } catch (e) {}
+    setTimeout(function () { try { $('ioText').focus(); } catch (e) {} }, 30);
+  }
+
+  /** 导入 AI 写的 plan.json（和命令行 apply 共用 js/planimport.js） */
+  function importPlanText(t) {
+    var PI = global.RWPlanImport;
+    if (!PI) { toast('导入模块没加载', true); return; }
+    var parsed;
+    try { parsed = PI.parsePlan(t); }
+    catch (e) { toast('plan.json 解析失败：' + e.message, true); return; }
+    var plan = parsed.plan;
+
+    var r = PI.apply(state, plan, { autoStuff: true });
+    var issues = [];
+    if (r.applied.buildings || r.applied.floors) {
+      // 走一遍 export/load，触发 reindex / render / change，让房间、校验、面板同步
+      RW.loadProject(RW.exportProject());
+      $('mapName').value = state.mapName;
+      RW.fitContent();
+      updateSaveInfo();
+      try { issues = Checks.analyse(state).issues || []; } catch (e) { issues = []; }
+    }
+
+    var softWarn = parsed.warnings.length ? parsed.warnings[0] : null;
+    var msg = '导入 ' + r.applied.buildings + ' 件建筑、' + r.applied.floors + ' 格地板';
+    if (softWarn) msg += '；' + softWarn;
+    var assumed = Object.keys(r.stuffAssumed).length;
+    if (assumed) msg += '；自动选材质 ' + assumed + ' 种';
+    if (r.demolish.length) msg += '；' + r.demolish.length + ' 处压到存档原有建筑';
+    if (r.roomTemp.length) msg += '；设了 ' + r.roomTemp.length + ' 个房间温度';
+
+    // 应用错误 + 校验 error（存档原有的不算，别让玩家去改遗迹）
+    var errCount = r.errors.length + issues.filter(function (it) {
+      return it.level === 'error' && it.source !== 'existing';
+    }).length;
+
+    if (errCount) {
+      var report = buildImportReport(plan.name, r, issues);
+      openText('导入 AI 规划：' + errCount + ' 个错误', report, function (v) {
+        copyText(v).then(function () { toast('错误信息已复制，发回给 AI 让它改'); });
+      }, '点「复制错误信息」把这段发回给 AI；也可以先自己看一遍', '复制错误信息');
+      toast(msg + '；' + errCount + ' 个错误，见弹窗', true);
+      return;
+    }
+    toast(msg);
+  }
+
   /** 导出 PNG（整个布局）。 */
   function doExportPng() {
     var name = safeName(currentName()) + '.png';
@@ -10186,10 +11752,11 @@ kbd {
     if (!r) { toast('画布上还没有东西可以导出'); return; }
   }
 
-  function openText(title, text, onApply, hint) {
+  function openText(title, text, onApply, hint, applyLabel) {
     $('ioTitle').textContent = title;
     $('ioHint').textContent = hint || '';
     $('ioText').value = text || '';
+    $('ioApply').textContent = applyLabel || '应用';
     $('ioModal').classList.add('show');
     $('ioApply').onclick = function () {
       var v = $('ioText').value;
@@ -10835,6 +12402,14 @@ kbd {
     $('btnExportBpDir').onclick = exportBlueprintToFolder;
     $('btnExportJson').onclick = doExportJson;
     if ($('btnExportPng')) $('btnExportPng').onclick = doExportPng;
+  if ($('btnBrief')) $('btnBrief').onclick = doExportBrief;
+  if ($('btnImportPlan')) $('btnImportPlan').onclick = doImportPlan;
+  if ($('btnPastePlan')) $('btnPastePlan').onclick = doPastePlan;
+  if ($('filePlan')) $('filePlan').onchange = function () {
+    var f = this.files[0]; if (!f) return;
+    X.readFile(f).then(importPlanText);
+    this.value = '';
+  };
 
     // 锁定存档原有建筑
     if ($('btnLockSel')) $('btnLockSel').onclick = function () {
@@ -11006,12 +12581,21 @@ kbd {
         return;
       }
       if (k === 'r') { RW.rotateSelection(); updateBrushInfo(); }
-      else if (k === 'escape') { RW.setBrush(null); state.paste = null; updateBrushInfo(); RW.render(); }
+      else if (k === 'escape') {
+      // Esc = 取消当前操作：有笔刷/粘贴时先取消它们；都空着就清掉「AI 简报区域」的框
+      var hadTool = !!state.brush || !!state.paste;
+      RW.setBrush(null); state.paste = null;
+      var hadRect = false;
+      if (!hadTool && state.briefRect) { delete state.briefRect; hadRect = true; }
+      updateBrushInfo(); RW.render();
+      if (hadRect) toast('已清除框选区域');
+    }
       else if (k === 'delete' || k === 'backspace') { RW.deleteSelection(); }
       else if (k === 'f') { RW.fitView(); }
       else if (k === '1') { RW.setTool('place'); updateTools(); }
       else if (k === '2') { RW.setTool('select'); updateTools(); }
       else if (k === '3') { RW.setTool('erase'); updateTools(); }
+    else if (k === '4') { RW.setTool('brief'); updateTools(); }
       else if (k === 'g') { state.layers.grid = !state.layers.grid; $('lyGrid').checked = state.layers.grid; RW.render(); }
       else if (k === 't') { state.layers.terrain = !state.layers.terrain; if ($('lyTerrain')) $('lyTerrain').checked = state.layers.terrain; RW.render(); }
       else if (k === 'b') { state.layers.blocked = !state.layers.blocked; if ($('lyBlocked')) $('lyBlocked').checked = state.layers.blocked; RW.render(); }

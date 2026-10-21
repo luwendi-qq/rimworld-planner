@@ -620,11 +620,16 @@
     var stEl = doc.getElementsByTagName('storyteller')[0];
     if (stEl) difficulty = textOf(stEl, 'difficulty') || '';
 
+    // 游戏内已过 tick：和 RimMolt 的 get_status.tick 对比就能判断存档新不新
+    var tick = 0;
+    var tickEl = doc.getElementsByTagName('ticksGame')[0];
+    if (tickEl) tick = parseInt((tickEl.textContent || '0').trim(), 10) || 0;
+
     return {
       buildings: found, floors: floors, unknown: unknown, skipped: skipped, onOtherMap: onOtherMap,
       mapSize: mapSize, mapSizes: mapSizes, mapIndex: curIdx, version: version, meta: metaInfo,
       layers: layers, pawns: pawns, research: research, resources: resources,
-      home: home, colonyName: faction.name || '',
+      home: home, colonyName: faction.name || '', tick: tick,
       difficulty: difficulty, factionRefs: Object.keys(faction.refs)
     };
   }
@@ -732,6 +737,7 @@
       resourcesHome: res.home || {}, resourcesAll: res.all || {},
       hasHome: !!res.hasHome,
       colonyName: result.colonyName || '',
+      tick: result.tick || 0,
       factionRefs: result.factionRefs || []
     };
     if (result.colonyName && (!RW.state.mapName || /未命名/.test(RW.state.mapName))) {

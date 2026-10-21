@@ -78,7 +78,17 @@
    *     <Name/><Category/><Size/></Blueprint></Blueprint>
    * Rotation 总是写出（整数 0-3），Size 是二维 (w, h)。
    */
-  function toBlueprintsXML(state, opts) {
+  /**
+   * 把工程换算成「游戏坐标 + 朝向」的条目（蓝图 XML 和 build-ops 共用）。
+   *
+   * 坐标换算只在这里做一次：编辑器 z 向下、游戏 +z 向北，所以要翻；
+   * 多格建筑再按 GenAdj.OccupiedRect 从「最小角」换成游戏里的 Position。
+   * 两条导出路径都吃这份结果，避免哪天改了一边、另一边忘了。
+   *
+   * @returns {{entries:Array, skipped:Object, lockedSkipped:number}}
+   *          entries[i] = {terrain} 或 {defName, stuff, x, z, rot}（全是游戏坐标）
+   */
+  function blueprintEntries(state, opts) {
     opts = opts || {};
     var stuff = STUFF_DEF[opts.stuff || 'stone'] || null;
     var entries = [], skipped = {}, lockedSkipped = 0;
@@ -120,6 +130,14 @@
         rot: rot
       });
     });
+
+    return { entries: entries, skipped: skipped, lockedSkipped: lockedSkipped };
+  }
+
+  function toBlueprintsXML(state, opts) {
+    opts = opts || {};
+    var packed = blueprintEntries(state, opts);
+    var entries = packed.entries, skipped = packed.skipped, lockedSkipped = packed.lockedSkipped;
 
     if (!entries.length) return { xml: '', count: 0, skipped: skipped, lockedSkipped: lockedSkipped };
 
@@ -182,7 +200,7 @@
   }
 
   global.RWExport = {
-    toBlueprintsXML: toBlueprintsXML, gameDefName: gameDefName,
+    toBlueprintsXML: toBlueprintsXML, blueprintEntries: blueprintEntries, gameDefName: gameDefName,
     download: download, readFile: readFile
   };
 })(typeof window !== 'undefined' ? window : globalThis);

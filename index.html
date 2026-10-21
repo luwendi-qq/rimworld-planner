@@ -50,6 +50,12 @@
         <button id="btnExportPng" class="ghost" title="把整个布局导出成 PNG 图片（分享 / 存档用）">导出图片</button>
         <button id="btnHelp" class="ghost" title="使用说明 / 存档路径">? 帮助</button>
       </div>
+      <div class="group">
+        <button id="btnBrief" title="导出「基地简报」：先用「简报区域」工具（4）拖出范围（画布上留青色虚线框，Esc 清除）；没定义就用当前视口">AI 简报</button>
+        <button id="btnImportPlan" title="从文件导入 AI 写好的 plan.json（和命令行 apply 同一套规则）">导入 AI 规划</button>
+        <button id="btnPastePlan" title="直接粘贴 AI 在对话里回复的 plan.json（Ctrl+V）">粘贴 AI 规划</button>
+        <input type="file" id="filePlan" accept=".json" hidden>
+      </div>
     </header>
 
     <!-- ================= 左侧：物品栏 ================= -->
@@ -80,6 +86,10 @@
         <button data-tool="erase" title="橡皮 (3)：拖一个框整片删掉（连地板）">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 15l7-7 6 6-4 4H7z"/><path d="M11 8l4-4 6 6-4 4"/><path d="M4 20h16"/></svg>
           <span>橡皮</span>
+        </button>
+        <button data-tool="brief" title="简报区域 (4)：拖一个矩形，定义 AI 简报的范围；不会影响框选">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h4M10 4h4M16 4h4M20 4v4M20 10v4M20 16v4M16 20h4M10 20h4M4 20h4M4 16v4M4 10v4M4 4v4"/></svg>
+          <span>简报</span>
         </button>
       </div>
     </main>
@@ -271,7 +281,7 @@
         <details>
           <summary>快捷键</summary>
           <p>
-            <kbd>1</kbd>/<kbd>2</kbd>/<kbd>3</kbd> 放置 / 框选 / 橡皮<br>
+            <kbd>1</kbd>/<kbd>2</kbd>/<kbd>3</kbd>/<kbd>4</kbd> 放置 / 框选 / 橡皮 / 简报区域<br>
             <kbd>R</kbd> 旋转 · <kbd>Delete</kbd> 删除 · <kbd>Esc</kbd> 取消<br>
             <kbd>G</kbd>/<kbd>T</kbd>/<kbd>B</kbd> 网格 / 地形 / 不可建造标记<br>
             <kbd>P</kbd>/<kbd>O</kbd> 电力 / 房间 · <kbd>F</kbd> 适配视图<br>
@@ -433,6 +443,9 @@
   <script src="js/checks.js"></script>
   <script src="js/workload.js"></script>
   <script src="js/exporters.js"></script>
+  <script src="js/buildops.js"></script>
+  <script src="js/planimport.js"></script>
+  <script src="js/brief.js"></script>
   <script src="js/io.js"></script>
   <script src="js/main.js"></script>
 </body>

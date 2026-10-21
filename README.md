@@ -87,6 +87,8 @@ git pull
 | **收藏 / 最近** | 物品栏加「★ 收藏」「🕘 最近」两个页签，常用的建筑不用每次都翻 |
 | **自动保存** | 改完自动存一份到浏览器，下次打开自动恢复，浏览器崩了也不至于全丢 |
 | **搜索** | 按中文 / 英文 / id 搜建筑 |
+| **命令行入口** | `node tools/plan.js` 不需要浏览器：读存档 → 校验 → 直接生成游戏侧 `build()` 调用。给「在玩游戏的 AI」或脚本用，见 [docs/for-llm.md](docs/for-llm.md) |
+| **AI 简报 / 导入 AI 规划** | 顶栏导出「基地简报」（框选区域的逐格地形 + 库存 + 科技 + 建筑表），贴给聊天 AI 写 `plan.json`；支持**文件导入**和**直接粘贴**，导入报错时可**一键复制错误信息**发回给 AI 修。AI 不需要读你的存档 |
 
 完整操作说明 → [docs/usage.md](docs/usage.md)
 
@@ -218,6 +220,7 @@ node --test        # 或 npm test
 | [docs/data.md](docs/data.md) | 数据准确性、从游戏提取 defs 的三种方案 |
 | [docs/textures.md](docs/textures.md) | 原版贴图的两种获取方式与还原程度 |
 | [docs/architecture.md](docs/architecture.md) | 代码结构、各文件职责、撤销栈设计、测试 |
+| [docs/for-llm.md](docs/for-llm.md) | 命令行入口：给 AI / 自动化的读档 → 规划 → 校验 → build 调用 |
 | [docs/faq.md](docs/faq.md) | 常见问题 |
 | [tools/README.md](tools/README.md) | 三个 Python 脚本的用法与依赖 |
 | [CHANGELOG.md](CHANGELOG.md) | 改了什么 |

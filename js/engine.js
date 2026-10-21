@@ -21,7 +21,7 @@
     nextUid: 1,
     selection: {},       // uid -> true（建筑）
     floorSelection: {},  // "x,z" -> true（地板，框选后可整片删）
-    tool: 'place',       // place | select | erase | move | pan
+    tool: 'place',       // place | select | erase | brief | move | pan
     drawMode: 'brush',   // brush(自由) | rect(方框) | rectFill(填充)
     brush: null,         // {kind:'building'|'floor', id, stuff}
     lastStuff: {},       // defId -> 上次选的材质（和游戏一样记住）
@@ -819,7 +819,9 @@
     ok: '#15b01a',                       // ColorLibrary.Green
     bad: '#e50000',                      // ColorLibrary.Red
     select: '#fff080',                   // TexUI.HighlightSelectedTex（游戏里的选中暖黄）
-    marquee: 'rgba(255,240,128,0.16)'
+    marquee: 'rgba(255,240,128,0.16)',
+    briefFill: 'rgba(51,205,217,0.06)',
+    briefLine: '#33CDD9'
   };
 
   function drawGrid(v) {
@@ -1274,7 +1276,7 @@
     }
 
     if (!state.hover) return;
-    if (state.tool === 'select' || state.tool === 'pan' || state.tool === 'erase') return;
+    if (state.tool === 'select' || state.tool === 'pan' || state.tool === 'erase' || state.tool === 'brief') return;
     if (!state.brush) return;
     var hx = state.hover.x, hz = state.hover.z;
 
@@ -1318,10 +1320,48 @@
     // 框选是按「格子」算的：起点和终点两格都要包含进去，所以宽高 +1。
     // 少这个 +1，反向拖（右下→左上 / 右上→左下）时会看起来和鼠标差一格。
     var w = Math.abs(b.x - a.x) + 1, h = Math.abs(b.z - a.z) + 1;
-    ctx.fillStyle = COLORS.marquee;
+    var isBrief = state.marquee.mode === 'brief';
+    ctx.fillStyle = isBrief ? COLORS.briefFill : COLORS.marquee;
     ctx.fillRect(x, z, w, h);
-    ctx.strokeStyle = COLORS.select; ctx.lineWidth = 1 / state.cam.cell;
+    ctx.strokeStyle = isBrief ? COLORS.briefLine : COLORS.select;
+    ctx.lineWidth = (isBrief ? 2 : 1) / state.cam.cell;
     ctx.strokeRect(x, z, w, h);
+  }
+
+  /**
+   * 持久显示「AI 简报区域」。
+   * 框选结束后 state.briefRect 会留着，这里画成青色虚线框，避免玩家分不清
+   * 「刚框过」和「什么都没框」。正在重新框选时先不画旧的，免得两层叠在一起。
+   */
+  function drawBriefRect() {
+    var r = state.briefRect;
+    if (!r || state.marquee) return;
+    var x = r.x0, z = r.z0;
+    var w = r.x1 - r.x0 + 1, h = r.z1 - r.z0 + 1;
+    if (w <= 0 || h <= 0) return;
+    var cell = state.cam.cell;
+    ctx.save();
+    ctx.fillStyle = COLORS.briefFill;
+    ctx.fillRect(x, z, w, h);
+    ctx.strokeStyle = COLORS.briefLine;
+    ctx.lineWidth = 2 / cell;
+    if (ctx.setLineDash) ctx.setLineDash([6 / cell, 4 / cell]);
+    ctx.strokeRect(x + 1 / cell, z + 1 / cell, Math.max(0, w - 2 / cell), Math.max(0, h - 2 / cell));
+    if (ctx.setLineDash) ctx.setLineDash([]);
+
+    if (w * cell > 84 && h * cell > 22) {
+      var pad = 4 / cell;
+      var fs2 = 11 / cell;
+      ctx.textBaseline = 'top';
+      ctx.font = 'bold ' + fs2 + 'px Arial, sans-serif';
+      var label = 'AI 简报区域';
+      var tw = (ctx.measureText ? ctx.measureText(label).width : label.length * fs2 * 0.7) + pad * 2;
+      ctx.fillStyle = 'rgba(10,14,16,0.78)';
+      ctx.fillRect(x + pad, z + pad, tw, fs2 + pad * 1.6);
+      ctx.fillStyle = COLORS.briefLine;
+      ctx.fillText(label, x + pad * 2, z + pad * 1.8);
+    }
+    ctx.restore();
   }
 
   /** 存档地形 / 山体（离屏 1px/格画布，按格缩放贴上去） */
@@ -1395,6 +1435,7 @@
     drawOverlays(v);
     if (state.layers.blocked) drawBlockedOverlay(v);
     drawMarquee();
+    drawBriefRect();
     drawBrushPreview(v);
     ctx.restore();
   }
@@ -1540,6 +1581,12 @@
         emit('change'); return;
       }
 
+      if (state.tool === 'brief') {
+        var cb = cellAt(sx, sy);
+        state.marquee = { a: cb, b: cb, mode: 'brief' };
+        render();
+        return;
+      }
       if (state.tool === 'select') {
         var c1 = cellAt(sx, sy);
         // 拖已经选中的东西 = 移动；拖空白 = 框选（两个功能合一）
@@ -1619,8 +1666,15 @@
         var m = state.marquee;
         var x0 = Math.min(m.a.x, m.b.x), z0 = Math.min(m.a.z, m.b.z);
         var x1 = Math.max(m.a.x, m.b.x), z1 = Math.max(m.a.z, m.b.z);
-        var hit = {};
         var single = (x1 - x0 < 0.5 && z1 - z0 < 0.5);
+        if (m.mode === 'brief') {
+          // 只定义 AI 简报的范围，不碰选中；单击不算
+          if (!single) state.briefRect = { x0: x0, z0: z0, x1: x1, z1: z1 };
+          state.marquee = null;
+          emit('change'); render();
+          return;
+        }
+        var hit = {};
         state.buildings.forEach(function (b) {
           var def = defOf(b); if (!def) return;
           var fp = footprint(def, b.rot);
@@ -1892,8 +1946,8 @@
   }
   function setTool(t) {
     state.tool = t;
-    if (t === 'select' || t === 'pan') state.brush = null;
-    if (t === 'select' || t === 'pan') state.paste = null;
+    if (t === 'select' || t === 'pan' || t === 'brief') state.brush = null;
+    if (t === 'select' || t === 'pan' || t === 'brief') state.paste = null;
     // 橡皮默认「拖框填充删除」（拖一个矩形整片删掉，含地板）
     if (t === 'erase') state.drawMode = 'rectFill';
     render(); emit('change');

@@ -5,6 +5,7 @@
 
 | 脚本 | 作用 | 需要 |
 | --- | --- | --- |
+| `plan.js` | **命令行规划 / 校验 / 导出**：读存档 → 规划 → 校验 → 生成游戏侧 `build()` 调用。给没有浏览器、只有 shell 的调用方（比如在玩游戏的 AI）用 | Node 18+，无依赖 |
 | `build_single.py` | 把 `index.html` + CSS + JS 打包成一个自包含的单文件 HTML | Python 3，无依赖 |
 | `extract_defs.py` | 从本机游戏目录读 `Defs`，生成精确的建筑数据库（尺寸 / 耗电 / 造价 / 科技前置） | Python 3，无依赖 |
 | `extract_textures.py` | 从本机游戏目录提取原版建筑贴图，生成 `img/` 和 `js/sprites.js` 清单 | Python 3 + `pillow` + `zstandard` |
@@ -12,6 +13,39 @@
 > ⚠️ **版权提醒**：`extract_textures.py` 的产物（`img/`、`js/sprites.js`）属于 RimWorld 的美术资源，
 > **不要提交到仓库、也不要随工具一起分发**（`.gitignore` 已经把它们排除）。
 > 脚本只在你自己的电脑上跑，读的是你自己买的游戏。
+
+---
+
+## plan.js —— 命令行规划（给 AI / 自动化用）
+
+```bash
+node tools/plan.js doctor                   # 环境自检：Node / 内核 / 存档目录
+node tools/plan.js import "Saves/xxx.rws"   # 读存档 → .planner/state.rwplan.json
+node tools/plan.js describe                 # 契约：def 表 + 规则 + 示例（约 16 KB）
+node tools/plan.js apply plan.json          # 把新规划叠到存档上
+node tools/plan.js validate                 # 冲突 / 地形 / 电力 / 房间 / 可达
+node tools/plan.js estimate                 # 材料缺口 / 科技缺口 / 工期
+node tools/plan.js render --width 100       # ASCII 图（游戏坐标）
+node tools/plan.js build-ops                # 直接喂给游戏侧 build() 的调用列表
+node tools/plan.js project --out a.rwplan.json   # 网页能直接打开的工程（交给玩家微调）
+node tools/plan.js brief --out a.brief.md   # 给没有存档访问权的 AI 的基地简报
+node tools/plan.js blueprint --out a.xml    # 传统出口：Blueprints 模组蓝图
+```
+
+- 内核和网页是**同一份代码**（`tools/lib/harness.js` 的沙箱 + `js/*.js`），不是另写一套，
+  所以「网页里校验通过」和「命令行校验通过」不会分叉。
+- 坐标全部是游戏坐标，和存档 / `build(x,z)` / `get_area` 一致。
+- `build-ops` 会把同 def / 同材质 / 同朝向的相邻格合并成矩形：43 件家具墙体的屋子 → 9 次调用。
+- 缓存写在 `.planner/`，已 gitignore。
+- 完整说明（含和 RimMolt 这类游戏侧 MCP 的配合顺序）→ [docs/for-llm.md](../docs/for-llm.md)
+- **分发给别人**：只要 `js/` + `tools/`（约 584 KB / 18 个文件，Node 18+，零依赖），
+  不需要 `tests/`，也不需要单文件 HTML。对方先跑 `node tools/plan.js doctor` 自检。
+  详见 [docs/for-llm.md 的第 0 节](../docs/for-llm.md#0-拿到这套东西先把环境跑通)。
+
+> 浏览器里没有的东西：`tools/lib/dom.js` 是一个极简 XML DOM，顶替 `DOMParser`；
+> `tools/lib/load.js` 补 `Blob.stream()` / `Response`，让存档里的地形网格能解压；
+> `tools/lib/harness.js` 是和测试共用的 `node:vm` 沙箱。
+> 加载器从 `tests/` 挪到了 `tools/lib/`，所以运行时不再依赖测试目录。
 
 ---
 

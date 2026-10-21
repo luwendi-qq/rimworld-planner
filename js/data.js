@@ -681,6 +681,19 @@
     mergeRocks: mergeRocks,
     researches: function () { return researches; },
     research: function (def) { return researches[def] || null; },
+    /**
+     * 存档里的 research.progress 收录**所有**研究项目（没研究的记 0），
+     * 只有进度达到成本（或没有成本数据时 >0 且不是当前项目）才算已完成。
+     * 直接数 key 会把 100 多项没研究的当成已解锁。
+     */
+    researchDone: function (rs, def) {
+      if (!rs || !rs.progress) return false;
+      var pt = rs.progress[def];
+      if (pt == null) return false;
+      var info = researches[def];
+      if (info && info.cost > 0) return pt >= info.cost - 0.001;
+      return pt > 0 && def !== rs.current;
+    },
     mergeResearches: function (list) {
       if (!list) return 0;
       var n = 0;

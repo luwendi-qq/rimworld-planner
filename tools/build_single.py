@@ -39,6 +39,9 @@ SCRIPT_ORDER = [
     'js/checks.js',
     'js/workload.js',              # 可行性 / 工作量估算
     'js/exporters.js',
+    'js/buildops.js',                # 把规划转成游戏侧 build() 调用（CLI / MCP 落地用）
+    'js/planimport.js',              # plan.json 合并（网页「导入 AI 规划」和 CLI apply 共用）
+    'js/brief.js',                   # 基地简报（给没有存档访问权的 AI）
     'js/io.js',
     'js/main.js',
 ]
