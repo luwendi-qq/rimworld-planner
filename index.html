@@ -170,6 +170,38 @@
       </div>
 
       <div class="panel">
+        <h3>导入模组建筑</h3>
+        <div id="modDrop" class="dropzone">
+          把 <b>Mods 文件夹</b>、<b>创意工坊的 294100 文件夹</b> 或单个模组文件夹拖到这里<br>
+          <span class="muted">需先导入游戏目录，ParentName 继承才能正确解析</span>
+        </div>
+        <details class="modhelp">
+          <summary>Steam 创意工坊的 mod 在哪？</summary>
+          <div>
+            <p>创意工坊订阅的 mod <b>不在</b> <code>RimWorld/Mods</code>，而在 Steam 库里的
+              <code>steamapps/workshop/content/294100/</code>（<code>294100</code> 是 RimWorld 的 AppID）。</p>
+            <ul>
+              <li>Windows：<code>C:\Program Files (x86)\Steam\steamapps\workshop\content\294100</code></li>
+              <li>macOS：<code>~/Library/Application Support/Steam/steamapps/workshop/content/294100</code></li>
+              <li>Linux：<code>~/.local/share/Steam/steamapps/workshop/content/294100</code></li>
+            </ul>
+            <p>把整个 <code>294100</code> 文件夹拖进上面的框，就是<b>一次导入全部订阅的 mod</b>（每个子文件夹名就是工坊 ID）。</p>
+            <p>找不到 Steam 装在哪个盘：Steam 客户端 → 库 → 右键 RimWorld → 管理 → 浏览本地文件，再退回到
+              <code>steamapps/workshop</code>；换过库位置的，去 Steam 设置 → 存储 里看每个库的路径。</p>
+            <p>🍎 <b>macOS 提示</b>：双击打开 html（<code>file://</code>）时浏览器会拦住拖进来的文件夹，
+              请点下面的「选择模组文件夹」按钮。</p>
+          </div>
+        </details>
+        <div style="display:flex;gap:4px;margin-top:6px">
+          <button id="btnPickMod" class="ghost" style="flex:1">选择模组文件夹</button>
+          <button id="btnModClear" class="ghost" title="清掉导入的模组建筑与模组贴图">清除全部</button>
+        </div>
+        <input type="file" id="fileModDir" webkitdirectory directory multiple hidden>
+        <div id="modList" class="modlist"></div>
+        <div id="modStatus" class="muted" style="font-size:11.5px;margin-top:6px"></div>
+      </div>
+
+      <div class="panel">
         <h3>本地存档</h3>
         <div style="display:flex;gap:4px">
           <button id="btnSaveLocal">保存到浏览器</button>
@@ -435,6 +467,8 @@
   <script src="js/gamezip.js" onerror="void 0"></script>
   <script src="js/gamedefs.js" onerror="void 0"></script>
   <script src="js/gameimport.js" onerror="void 0"></script>
+  <!-- 浏览器内直接读模组文件夹（依赖上面读到的游戏核心数据；文件不存在时模组入口会被判空跳过） -->
+  <script src="js/modimport.js" onerror="void 0"></script>
   <script src="js/icons.js"></script>
   <script src="js/engine.js"></script>
   <!-- 存档地形 / 山体 / 可建造性 -->

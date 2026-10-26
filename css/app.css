@@ -518,3 +518,42 @@ kbd {
 /* 物品栏格子里的 defName 太长时不撑破格子 */
 .pitem span { max-width: 100%; overflow: hidden; }
 .pitem b { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+
+/* ---------- 模组建筑列表（右侧「导入模组建筑」面板） ---------- */
+.modlist { margin-top: 6px; display: flex; flex-direction: column; gap: 3px; }
+.modrow {
+  display: flex; align-items: center; gap: 4px;
+  padding: 3px 4px 3px 6px; font-size: 11.5px;
+  background: rgba(255,255,255,.04); border: 1px solid var(--line);
+  border-radius: 3px;
+}
+.modrow .modname {
+  flex: 1; min-width: 0; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; color: var(--fg);
+}
+.modrow .modmeta { color: var(--fg2); font-size: 10.5px; white-space: nowrap; }
+.modrow button.moddel {
+  padding: 0 5px; font-size: 10.5px; line-height: 15px; border-radius: 3px;
+  color: var(--fg2);
+}
+.modrow button.moddel:hover { color: #f3c7c2; }
+.modempty { font-size: 11.5px; padding: 2px 2px 0; }
+
+/* 「创意工坊的 mod 在哪？」折叠说明 */
+.modhelp { margin-top: 6px; font-size: 11.5px; }
+.modhelp summary {
+  cursor: pointer; color: #8fb7e0; padding: 2px 0; user-select: none;
+}
+.modhelp summary:hover { color: #b6d4f2; }
+.modhelp > div {
+  margin-top: 4px; padding: 6px 8px; line-height: 1.65;
+  background: rgba(255,255,255,.03); border: 1px solid var(--line); border-radius: 3px;
+}
+.modhelp p { margin: 0 0 4px; }
+.modhelp p:last-child { margin-bottom: 0; }
+.modhelp ul { margin: 2px 0 4px; padding-left: 16px; }
+.modhelp code {
+  font-family: var(--mono, ui-monospace, monospace); font-size: 10.5px;
+  background: rgba(0,0,0,.25); padding: 0 3px; border-radius: 2px;
+  word-break: break-all;
+}

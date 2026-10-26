@@ -528,8 +528,47 @@ kbd {
 .pitem span { max-width: 100%; overflow: hidden; }
 .pitem b { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
 
+/* ---------- 模组建筑列表（右侧「导入模组建筑」面板） ---------- */
+.modlist { margin-top: 6px; display: flex; flex-direction: column; gap: 3px; }
+.modrow {
+  display: flex; align-items: center; gap: 4px;
+  padding: 3px 4px 3px 6px; font-size: 11.5px;
+  background: rgba(255,255,255,.04); border: 1px solid var(--line);
+  border-radius: 3px;
+}
+.modrow .modname {
+  flex: 1; min-width: 0; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; color: var(--fg);
+}
+.modrow .modmeta { color: var(--fg2); font-size: 10.5px; white-space: nowrap; }
+.modrow button.moddel {
+  padding: 0 5px; font-size: 10.5px; line-height: 15px; border-radius: 3px;
+  color: var(--fg2);
+}
+.modrow button.moddel:hover { color: #f3c7c2; }
+.modempty { font-size: 11.5px; padding: 2px 2px 0; }
+
+/* 「创意工坊的 mod 在哪？」折叠说明 */
+.modhelp { margin-top: 6px; font-size: 11.5px; }
+.modhelp summary {
+  cursor: pointer; color: #8fb7e0; padding: 2px 0; user-select: none;
+}
+.modhelp summary:hover { color: #b6d4f2; }
+.modhelp > div {
+  margin-top: 4px; padding: 6px 8px; line-height: 1.65;
+  background: rgba(255,255,255,.03); border: 1px solid var(--line); border-radius: 3px;
+}
+.modhelp p { margin: 0 0 4px; }
+.modhelp p:last-child { margin-bottom: 0; }
+.modhelp ul { margin: 2px 0 4px; padding-left: 16px; }
+.modhelp code {
+  font-family: var(--mono, ui-monospace, monospace); font-size: 10.5px;
+  background: rgba(0,0,0,.25); padding: 0 3px; border-radius: 2px;
+  word-break: break-all;
+}
+
 </style>
-<!-- 单文件构建：2026-10-21 13:51 UTC  内联模块：js/data.js, js/zh-names.js, js/buildings.generated.js, js/vendor/fzstd.js, js/gamezip.js, js/gamedefs.js, js/gameimport.js, js/icons.js, js/engine.js, js/site.js, js/rooms.js, js/checks.js, js/workload.js, js/exporters.js, js/buildops.js, js/planimport.js, js/brief.js, js/io.js, js/main.js -->
+<!-- 单文件构建：2026-10-26 09:57 UTC  内联模块：js/data.js, js/zh-names.js, js/buildings.generated.js, js/vendor/fzstd.js, js/gamezip.js, js/gamedefs.js, js/gameimport.js, js/modimport.js, js/icons.js, js/engine.js, js/site.js, js/rooms.js, js/checks.js, js/workload.js, js/exporters.js, js/buildops.js, js/planimport.js, js/brief.js, js/io.js, js/main.js -->
 </head>
 
 <body>
@@ -691,6 +730,38 @@ kbd {
         </div>
         <input type="file" id="fileGameDir" webkitdirectory directory multiple hidden>
         <div id="gameStatus" class="muted" style="font-size:11.5px;margin-top:6px"></div>
+      </div>
+
+      <div class="panel">
+        <h3>导入模组建筑</h3>
+        <div id="modDrop" class="dropzone">
+          把 <b>Mods 文件夹</b>、<b>创意工坊的 294100 文件夹</b> 或单个模组文件夹拖到这里<br>
+          <span class="muted">需先导入游戏目录，ParentName 继承才能正确解析</span>
+        </div>
+        <details class="modhelp">
+          <summary>Steam 创意工坊的 mod 在哪？</summary>
+          <div>
+            <p>创意工坊订阅的 mod <b>不在</b> <code>RimWorld/Mods</code>，而在 Steam 库里的
+              <code>steamapps/workshop/content/294100/</code>（<code>294100</code> 是 RimWorld 的 AppID）。</p>
+            <ul>
+              <li>Windows：<code>C:\Program Files (x86)\Steam\steamapps\workshop\content\294100</code></li>
+              <li>macOS：<code>~/Library/Application Support/Steam/steamapps/workshop/content/294100</code></li>
+              <li>Linux：<code>~/.local/share/Steam/steamapps/workshop/content/294100</code></li>
+            </ul>
+            <p>把整个 <code>294100</code> 文件夹拖进上面的框，就是<b>一次导入全部订阅的 mod</b>（每个子文件夹名就是工坊 ID）。</p>
+            <p>找不到 Steam 装在哪个盘：Steam 客户端 → 库 → 右键 RimWorld → 管理 → 浏览本地文件，再退回到
+              <code>steamapps/workshop</code>；换过库位置的，去 Steam 设置 → 存储 里看每个库的路径。</p>
+            <p>🍎 <b>macOS 提示</b>：双击打开 html（<code>file://</code>）时浏览器会拦住拖进来的文件夹，
+              请点下面的「选择模组文件夹」按钮。</p>
+          </div>
+        </details>
+        <div style="display:flex;gap:4px;margin-top:6px">
+          <button id="btnPickMod" class="ghost" style="flex:1">选择模组文件夹</button>
+          <button id="btnModClear" class="ghost" title="清掉导入的模组建筑与模组贴图">清除全部</button>
+        </div>
+        <input type="file" id="fileModDir" webkitdirectory directory multiple hidden>
+        <div id="modList" class="modlist"></div>
+        <div id="modStatus" class="muted" style="font-size:11.5px;margin-top:6px"></div>
       </div>
 
       <div class="panel">
@@ -951,6 +1022,7 @@ kbd {
   <!-- 若存在 tools/extract_defs.py 生成的完整数据库，自动合并进内置库 -->
   <!-- 若存在 tools/extract_textures.py 生成的原版贴图清单（本地提取），自动启用 -->
   <!-- 浏览器内直接读游戏目录（zip + zstd + DDS 解码）；不导入游戏时完全不启用 -->
+  <!-- 浏览器内直接读模组文件夹（依赖上面读到的游戏核心数据；文件不存在时模组入口会被判空跳过） -->
   <!-- 存档地形 / 山体 / 可建造性 -->
   <script>
 /* ==== js/data.js ==== */
@@ -1459,6 +1531,58 @@ kbd {
     return { replaced: replaced, added: added, keptArt: keptArt, total: BUILDINGS.length };
   }
 
+  /**
+   * 把「带 .mod 标记的模组建筑」还原成核心游戏数据（删除模组 / 重新解析前用）。
+   * base 是核心游戏数据快照（浏览器里存的是 IndexedDB 的 buildings 列表）：
+   *   - base 里有的：说明模组覆盖了原版同名建筑，把核心字段写回去并去掉 mod 标记；
+   *   - base 里没有的：模组新增的，从库里删掉。
+   */
+  function restoreBaseBuildings(base) {
+    var baseByKey = {};
+    (base || []).forEach(function (b) {
+      if (!b) return;
+      var k = normDef(b.def || b.en || b.id);
+      if (k) baseByKey[k] = b;
+    });
+    var removed = 0, restored = 0;
+    for (var i = BUILDINGS.length - 1; i >= 0; i--) {
+      var b = BUILDINGS[i];
+      if (!b || !b.mod) continue;
+      var src = baseByKey[normDef(b.def || b.en || b.id)] || null;
+      if (!src) {
+        BUILDINGS.splice(i, 1);
+        if (b.id && byId[b.id] === b) delete byId[b.id];
+        removed++;
+        continue;
+      }
+      var copy = {};
+      for (var k in src) if (Object.prototype.hasOwnProperty.call(src, k)) copy[k] = src[k];
+      copy.id = b.id;
+      copy.exact = true;
+      BUILDINGS[i] = copy;
+      byId[copy.id] = copy;
+      restored++;
+    }
+    reindexBuildings();
+    return { removed: removed, restored: restored };
+  }
+
+  /** 直接改过 BUILDINGS/byId 之后，重建规范化字段与「defName → id」索引 */
+  function reindexBuildings() {
+    // byId 是给外部直接读的对象，就地把已经不在 BUILDINGS 里的条目删掉
+    var live = {};
+    for (var i = 0; i < BUILDINGS.length; i++) live[BUILDINGS[i].id] = BUILDINGS[i];
+    for (var k in byId) {
+      if (Object.prototype.hasOwnProperty.call(byId, k) && !live[k]) delete byId[k];
+    }
+    for (var k2 in live) {
+      if (Object.prototype.hasOwnProperty.call(live, k2)) byId[k2] = live[k2];
+    }
+    nameIndex = null;
+    normalizeDefs();
+    buildNameIndex();
+  }
+
   // ------------------------------------------------------------------
   // 地形 / 山体 / 科技树 索引
   // ------------------------------------------------------------------
@@ -1621,6 +1745,8 @@ kbd {
     normDef: normDef,
     matchDefName: matchDefName,
     mergeBuildings: mergeBuildings,
+    restoreBaseBuildings: restoreBaseBuildings,
+    reindexBuildings: reindexBuildings,
     // ---- 地形 / 山体 / 科技树 ----
     terrainHash: terrainHash,
     terrains: function () { return terrains; },
@@ -2937,29 +3063,140 @@ kbd {
       tx.onerror = function () { rej(tx.error); };
     });
   }
+  function idbDel(db, store, key) {
+    if (db && db.mem) { delete MEM[store][key]; return Promise.resolve(); }
+    return new Promise(function (res, rej) {
+      var tx = db.transaction(store, 'readwrite');
+      tx.objectStore(store).delete(key);
+      tx.oncomplete = function () { res(); };
+      tx.onerror = function () { rej(tx.error); };
+    });
+  }
 
   // ---------------------------------------------------------------- 目录遍历
+  //
+  // 拖文件夹进浏览器，能用的接口就两个，各自的脾气（2026-10 在 macOS 上实测）：
+  //
+  //   webkitGetAsEntry（老接口，Safari / Chrome / Edge 都认）
+  //     · http(s) 页面：能拿目录对象，readEntries 正常，递归读全部文件 —— 主路径。
+  //     · file:// 页面（双击打开 html）：在 macOS 的 Chromium 上 readEntries 直接抛
+  //       EncodingError（Windows 上同样的代码能读，所以「只有 Mac 导入不了」），
+  //       拿到的目录对象是空的，只能靠 main.js 引导用户去点「选择目录」。
+  //     · DataTransferItem 在 drop 事件的同步阶段之外会被「neutered」，所以必须在
+  //       事件里先把 entry 拿到手，之后再慢慢读 —— 这是下面先取 entry 再不等 FSA 的原因。
+  //
+  //   getAsFileSystemHandle（新接口）
+  //     · 在 file:// 页面上返回的 Promise 永远不 resolve（不给本地来源弹权限框），
+  //       所以绝不能把它放在主路径上等，只能当兜底，而且必须带超时。
+  //
+  //  `<input webkitdirectory>`（选择目录）在两个协议下都好使，是 file:// 的唯一活路。
+
+  /** promise 超时兜底：到点当作失败 */
+  function withTimeout(p, ms) {
+    return new Promise(function (res, rej) {
+      var t = setTimeout(function () { rej(new Error('timeout')); }, ms);
+      p.then(function (v) { clearTimeout(t); res(v); }, function (e) { clearTimeout(t); rej(e); });
+    });
+  }
+
+  function isLocalFilePage() {
+    try { return !!(global.location && global.location.protocol === 'file:'); } catch (e) { return false; }
+  }
+
+  /** 拖入的东西里有没有文件/文件夹（纯文字/链接的拖拽不算） */
+  function dropHasFiles(dt) {
+    if (!dt) return false;
+    if (dt.files && dt.files.length) return true;
+    var items = dt.items || [];
+    for (var i = 0; i < items.length; i++) {
+      if (items[i] && items[i].kind === 'file') return true;
+    }
+    return false;
+  }
 
   /** 从拖入的 DataTransfer 里收集文件；目录会递归展开 */
   function collectFromDrop(dt) {
     var out = [];
-    var items = dt.items;
+    var items = (dt && dt.items) || [];
+    // DataTransfer 在 drop 事件结束会被清空，能同步拿的先拿下来
+    var plainFiles = [];
+    try {
+      if (dt && dt.files) plainFiles = Array.prototype.slice.call(dt.files);
+    } catch (e) { plainFiles = []; }
     var jobs = [];
     for (var i = 0; i < items.length; i++) {
-      var entry = items[i].webkitGetAsEntry && items[i].webkitGetAsEntry();
-      if (entry) jobs.push(walkEntry(entry, '', out));
-      else if (items[i].getAsFile) {
-        var f = items[i].getAsFile();
-        if (f) out.push({ path: f.name, file: f });
-      }
+      var item = items[i];
+      if (!item || item.kind === 'string') continue;
+      jobs.push(walkItem(item, out));
     }
-    return Promise.all(jobs).then(function () { return out; });
+    return Promise.all(jobs).then(function () {
+      // items 为空或被浏览器清掉时，还能从 files 里拿到平铺的文件
+      if (!out.length) {
+        for (var j = 0; j < plainFiles.length; j++) {
+          var f = plainFiles[j];
+          if (f) out.push({ path: f.webkitRelativePath || f.name, file: f });
+        }
+      }
+      return out;
+    });
+  }
+
+  /** 单个 DataTransferItem：entry（主路径）→ FileSystemHandle（兜底）→ 单个文件 */
+  function walkItem(item, out) {
+    var entry = null, single = null;
+    try { entry = item.webkitGetAsEntry && item.webkitGetAsEntry(); } catch (e) { entry = null; }
+    try { single = item.getAsFile && item.getAsFile(); } catch (e) { single = null; }
+    if (entry) {
+      var before = out.length;
+      return walkEntry(entry, '', out).then(function () {
+        if (out.length > before) return;           // 老接口读到了，收工
+        return walkByHandle(item, single, out);    // 老接口读不动（macOS file:// 常见）
+      });
+    }
+    return walkByHandle(item, single, out);
+  }
+
+  /** 兜底：File System Access；file:// 下它永不 resolve，直接跳过 */
+  function walkByHandle(item, single, out) {
+    var job = null;
+    if (!isLocalFilePage() && typeof item.getAsFileSystemHandle === 'function') {
+      try { job = withTimeout(Promise.resolve(item.getAsFileSystemHandle()), 3000); } catch (e) { job = null; }
+    }
+    return (job ? job.catch(function () { return null; }) : Promise.resolve(null)).then(function (handle) {
+      if (handle) return walkHandle(handle, '', out);
+      if (single) out.push({ path: single.name, file: single });
+    });
+  }
+
+  /** FileSystemHandle 递归（每次 await 都带超时，防浏览器抽风把导入卡死） */
+  function walkHandle(handle, prefix, out) {
+    if (!handle) return Promise.resolve();
+    if (handle.kind === 'file') {
+      return withTimeout(Promise.resolve().then(function () { return handle.getFile(); }), 20000).then(function (f) {
+        if (f) out.push({ path: prefix + handle.name, file: f });
+      }, function () { /* 读不了就跳过 */ });
+    }
+    if (handle.kind !== 'directory') return Promise.resolve();
+    var dir = prefix + handle.name + '/';
+    var it = handle.values();
+    var all = [];
+    function more() {
+      return withTimeout(Promise.resolve(it.next()), 30000).then(function (r) {
+        if (!r || r.done) return all;
+        all.push(r.value);
+        return more();
+      }, function () { return all; });
+    }
+    return more().then(function (list) {
+      return Promise.all(list.map(function (h) { return walkHandle(h, dir, out); }));
+    });
   }
 
   function walkEntry(entry, prefix, out) {
     if (entry.isFile) {
       return new Promise(function (res) {
-        entry.file(function (f) { out.push({ path: prefix + entry.name, file: f }); res(); }, function () { res(); });
+        entry.file(function (f) { out.push({ path: prefix + entry.name, file: f }); res(); },
+                   function () { res(); });   // 读不了就跳过（macOS file:// 会走到这）
       });
     }
     if (!entry.isDirectory) return Promise.resolve();
@@ -2975,7 +3212,7 @@ kbd {
           }
           all = all.concat(Array.prototype.slice.call(batch));
           more();
-        }, function () { res(); });
+        }, function () { res(); });             // macOS file://：EncodingError 会落到这里
       }
       more();
     });
@@ -2989,6 +3226,36 @@ kbd {
       out.push({ path: (f.webkitRelativePath || f.name), file: f });
     }
     return out;
+  }
+
+  function pathOfGameFile(f) {
+    return (f && (f.path || f.webkitRelativePath || f.name)) || '';
+  }
+
+  /**
+   * 收集到的一堆文件里，是否像「RimWorld 安装目录 / Data 目录」？
+   * 拖拽在 macOS 的 file:// 页面上读不到目录内容，只会掉出一两个假文件；
+   * 用它来判断「该提示换选择目录」还是「真能开始导入」，别让用户白等一次解析。
+   */
+  function looksLikeGameDir(files) {
+    for (var i = 0; files && i < files.length; i++) {
+      var p = pathOfGameFile(files[i]);
+      if (/\.zip$/i.test(p)) return true;
+      if (/(^|\/)Data\/[^/]+\/Defs\/.+\.xml$/i.test(p)) return true;
+      if (/(^|\/)Core\/Defs\/.+\.xml$/i.test(p)) return true;
+      if (/(^|\/)About\/About\.xml$/i.test(p) && /(^|\/)Core\//i.test(p)) return true;
+    }
+    return false;
+  }
+
+  /** 是否像「Mods 目录 / 单个模组目录」：有 About.xml 或任意 Defs/*.xml */
+  function looksLikeModDir(files) {
+    for (var i = 0; files && i < files.length; i++) {
+      var p = pathOfGameFile(files[i]);
+      if (/(^|\/)About\/About\.xml$/i.test(p)) return true;
+      if (/(^|\/)Defs\/.+\.xml$/i.test(p)) return true;
+    }
+    return false;
   }
 
   // ---------------------------------------------------------------- 贴图清单
@@ -3085,20 +3352,44 @@ kbd {
     if (this.onProgress) this.onProgress(text, frac);
   };
 
+  /** 从拖入的文件里认出游戏版本（Version.txt 优先，其次 Core 的 About.xml supportedVersions） */
+  async function detectGameVersion(verFiles, coreAbout) {
+    for (var i = 0; i < verFiles.length; i++) {
+      try {
+        var txt = await verFiles[i].text();
+        var m = /(\d+\.\d+)(?:\.\d+)?/.exec(txt);
+        if (m) return m[1];
+      } catch (e) { /* 换下一个 */ }
+    }
+    if (coreAbout) {
+      try {
+        var ax = await coreAbout.text();
+        var sm = /<supportedVersions>([\s\S]*?)<\/supportedVersions>/.exec(ax);
+        if (sm) {
+          var vs = sm[1].match(/\d+\.\d+/g);
+          if (vs && vs.length) return vs[vs.length - 1];
+        }
+      } catch (e) { /* 忽略 */ }
+    }
+    return '';
+  }
+
   /**
    * 导入。files = [{path, file}]
    * 返回 { buildings, stuffs, stuffCats, floors, spriteCount, skipped }
    */
   Importer.prototype.run = async function (files) {
     var self = this;
-    var docs = [], zips = [], langJobs = [];
+    var docs = [], zips = [], langJobs = [], verFiles = [], coreAbout = null;
 
     this.tick('正在读取游戏目录…', 0.02);
     files.forEach(function (f) {
       var p = f.path.replace(/\\/g, '/');
       var lower = p.toLowerCase();
       var base = lower.split('/').pop();
-      if (base === 'assets.zip') { zips.push(f.file); return; }
+      if (base === 'version.txt') { verFiles.push(f.file); return; }
+      if (base === 'about.xml' && /(^|\/)data\/core\/about\//i.test(lower)) { coreAbout = f.file; return; }
+      if (base === 'assets.zip') { zips.push({ file: f.file, path: lower }); return; }
       // 语言包：官方简中（tar 打包 或 解包后的 DefInjected XML 都认）
       if (lower.indexOf('chinesesimplified') >= 0) {
         if (/\.tar$/.test(base)) langJobs.push({ file: f.file, kind: 'tar' });
@@ -3108,8 +3399,17 @@ kbd {
       if (/\/defs\/.+\.xml$/i.test(lower)) docs.push(f);
     });
 
-    if (!docs.length) throw new Error('没找到 Data/**/Defs/**/*.xml —— 请拖入整个 RimWorld 安装目录（或它的 Data 目录）');
-    if (!zips.length) throw new Error('没找到 Assets.zip —— 请拖入整个 RimWorld 安装目录（新版贴图打包在 Assets.zip 里）');
+    if (!docs.length) throw new Error('没找到 Data/**/Defs/**/*.xml —— 请选择整个 RimWorld 安装目录（或它的 Data 目录）');
+    if (!zips.length) throw new Error('没找到 Assets.zip —— 请选择整个 RimWorld 安装目录（新版贴图打包在 Assets.zip 里；macOS 在 RimWorld.app/Contents/MacOS/Assets.zip）');
+    // macOS 特例：原版的 Assets.zip 在 RimWorld.app 里面，只选 Data 目录就只剩 5 个 DLC 贴图包，
+    // 建筑会全部没有贴图。这里直接说清楚，别让人对着「导入了但没贴图」发懵。
+    var hasCoreZip = zips.some(function (z) {
+      return /(^|\/)data\/core\/assets\.zip$/.test(z.path) || /\.app\/contents\/macos\/assets\.zip$/.test(z.path);
+    });
+    if (!hasCoreZip) {
+      throw new Error('只找到 DLC 的 Assets.zip，没找到原版（Core）贴图包。macOS 上它在 RimWorld.app/Contents/MacOS/Assets.zip 里，' +
+        '请选择整个 RimWorld 安装目录（Steam 里右键游戏 → 管理 → 浏览本地文件），别只选 Data 目录。');
+    }
 
     this.tick('正在读取定义文件（' + docs.length + ' 个）…', 0.08);
     var xmlDocs = [];
@@ -3135,6 +3435,8 @@ kbd {
         }
       } catch (e) { /* 换下一个来源 */ }
     }
+    this.tick('正在识别游戏版本…', 0.21);
+    var gameVersion = await detectGameVersion(verFiles, coreAbout);
     this.tick('正在解析建筑数据…', 0.22);
     var parsed = global.RWDefs.parse(xmlDocs, lang);
     if (!parsed.buildings.length) throw new Error('解析出来的建筑是 0 条，游戏版本可能不兼容');
@@ -3143,7 +3445,7 @@ kbd {
     this.tick('正在打开贴图包（' + zips.length + ' 个）…', 0.26);
     var zipReaders = [];
     for (var z = 0; z < zips.length; z++) {
-      zipReaders.push(await global.RWZip.openZip(zips[z]));
+      zipReaders.push(await global.RWZip.openZip(zips[z].file));
       if (this.cancel) throw new Error('已取消');
     }
     var tex = buildTexIndex(zipReaders);
@@ -3304,7 +3606,11 @@ kbd {
           }
         }
       } catch (e) {
+        // 这张贴图解不出来（最常见：浏览器没开硬件加速 / 没有 BC7(BC6) 纹理扩展）。
+        // 别登记半成品条目（imgs 会是空的，渲染层会拿到一份解不出的计划），
+        // 直接留空，画布上这个建筑就走矢量图，不影响布局。
         skipped++;
+        continue;
       }
       manifest.items[dn] = entry;
       manifest.byName[norm(dn)] = dn;
@@ -3354,11 +3660,15 @@ kbd {
     await idbPut(db, META, 'rocks', parsed.rocks || []);
     await idbPut(db, META, 'researches', parsed.researches || []);
     await idbPut(db, META, 'items', parsed.items || {});
+    // 原始 Defs XML + 游戏版本：之后扫描模组时，要用它们来解析 ParentName 跨模组/跨原版继承
+    await idbPut(db, META, 'defdocs', xmlDocs);
+    if (gameVersion) await idbPut(db, META, 'gameVersion', gameVersion);
     meta.sprites = done;
     meta.skipped = skipped;
     meta.bytes = bytes;
     meta.buildingsTotal = merged.total;
     meta.langSource = langSource;
+    meta.gameVersion = gameVersion || '';
     await idbPut(db, META, 'info', meta);
     db.close();
 
@@ -3500,15 +3810,1184 @@ kbd {
     } catch (e) { return null; }
   }
 
+  // ---------------------------------------------------------------- 给模组导入用的底层 API
+  // js/modimport.js 复用同一套 IndexedDB：核心游戏数据是「底」，模组只是在上面加一层。
+
+  async function getMeta(key) {
+    try {
+      var db = await idbOpen();
+      var v = await idbGet(db, META, key);
+      db.close();
+      return v;
+    } catch (e) { return null; }
+  }
+  async function setMeta(key, val) {
+    var db = await idbOpen();
+    await idbPut(db, META, key, val);
+    db.close();
+  }
+  async function delMeta(key) {
+    var db = await idbOpen();
+    await idbDel(db, META, key);
+    db.close();
+  }
+  async function putTexture(name, blob) {
+    var db = await idbOpen();
+    await idbPut(db, STORE, name, blob);
+    db.close();
+  }
+  async function delTextures(names) {
+    if (!names || !names.length) return;
+    var db = await idbOpen();
+    for (var i = 0; i < names.length; i++) await idbDel(db, STORE, names[i]);
+    db.close();
+  }
+  /** 核心 Defs 原始 XML（游戏目录导入时存下的）+ 游戏版本；没导入过游戏目录时返回 null */
+  async function getCoreDefDocs() {
+    try {
+      var docs = await getMeta('defdocs');
+      if (!docs || !docs.length) return null;
+      var version = await getMeta('gameVersion');
+      return { docs: docs, version: version || '' };
+    } catch (e) { return null; }
+  }
+
   global.RWGame = {
     Importer: Importer,
     collectFromDrop: collectFromDrop,
     collectFromInput: collectFromInput,
+    dropHasFiles: dropHasFiles,
+    looksLikeGameDir: looksLikeGameDir,
+    looksLikeModDir: looksLikeModDir,
     loadCache: loadCache,
     getImageURL: getImageURL,
     clearCache: clearCache,
     cacheInfo: cacheInfo,
+    // —— 模组导入（js/modimport.js）用的底层接口 ——
+    getMeta: getMeta,
+    setMeta: setMeta,
+    delMeta: delMeta,
+    putTexture: putTexture,
+    delTextures: delTextures,
+    getCoreDefDocs: getCoreDefDocs,
     _findGraphic: findGraphic
+  };
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+/* ==== js/modimport.js ==== */
+/*
+ * modimport.js —— 「拖入模组，把模组新增的可建造建筑扫描进来」
+ *
+ * 和 gameimport.js 一样全部在浏览器里跑，玩家不用装任何东西：
+ *   1. 从拖入的文件路径里找 About/About.xml，认出每个模组（packageId / 名字 / 支持版本 / 创意工坊 id）
+ *   2. 按 LoadFolders.xml 挑出这个模组对当前游戏版本生效的文件夹；
+ *      没写 LoadFolders.xml 的（老模组，通常只有 1.6/ 1.7/ 这样的版本目录）按版本目录回退
+ *   3. 把模组 Defs XML 和「导入游戏目录时缓存下来的核心 Defs XML」拼在一起交给 RWDefs 解析
+ *      —— 模组里 ParentName 指向原版抽象 def 的继承，只有这样才解得开
+ *   4. 只挑这个模组自己声明的 ThingDef（可建造的），打上 mod/modName 标记并进 RWData
+ *   5. 模组的 Textures/** 是散装 png/dds（不像原版打包在 Assets.zip 里），按 graphicData 解出来合并进贴图清单
+ *   6. 全部存 IndexedDB：下次打开自动恢复；删除模组时只回滚模组那一层，核心数据不动
+ *
+ * 依赖：RWData（data.js）、RWDefs（gamedefs.js）、RWZip（gamezip.js）、RWGame（gameimport.js）。
+ * 单独加载本文件是安全的：所有跨模块引用都发生在函数调用时。
+ */
+(function (global) {
+  'use strict';
+
+  var MODS_KEY = 'mods';
+  var IMG_EXT = /\.(dds|png|jpg|jpeg)$/i;
+  var DIR_SLOT = { north: 'n', back: 'n', east: 'e', side: 'e', south: 's', front: 's', west: 'w' };
+  var SKIP_TAIL = { m: 1, menuicon: 1, blueprint: 1 };
+  var LINK_KIND = {
+    cornerfiller: 'corner', basic: 'basic', transmitter: 'transmitter',
+    transmitteroverlay: 'transmitter', asymmetric: 'basic'
+  };
+  var APPEARANCES = ['Planks', 'Bricks', 'Metal', 'Smooth'];
+  var MAXPX = 512;
+  // 官方 Core/DLC：它们应该从「导入游戏资源」走，不要当模组导进来
+  var OFFICIAL = {
+    'ludeon.rimworld': 1, 'ludeon.rimworld.royalty': 1, 'ludeon.rimworld.ideology': 1,
+    'ludeon.rimworld.biotech': 1, 'ludeon.rimworld.anomaly': 1, 'ludeon.rimworld.odyssey': 1
+  };
+
+  // 内存里的当前状态：records = 已导入模组记录；base = 核心游戏数据快照
+  var state = { records: null, base: null, gameVersion: '' };
+
+  // ---------------------------------------------------------------- 小工具
+
+  function norm(s) { return String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]/g, ''); }
+  function safeName(s) {
+    return String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'mod';
+  }
+  function stripExt(s) {
+    return s.replace(/\.(psd|png|jpg|jpeg|tga)\.dds$/i, '').replace(/\.(dds|png|jpg|jpeg|tga|psd)$/i, '');
+  }
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function cloneObj(o) {
+    var r = {};
+    if (o) for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) r[k] = o[k];
+    return r;
+  }
+  function cloneEntry(e) {
+    var r = {};
+    if (e) for (var k in e) if (Object.prototype.hasOwnProperty.call(e, k)) r[k] = e[k];
+    return r;
+  }
+
+  function readText(file) {
+    if (!file) return Promise.resolve('');
+    if (typeof file.text === 'function') return Promise.resolve(file.text());
+    if (typeof file.text === 'string') return Promise.resolve(file.text);
+    return Promise.resolve('');
+  }
+  function readBuf(file) {
+    if (!file) return Promise.resolve(new ArrayBuffer(0));
+    if (typeof file.arrayBuffer === 'function') return file.arrayBuffer();
+    return Promise.resolve(new ArrayBuffer(0));
+  }
+
+  /** 取一个 XML 里某个标签的文本（About.xml / LoadFolders.xml 够用了） */
+  function xmlText(xml, tag) {
+    var re = new RegExp('<' + tag + '\\b[^>]*>([\\s\\S]*?)<\\/' + tag + '>', 'i');
+    var m = re.exec(xml || '');
+    if (!m) return '';
+    return m[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').replace(/<[^>]+>/g, '').trim();
+  }
+  /** 取某个标签里所有 <li> 的文本 */
+  function xmlList(xml, tag) {
+    var re = new RegExp('<' + tag + '\\b[^>]*>([\\s\\S]*?)<\\/' + tag + '>', 'i');
+    var m = re.exec(xml || '');
+    if (!m) return [];
+    var out = [], liRe = /<li\b[^>]*>([\s\S]*?)<\/li>/g, lm;
+    while ((lm = liRe.exec(m[1]))) {
+      var v = lm[1].replace(/<[^>]+>/g, '').trim();
+      if (v) out.push(v);
+    }
+    return out;
+  }
+  function cmpVer(a, b) {
+    var x = String(a || '0').split('.').map(Number), y = String(b || '0').split('.').map(Number);
+    return ((x[0] || 0) - (y[0] || 0)) || ((x[1] || 0) - (y[1] || 0));
+  }
+
+  // ---------------------------------------------------------------- 文件分组：认出模组
+
+  function relOf(p, root) {
+    var s = String(p || '').replace(/\\/g, '/').replace(/^\/+/, '');
+    if (!root) return s;
+    var r = String(root).replace(/\\/g, '/');
+    if (s.indexOf(r + '/') === 0) return s.slice(r.length + 1);
+    return s;
+  }
+
+  /**
+   * 从一个文件集合里认出模组：路径里出现 About/About.xml 的那一级就是模组根。
+   * 支持一次拖入整个 Mods/（里面多个模组），也支持单个模组文件夹。
+   *
+   * 分两趟：先靠 About.xml 找出所有模组根，再把每个文件归到最长的那个根下面
+   * （这样 Mods/A 和嵌套在里面的 Mods/A/B 不会串）。
+   */
+  function groupMods(files) {
+    var groups = {}, order = [], list = [];
+    (files || []).forEach(function (f) {
+      if (!f || !f.path) return;
+      list.push({ f: f, p: String(f.path).replace(/\\/g, '/').replace(/^\/+/, '') });
+    });
+    // 第一趟：找模组根
+    list.forEach(function (it) {
+      var segs = it.p.split('/');
+      var idx = -1;
+      for (var i = 0; i < segs.length - 1; i++) {
+        if (segs[i].toLowerCase() === 'about' && segs[i + 1].toLowerCase() === 'about.xml') { idx = i; break; }
+      }
+      if (idx < 0) return;
+      var root = segs.slice(0, idx).join('/');
+      var key = root.toLowerCase();
+      if (!groups[key]) {
+        groups[key] = { root: root, files: [], aboutFile: it.f.file, aboutPath: it.p };
+        order.push(key);
+      }
+    });
+    // 第二趟：把文件归到最长的模组根（嵌套模组时更具体的那层优先）
+    var roots = order.map(function (k) { return { key: k, root: groups[k].root }; })
+      .sort(function (a, b) { return b.root.length - a.root.length; });
+    list.forEach(function (it) {
+      for (var i = 0; i < roots.length; i++) {
+        var r = roots[i];
+        if (it.p === r.root + '/About/About.xml' || it.p.indexOf(r.root + '/') === 0) {
+          groups[r.key].files.push(it.f);
+          return;
+        }
+      }
+    });
+    return order.map(function (k) { return groups[k]; });
+  }
+
+  /** 从 About/About.xml（+ PublishedFileId.txt）读出模组元信息 */
+  async function readAbout(group) {
+    var xml = await readText(group.aboutFile);
+    var meta = {
+      packageId: xmlText(xml, 'packageId'),
+      name: xmlText(xml, 'name') || xmlText(xml, 'packageId'),
+      author: xmlText(xml, 'author'),
+      version: xmlText(xml, 'modVersion'),
+      supported: xmlList(xml, 'supportedVersions'),
+      steamId: ''
+    };
+    // 创意工坊 id：优先 PublishedFileId.txt，其次 About.xml 里的链接
+    for (var i = 0; i < group.files.length; i++) {
+      var rel = relOf(group.files[i].path, group.root).toLowerCase();
+      if (rel === 'about/publishedfileid.txt') {
+        var txt = (await readText(group.files[i].file)).replace(/\s+/g, '').trim();
+        if (/^\d+$/.test(txt)) { meta.steamId = txt; break; }
+      }
+    }
+    if (!meta.steamId) {
+      var m = /steam:\/\/url\/CommunityFilePage\/(\d+)/.exec(xml) ||
+              /<publishedFileId>\s*(\d+)\s*<\/publishedFileId>/i.exec(xml) ||
+              /communityFilePage\/(\d+)/i.exec(xml);
+      if (m) meta.steamId = m[1];
+    }
+    // 创意工坊 mod 的文件夹名就是发布 ID（steamapps/workshop/content/294100/<id>/），
+    // 有些老 mod 没带 PublishedFileId.txt，用文件夹名兜底
+    if (!meta.steamId) {
+      var segs = String(group.root || '').split('/');
+      var last = segs[segs.length - 1] || '';
+      if (/^\d+$/.test(last)) meta.steamId = last;
+    }
+    if (!meta.packageId) meta.packageId = 'unknown.' + safeName(meta.name);
+    return meta;
+  }
+
+  // ---------------------------------------------------------------- 版本目录 / LoadFolders
+
+  /** 模组根下直接出现的版本目录（1.0 / 1.6 / 1.7 …） */
+  function versionDirsOf(group) {
+    var set = {};
+    group.files.forEach(function (f) {
+      var rel = relOf(f.path, group.root);
+      var seg = rel.split('/')[0];
+      if (/^\d+\.\d+$/.test(seg)) set[seg] = 1;
+    });
+    return Object.keys(set).sort(cmpVer);
+  }
+
+  /**
+   * 解析 LoadFolders.xml，挑出当前游戏版本要加载的文件夹。
+   * 返回 null 表示没写 LoadFolders.xml（调用方走版本目录回退）。
+   */
+  function pickLoadFolders(xml, gameVersion) {
+    if (!xml) return null;
+    var body = /<loadFolders\b[^>]*>([\s\S]*)<\/loadFolders>/i.exec(xml);
+    if (!body) return null;
+    var blocks = [], blockRe = /<([A-Za-z0-9_.\-]+)>([\s\S]*?)<\/\1>/g, m;
+    while ((m = blockRe.exec(body[1]))) {
+      if (m[1].toLowerCase() === 'li') continue;
+      var dirs = [], liRe = /<li\b([^>]*)>([\s\S]*?)<\/li>/g, lm;
+      while ((lm = liRe.exec(m[2]))) {
+        // 条件文件夹（IfModActive…）先跳过：我们无法精确还原玩家的模组加载顺序
+        if (/IfMod(Active|NotActive)/i.test(lm[1] || '')) continue;
+        var v = lm[2].replace(/<[^>]+>/g, '').trim();
+        if (v) dirs.push(v.replace(/\\/g, '/').replace(/^\/+|\/+$/g, ''));
+      }
+      blocks.push({ key: m[1].toLowerCase(), dirs: dirs });
+    }
+    if (!blocks.length) return null;
+    var chosen = null, i;
+    if (gameVersion) {
+      var want = 'v' + gameVersion;
+      for (i = 0; i < blocks.length; i++) if (blocks[i].key === want) { chosen = blocks[i]; break; }
+    }
+    if (!chosen && gameVersion) {
+      for (i = 0; i < blocks.length; i++) {
+        var vm = /^v(\d+\.\d+)$/.exec(blocks[i].key);
+        if (!vm || cmpVer(vm[1], gameVersion) > 0) continue;
+        if (!chosen || cmpVer(vm[1], chosen.key.slice(1)) > 0) chosen = blocks[i];
+      }
+    }
+    if (!chosen) for (i = 0; i < blocks.length; i++) if (blocks[i].key === 'default') { chosen = blocks[i]; break; }
+    if (!chosen) chosen = blocks[blocks.length - 1];
+    return chosen.dirs;
+  }
+
+  /** 这个模组对当前游戏版本生效的加载文件夹（'' 表示模组根） */
+  async function effectiveFolders(group, gameVersion) {
+    for (var i = 0; i < group.files.length; i++) {
+      var rel = relOf(group.files[i].path, group.root).toLowerCase();
+      if (rel === 'loadfolders.xml') {
+        var dirs = pickLoadFolders(await readText(group.files[i].file), gameVersion);
+        if (dirs && dirs.length) return dirs;
+        break;
+      }
+    }
+    // 没写 LoadFolders.xml：根 + 「不高于当前游戏版本的最高版本目录」
+    var vers = versionDirsOf(group);
+    var folders = [''];
+    if (vers.length) {
+      var pick = null;
+      for (var v = 0; v < vers.length; v++) {
+        if (!gameVersion || cmpVer(vers[v], gameVersion) <= 0) pick = vers[v];
+      }
+      if (!pick) pick = vers[0];
+      folders.push(pick);
+    }
+    return folders;
+  }
+
+  /** 按生效文件夹分类文件：Defs XML / 简中语言包 / Textures 散装贴图 */
+  function classifyFiles(group, folders) {
+    var out = { defDocs: [], langDocs: [], textures: [] };
+    var seen = {};
+    folders = folders.filter(function (v, i, a) { return a.indexOf(v) === i; });
+    group.files.forEach(function (f) {
+      var rel = relOf(f.path, group.root);
+      var lower = rel.toLowerCase();
+      for (var i = 0; i < folders.length; i++) {
+        var pre = folders[i] ? folders[i].toLowerCase() + '/' : '';
+        if (lower.indexOf(pre + 'defs/') === 0 && /\.xml$/i.test(rel)) {
+          if (!seen['d:' + rel]) { seen['d:' + rel] = 1; out.defDocs.push({ rel: rel, file: f.file }); }
+          return;
+        }
+        if (lower.indexOf(pre + 'languages/chinesesimplified/definjected/') === 0 && /\.xml$/i.test(rel)) {
+          if (!seen['l:' + rel]) { seen['l:' + rel] = 1; out.langDocs.push({ rel: rel, file: f.file }); }
+          return;
+        }
+        if (lower.indexOf(pre + 'textures/') === 0 && IMG_EXT.test(rel)) {
+          var texRel = rel.slice(pre.length + 'textures/'.length);
+          if (!seen['t:' + texRel]) { seen['t:' + texRel] = 1; out.textures.push({ rel: texRel, file: f.file }); }
+          return;
+        }
+      }
+    });
+    return out;
+  }
+
+  // ---------------------------------------------------------------- 声明了哪些 def
+
+  /** 扫这个模组自己的 Defs XML，记下它声明了哪些 defName（只看顶层 def 标签） */
+  function scanDeclared(docs) {
+    var out = { things: {}, terrains: {}, researches: {}, stuffCats: {} };
+    (docs || []).forEach(function (d) {
+      var xml = d.xml || '';
+      var re = /<ThingDef\b[^>]*>([\s\S]*?)<\/ThingDef>/g, m;
+      while ((m = re.exec(xml))) {
+        var dn = xmlText(m[1], 'defName');
+        if (dn) out.things[dn] = 1;
+      }
+      var tre = /<TerrainDef\b[^>]*>([\s\S]*?)<\/TerrainDef>/g;
+      while ((m = tre.exec(xml))) {
+        var tdn = xmlText(m[1], 'defName');
+        if (tdn) out.terrains[tdn] = 1;
+      }
+      var rre = /<ResearchProjectDef\b[^>]*>([\s\S]*?)<\/ResearchProjectDef>/g;
+      while ((m = rre.exec(xml))) {
+        var rdn = xmlText(m[1], 'defName');
+        if (rdn) out.researches[rdn] = 1;
+      }
+      var cre = /<StuffCategoryDef\b[^>]*>([\s\S]*?)<\/StuffCategoryDef>/g;
+      while ((m = cre.exec(xml))) {
+        var cdn = xmlText(m[1], 'defName');
+        if (cdn) out.stuffCats[cdn] = 1;
+      }
+    });
+    return out;
+  }
+
+  // ---------------------------------------------------------------- 贴图索引 / 解码（和 gameimport 同款规则）
+
+  function buildTexIndex(list) {
+    var arr = list.slice().sort(function (a, b) { return a.rel < b.rel ? -1 : a.rel > b.rel ? 1 : 0; });
+    return {
+      all: arr,
+      find: function (prefix) {
+        var p = String(prefix || '').replace(/\\/g, '/').replace(/^\/+/, '');
+        var out = [];
+        for (var i = 0; i < arr.length; i++) {
+          var r = arr[i].rel;
+          if (r.indexOf(p) !== 0) continue;
+          if (r.length > p.length && '._/'.indexOf(r[p.length]) < 0) continue;
+          out.push(arr[i]);
+        }
+        return out;
+      }
+    };
+  }
+
+  function classify(files, base) {
+    var lastseg = base.split('/').pop();
+    var out = { variants: [] };
+    files.forEach(function (f) {
+      var stem = stripExt(f.rel);
+      var tail;
+      if (stem.indexOf(base + '/') === 0) {
+        var rest = stem.slice(base.length + 1);
+        tail = rest.indexOf(lastseg) === 0 ? rest.slice(lastseg.length) : rest;
+      } else if (stem.indexOf(base) === 0) {
+        tail = stem.slice(base.length);
+      } else return;
+      var t = tail.replace(/^_+/, '').toLowerCase();
+      if (!t) { if (!out.plain) out.plain = f; return; }
+      if (DIR_SLOT[t]) { if (!out[DIR_SLOT[t]]) out[DIR_SLOT[t]] = f; return; }
+      if (SKIP_TAIL[t]) return;
+      out.variants.push(f);
+    });
+    return out;
+  }
+
+  function isGrayscale(rgba, w, h) {
+    var step = Math.max(1, Math.floor((w * h) / 2000));
+    var sat = 0, n = 0;
+    for (var i = 0; i < w * h; i += step) {
+      var o = i * 4;
+      if (rgba[o + 3] < 32) continue;
+      var r = rgba[o], g = rgba[o + 1], b = rgba[o + 2];
+      var mx = Math.max(r, g, b);
+      if (!mx) continue;
+      sat += (mx - Math.min(r, g, b)) / mx;
+      n++;
+    }
+    return n ? (sat / n) < 0.15 : false;
+  }
+
+  function alphaBox(rgba, w, h) {
+    var minx = w, miny = h, maxx = -1, maxy = -1;
+    for (var y = 0; y < h; y++) {
+      for (var x = 0; x < w; x++) {
+        if (rgba[(y * w + x) * 4 + 3] > 24) {
+          if (x < minx) minx = x; if (x > maxx) maxx = x;
+          if (y < miny) miny = y; if (y > maxy) maxy = y;
+        }
+      }
+    }
+    if (maxx < 0) return null;
+    var nx = minx / w, ny = miny / h, nw = (maxx - minx + 1) / w, nh = (maxy - miny + 1) / h;
+    if (nx < 0.005 && ny < 0.005 && nw > 0.99 && nh > 0.99) return null;
+    return [Math.round(nx * 1e4) / 1e4, Math.round(ny * 1e4) / 1e4,
+            Math.round(nw * 1e4) / 1e4, Math.round(nh * 1e4) / 1e4];
+  }
+
+  function parseVec(raw) {
+    if (!raw) return [1, 1];
+    var n = (String(raw).match(/-?\d+(?:\.\d+)?/g) || []).map(Number);
+    if (!n.length) return [1, 1];
+    if (n.length === 1) return [Math.round(n[0] * 1e4) / 1e4, Math.round(n[0] * 1e4) / 1e4];
+    return [Math.round(n[0] * 1e4) / 1e4, Math.round(n[1] * 1e4) / 1e4];
+  }
+  function parseVec3(raw) {
+    if (!raw) return null;
+    var n = (String(raw).match(/-?\d+(?:\.\d+)?/g) || []).map(Number);
+    if (n.length >= 3) return [n[0], n[2]];
+    if (n.length === 2) return [n[0], n[1]];
+    return null;
+  }
+  function offsetsOf(g) {
+    var out = {}, any = false;
+    [['n', 'drawOffsetNorth'], ['e', 'drawOffsetEast'], ['s', 'drawOffsetSouth'], ['w', 'drawOffsetWest']].forEach(function (p) {
+      var v = parseVec3(g[p[1]]);
+      if (v && (Math.abs(v[0]) > 1e-6 || Math.abs(v[1]) > 1e-6)) {
+        out[p[0]] = [Math.round(v[0] * 1e4) / 1e4, Math.round(v[1] * 1e4) / 1e4];
+        any = true;
+      }
+    });
+    var gv = parseVec3(g.drawOffset);
+    if (gv && (Math.abs(gv[0]) > 1e-6 || Math.abs(gv[1]) > 1e-6)) { out.g = gv; any = true; }
+    return any ? out : null;
+  }
+  function colorOf(raw) {
+    var n = (String(raw).match(/-?\d+(?:\.\d+)?/g) || []).map(Number);
+    if (n.length < 3) return null;
+    if (Math.max(n[0], n[1], n[2]) <= 1) n = n.map(function (v) { return v * 255; });
+    function h(v) { v = Math.max(0, Math.min(255, Math.round(v))); return (v < 16 ? '0' : '') + v.toString(16); }
+    return '#' + h(n[0]) + h(n[1]) + h(n[2]);
+  }
+
+  /** 一张散装贴图 → {rgba,width,height}；dds 用 RWZip 解，png/jpg 交给浏览器 */
+  async function imageOf(texEntry) {
+    var rel = String(texEntry.rel || '').toLowerCase();
+    if (/\.dds$/.test(rel)) {
+      if (!global.RWZip || !global.RWZip.decodeDds) throw new Error('缺少 DDS 解码器');
+      var dec = global.RWZip.decodeDds(new Uint8Array(await readBuf(texEntry.file)));
+      return { rgba: dec.rgba, width: dec.width, height: dec.height };
+    }
+    if (typeof global.createImageBitmap !== 'function') throw new Error('环境不支持 PNG 解码');
+    var bytes = new Uint8Array(await readBuf(texEntry.file));
+    var blob = new global.Blob([bytes], { type: /\.jpe?g$/i.test(rel) ? 'image/jpeg' : 'image/png' });
+    var bmp = await global.createImageBitmap(blob);
+    var c = global.document.createElement('canvas');
+    c.width = bmp.width; c.height = bmp.height;
+    var cx = c.getContext('2d');
+    cx.drawImage(bmp, 0, 0);
+    var d = cx.getImageData(0, 0, c.width, c.height);
+    return { rgba: d.data, width: c.width, height: c.height };
+  }
+
+  /** 解码 → 必要时降到 512px → 存 IndexedDB；返回 alphaBox / 实际写盘的名字 */
+  async function saveSprite(name, img) {
+    var rgba = img.rgba, w = img.width, h = img.height;
+    if (Math.max(w, h) > MAXPX) {
+      var r = MAXPX / Math.max(w, h);
+      var nw = Math.max(1, Math.round(w * r)), nh = Math.max(1, Math.round(h * r));
+      var big = global.document.createElement('canvas');
+      big.width = w; big.height = h;
+      big.getContext('2d').putImageData(new global.ImageData(rgba, w, h), 0, 0);
+      var small = global.document.createElement('canvas');
+      small.width = nw; small.height = nh;
+      var sc = small.getContext('2d');
+      sc.imageSmoothingEnabled = true; sc.imageSmoothingQuality = 'high';
+      sc.drawImage(big, 0, 0, nw, nh);
+      rgba = sc.getImageData(0, 0, nw, nh).data;
+      w = nw; h = nh;
+    }
+    var canvas = global.document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    var cx = canvas.getContext('2d');
+    cx.putImageData(new global.ImageData(rgba, w, h), 0, 0);
+    var blob = await new Promise(function (res, rej) {
+      canvas.toBlob(function (b) { if (b) res(b); else rej(new Error('PNG 编码失败')); }, 'image/png');
+    });
+    await global.RWGame.putTexture(name, blob);
+    return { box: alphaBox(rgba, w, h), size: blob.size || 0 };
+  }
+
+  function spriteNamesOf(entry) {
+    var out = [];
+    if (!entry) return out;
+    if (entry.imgs) for (var k in entry.imgs) out.push(entry.imgs[k]);
+    if (entry.sheets) for (var s in entry.sheets) out.push(entry.sheets[s]);
+    if (entry.ov && entry.ov.imgs) for (var o in entry.ov.imgs) out.push(entry.ov.imgs[o]);
+    return out;
+  }
+
+  /**
+   * 给一个模组的建筑解贴图。摸不到图 / 环境不支持就跳过，让图标回退到矢量画法。
+   * 返回 {items:{defName:entry}, names:[文件名], boxes:{文件名:box}, sprites:n}
+   */
+  async function packModSprites(parsed, mod) {
+    var res = { items: {}, names: [], boxes: {}, sprites: 0 };
+    if (!mod.textures || !mod.textures.length) return res;
+    var tex = buildTexIndex(mod.textures);
+    var tag = 'mod_' + safeName(mod.packageId) + '__';
+
+    async function add(name, texEntry) {
+      var img = await imageOf(texEntry);
+      var saved = await saveSprite(name, img);
+      res.names.push(name);
+      if (saved.box) res.boxes[name] = saved.box;
+      res.sprites++;
+      return img;
+    }
+
+    for (var i = 0; i < mod.buildings.length; i++) {
+      if (mod.cancelled) return res;
+      var def = mod.buildings[i];
+      var dn = def.def;
+      var g;
+      try { g = global.RWGame._findGraphic(parsed, dn); } catch (e) { g = null; }
+      if (!g || !g.texPath) continue;
+      var files = tex.find(g.texPath);
+      if (!files.length) continue;
+      var got = classify(files, g.texPath);
+      var gc = (g.graphicClass || '').split('.').pop();
+      var link = LINK_KIND[norm(g.linkType)];
+      var ds = parseVec(g.drawSize);
+      var offs = offsetsOf(g);
+      var stuffable = !!(def.stuffCats && def.stuffCats.length);
+      var fixed = g.color ? colorOf(g.color) : null;
+      var tint = fixed || (stuffable ? 'stuff' : null);
+      var entry = { ds: ds };
+      if (offs) entry.off = offs;
+      try {
+        if (link) {
+          var sheets = {}, grayAny = false;
+          if (gc === 'Graphic_Appearances') {
+            var baseName = g.texPath.split('/').pop();
+            for (var a = 0; a < APPEARANCES.length; a++) {
+              var app = APPEARANCES[a];
+              var hit = tex.find(g.texPath + '/' + baseName + '_Atlas_' + app);
+              if (!hit.length) continue;
+              var d1 = await add(tag + dn + '__' + app + '.png', hit[0]);
+              sheets[app] = tag + dn + '__' + app + '.png';
+              if (isGrayscale(d1.rgba, d1.width, d1.height)) grayAny = true;
+            }
+            if (!Object.keys(sheets).length) continue;
+            if (!grayAny) tint = null;
+          } else {
+            var atlasName = tag + dn + '__atlas.png';
+            var d2 = await add(atlasName, got.plain || files[0]);
+            sheets['default'] = atlasName;
+            if (!isGrayscale(d2.rgba, d2.width, d2.height)) tint = null;
+          }
+          entry.kind = 'linked';
+          entry.link = link;
+          entry.sheets = sheets;
+          if (g.linkFlags && g.linkFlags.length) entry.lf = g.linkFlags;
+        } else if (gc === 'Graphic_Multi') {
+          var imgs = {}, first = null, slots = ['n', 'e', 's', 'w'];
+          for (var s = 0; s < slots.length; s++) {
+            var f = got[slots[s]];
+            if (!f) continue;
+            var nmM = tag + dn + '__' + slots[s] + '.png';
+            var d3 = await add(nmM, f);
+            imgs[slots[s]] = nmM;
+            first = first || d3;
+          }
+          if (!first) {
+            var nmM1 = tag + dn + '__n.png';
+            first = await add(nmM1, got.plain || got.variants[0] || files[0]);
+            imgs.n = nmM1;
+          }
+          if (tint && first && !isGrayscale(first.rgba, first.width, first.height)) tint = null;
+          entry.kind = 'multi';
+          entry.imgs = imgs;
+        } else {
+          var pick = (gc === 'Graphic_Random' && got.variants.length)
+            ? got.variants.slice().sort(function (x, y) { return x.rel < y.rel ? -1 : 1; })[0]
+            : (got.plain || got.variants[0] || files[0]);
+          if (!pick) continue;
+          var nmS = tag + dn + '__n.png';
+          var d5 = await add(nmS, pick);
+          if (tint && !isGrayscale(d5.rgba, d5.width, d5.height)) tint = null;
+          entry.kind = 'single';
+          entry.imgs = { n: nmS };
+        }
+        if (tint) entry.tint = tint;
+        if ((g.thingClass || '').indexOf('Building_Door') >= 0) entry.mir = 1;
+        if (g.turretGunDef) {
+          var gg = global.RWGame._findGraphic(parsed, g.turretGunDef);
+          if (gg && gg.texPath) {
+            var gf = tex.find(gg.texPath);
+            if (gf.length) {
+              var topName = tag + dn + '__top.png';
+              await add(topName, gf[0]);
+              entry.ov = { ds: parseVec(gg.drawSize), imgs: { n: topName } };
+            }
+          }
+        }
+      } catch (e) {
+        // 单张贴图失败不影响整个模组：回退矢量图标
+        continue;
+      }
+      res.items[dn] = entry;
+    }
+    return res;
+  }
+
+  // ---------------------------------------------------------------- 数据合并 / 回滚
+
+  function cloneManifest(m) {
+    if (!m) return null;
+    return {
+      base: m.base || null,
+      atlas: m.atlas || { cols: 4, rows: 4, inset: 0.03125 },
+      stuff: cloneObj(m.stuff),
+      byName: cloneObj(m.byName),
+      boxes: cloneObj(m.boxes),
+      items: cloneObj(m.items),
+      floors: cloneObj(m.floors)
+    };
+  }
+
+  function emptyManifest() {
+    return { base: null, atlas: { cols: 4, rows: 4, inset: 0.03125 }, stuff: {}, byName: {}, boxes: {}, items: {}, floors: {} };
+  }
+
+  /** 把「核心快照 + 若干模组记录」重新合进 RWData，返回合并后的贴图清单 */
+  function applyRecords(records, base) {
+    var D = global.RWData;
+    records = records || [];
+
+    // ---- 建筑：先回滚到核心，再按记录顺序合并（后导入的覆盖先导入的）----
+    if (base && base.buildings) {
+      D.restoreBaseBuildings(base.buildings);
+      // 用户可能还没走过「导入游戏资源」的初始化合并（例如只导了模组）：
+      // 把核心建筑补进来，保证核心数据不会因为导模组而变少。
+      D.mergeBuildings(base.buildings);
+    } else {
+      var B = D.BUILDINGS;
+      for (var i = B.length - 1; i >= 0; i--) {
+        if (B[i] && B[i].mod) {
+          if (D.byId[B[i].id] === B[i]) delete D.byId[B[i].id];
+          B.splice(i, 1);
+        }
+      }
+      D.reindexBuildings();
+    }
+    records.forEach(function (r) { if (r.buildings && r.buildings.length) D.mergeBuildings(r.buildings); });
+
+    // ---- 材质 / 材质分类：核心打底，模组按 id 去重追加 ----
+    var baseStuffs = (base && base.stuffs) ? base.stuffs : (D.STUFFS || []).filter(function (s) { return !s.mod; });
+    var seenS = {}, stuffs = [];
+    baseStuffs.forEach(function (s) { if (s && s.id && !seenS[s.id]) { stuffs.push(s); seenS[s.id] = 1; } });
+    records.forEach(function (r) {
+      (r.stuffs || []).forEach(function (s) {
+        if (!s || !s.id || seenS[s.id]) return;
+        var c = cloneEntry(s); c.mod = r.packageId;
+        stuffs.push(c); seenS[s.id] = 1;
+      });
+    });
+    D.STUFFS = stuffs;
+
+    var baseCats = (base && base.stuffCats) ? base.stuffCats : (D.STUFF_CATS || []).filter(function (c) { return !c.mod; });
+    var seenC = {}, cats = [];
+    baseCats.forEach(function (c) { if (c && c.id && !seenC[c.id]) { cats.push(c); seenC[c.id] = 1; } });
+    records.forEach(function (r) {
+      (r.stuffCats || []).forEach(function (c) {
+        if (!c || !c.id || seenC[c.id]) return;
+        var cc = cloneEntry(c); cc.mod = r.packageId;
+        cats.push(cc); seenC[c.id] = 1;
+      });
+    });
+    D.STUFF_CATS = cats;
+
+    // ---- 科技 / 物品名（只增不减；删模组后残留也无害）----
+    records.forEach(function (r) {
+      if (r.researches && r.researches.length) D.mergeResearches(r.researches);
+      if (r.items) D.mergeItemNames(r.items);
+    });
+
+    // ---- 贴图清单 ----
+    var baseManifest = (base && base.manifest) || global.RWSprites || null;
+    if (!records.length) return baseManifest ? cloneManifest(baseManifest) : null;
+    var m = baseManifest ? cloneManifest(baseManifest) : emptyManifest();
+    records.forEach(function (r) {
+      var sp = r.sprites || {};
+      Object.keys(sp).forEach(function (dn) {
+        m.items[dn] = sp[dn];
+        m.byName[norm(dn)] = dn;
+      });
+      var bx = r.boxes || {};
+      Object.keys(bx).forEach(function (k) { m.boxes[k] = bx[k]; });
+    });
+    return m;
+  }
+
+  async function loadBase() {
+    var G = global.RWGame;
+    var base = { buildings: null, stuffs: null, stuffCats: null, manifest: null, gameVersion: '' };
+    if (!G) return base;
+    try {
+      base.buildings = await G.getMeta('buildings');
+      base.stuffs = await G.getMeta('stuffs');
+      base.stuffCats = await G.getMeta('stuffCats');
+      base.manifest = await G.getMeta('manifest');
+      base.gameVersion = (await G.getMeta('gameVersion')) || '';
+    } catch (e) { /* 没有游戏数据也能只导模组 */ }
+    return base;
+  }
+
+  async function loadRecords() {
+    if (state.records) return state.records;
+    try { state.records = (await global.RWGame.getMeta(MODS_KEY)) || []; }
+    catch (e) { state.records = []; }
+    return state.records;
+  }
+
+  function setRecords(records) {
+    state.records = records || [];
+    return global.RWGame.setMeta(MODS_KEY, state.records);
+  }
+
+  // ---------------------------------------------------------------- 解析
+
+  /**
+   * 把核心 Defs + 已存模组 Defs + 本次新模组 Defs 一起解析。
+   * （ParentName 可能跨模组/跨原版，必须同一批喂给 RWDefs.parse）
+   */
+  function parseTogether(baseRecords, newMods, core) {
+    var docs = [], lang = {};
+    if (core && core.docs && core.docs.length) docs = docs.concat(core.docs);
+    (baseRecords || []).forEach(function (r) {
+      if (r.defDocs) docs = docs.concat(r.defDocs);
+      if (r.lang) for (var k in r.lang) lang[k] = r.lang[k];
+    });
+    newMods.forEach(function (m) {
+      if (m.defDocs) docs = docs.concat(m.defDocs);
+      if (m.lang) for (var k2 in m.lang) lang[k2] = m.lang[k2];
+    });
+    return global.RWDefs.parse(docs, lang);
+  }
+
+  function extractForMod(parsed, mod) {
+    var dec = mod.declared;
+    var buildings = [];
+    var seen = {};
+    parsed.buildings.forEach(function (b) {
+      if (!b || !b.def || !dec.things[b.def] || seen[b.def]) return;
+      seen[b.def] = 1;
+      var c = cloneEntry(b);
+      c.mod = mod.packageId;
+      c.modName = mod.name;
+      buildings.push(c);
+    });
+    var stuffs = [];
+    parsed.stuffs.forEach(function (s) {
+      if (!s || !s.def || !dec.things[s.def]) return;
+      var c = cloneEntry(s);
+      c.mod = mod.packageId;
+      stuffs.push(c);
+    });
+    var cats = [];
+    parsed.stuffCats.forEach(function (c) {
+      if (!c || !c.id || !dec.stuffCats[c.id]) return;
+      var cc = cloneEntry(c);
+      cc.mod = mod.packageId;
+      cats.push(cc);
+    });
+    var researches = [];
+    parsed.researches.forEach(function (r) {
+      if (!r || !r.def || !dec.researches[r.def]) return;
+      var c = cloneEntry(r);
+      c.mod = mod.packageId;
+      researches.push(c);
+    });
+    var items = {};
+    if (parsed.items) Object.keys(parsed.items).forEach(function (dn) {
+      if (dec.things[dn]) items[dn] = parsed.items[dn];
+    });
+    return { buildings: buildings, stuffs: stuffs, stuffCats: cats, researches: researches, items: items };
+  }
+
+  // ---------------------------------------------------------------- 公开操作
+
+  function tickOf(onProgress) {
+    return function (text, frac) { if (onProgress) onProgress(text, frac); };
+  }
+
+  /**
+   * 导入一批文件（来自 RWGame.collectFromDrop / collectFromInput 的 [{path,file}]）。
+   * @param {Array} files
+   * @param {Function} [onProgress] (text, frac)
+   * @param {Object} [opts] {skipTextures:true} —— Node 命令行/单测里跳过贴图解码
+   */
+  async function importFiles(files, onProgress, opts) {
+    opts = opts || {};
+    var tick = tickOf(onProgress);
+
+    tick('正在识别模组…', 0.02);
+    var groups = groupMods(files);
+    var errors = [], added = [], warnings = [];
+    if (!groups.length) {
+      throw new Error('没找到模组：拖入的文件夹里没有 About/About.xml。' +
+        '本地模组在 RimWorld/Mods/；Steam 创意工坊订阅的 mod 在 steamapps/workshop/content/294100/，' +
+        '把 294100 整个文件夹拖进来即可（面板里「创意工坊的 mod 在哪？」有各平台路径）。');
+    }
+
+    var base = await loadBase();
+    var core = await global.RWGame.getCoreDefDocs();
+    var records = (await loadRecords()).slice();
+    var gameVersion = (core && core.version) || base.gameVersion || '';
+
+    // ---- 读 About / 选生效文件夹 / 分类文件 ----
+    var mods = [];
+    for (var gi = 0; gi < groups.length; gi++) {
+      var group = groups[gi];
+      tick('正在读取模组信息 ' + (gi + 1) + '/' + groups.length + '…', 0.04 + 0.12 * gi / groups.length);
+      var about;
+      try { about = await readAbout(group); }
+      catch (e) { errors.push({ name: group.root || '?', message: 'About.xml 读取失败：' + (e.message || e) }); continue; }
+      if (OFFICIAL[String(about.packageId).toLowerCase()] || /^ludeon\./i.test(about.packageId)) {
+        errors.push({ name: about.name || group.root, message: '这是官方 Core/DLC，请用「导入游戏资源」导入游戏目录，不要当模组导入' });
+        continue;
+      }
+      var folders = await effectiveFolders(group, gameVersion);
+      var cls = classifyFiles(group, folders);
+      var defDocs = [];
+      for (var di = 0; di < cls.defDocs.length; di++) {
+        var rel = cls.defDocs[di].rel;
+        defDocs.push({ path: (group.root ? group.root + '/' : '') + rel, xml: await readText(cls.defDocs[di].file) });
+        if (di % 30 === 0) await sleep(0);
+      }
+      var lang = {};
+      for (var li = 0; li < cls.langDocs.length; li++) {
+        try {
+          var ltxt = await readText(cls.langDocs[li].file);
+          if (global.RWDefs.collectLangXml) global.RWDefs.collectLangXml(ltxt, lang);
+        } catch (e) { /* 语言包坏了不影响 */ }
+      }
+      var declared = scanDeclared(defDocs);
+      var mod = {
+        packageId: about.packageId,
+        name: about.name,
+        author: about.author,
+        version: about.version,
+        supported: about.supported,
+        steamId: about.steamId,
+        at: Date.now(),
+        gameVersion: gameVersion,
+        folders: folders,
+        defDocs: defDocs,
+        lang: lang,
+        declared: declared,
+        textures: opts.skipTextures ? [] : cls.textures
+      };
+      if (!defDocs.length) {
+        warnings.push({ name: about.name, message: '没有找到当前游戏版本生效的 Defs（' + (gameVersion || '未知版本') + '），已跳过' });
+      }
+      mods.push(mod);
+    }
+    if (!mods.length) return finalize([], base, errors, added, warnings, 0, 0);
+
+    // ---- 一起解析（核心 + 旧模组 + 新模组）----
+    var newPkgs = {};
+    mods.forEach(function (m) { newPkgs[m.packageId] = 1; });
+    var keepRecords = records.filter(function (r) { return !newPkgs[r.packageId]; });
+    tick('正在解析模组定义（' + (core && core.docs ? '核心 + ' : '') + mods.length + ' 个模组）…', 0.2);
+    var parsed = parseTogether(keepRecords, mods, core);
+    if (!core) warnings.push({ name: '', message: '没有找到已导入的游戏目录数据（如果之前导入过旧版缓存，请重新导入一次游戏目录）：模组里 ParentName 指向原版/其它 DLC 的继承可能解析不全。建议先「导入游戏资源」再导模组。' });
+
+    // ---- 每个模组只挑自己声明的 def ----
+    var got = {}, dupes = {};
+    for (var mi = 0; mi < mods.length; mi++) {
+      var m = mods[mi];
+      var data = extractForMod(parsed, m);
+      data.buildings.forEach(function (b) {
+        if (got[b.def]) { dupes[b.def] = 1; return; }
+        (m.buildings = m.buildings || []).push(b);
+      });
+      m.stuffs = [];
+      m.stuffCats = [];
+      m.researches = [];
+      m.items = {};
+      m.buildings = m.buildings || [];
+      m.stuffs = data.stuffs;
+      m.stuffCats = data.stuffCats;
+      m.researches = data.researches;
+      m.items = data.items;
+      if (!m.buildings.length) {
+        warnings.push({ name: m.name, message: '没有解析出可建造建筑（可能只加了物品/家具 def 不是 Building，或依赖原版补丁）' });
+      }
+      got = got;
+      // 记录已占用的 defName，避免后面的模组重复加
+      m.buildings.forEach(function (b) { got[b.def] = 1; });
+    }
+    if (Object.keys(dupes).length) {
+      warnings.push({ name: '', message: '有 ' + Object.keys(dupes).length + ' 个 def 被多个模组同时声明，按导入顺序取了第一个：' + Object.keys(dupes).slice(0, 8).join(', ') });
+    }
+
+    // ---- 贴图 ----
+    var sprites = 0, bytes = 0;
+    if (!opts.skipTextures) {
+      for (var pi = 0; pi < mods.length; pi++) {
+        tick('正在解出模组贴图 ' + (pi + 1) + '/' + mods.length + '…', 0.5 + 0.45 * pi / mods.length);
+        try {
+          var packed = await packModSprites(parsed, mods[pi]);
+          mods[pi].sprites = packed.items;
+          mods[pi].spriteNames = packed.names;
+          mods[pi].boxes = packed.boxes;
+          sprites += packed.sprites;
+          if (global.RWGame && global.RWGame._lastSpriteBytes) bytes += 0; // 预留
+        } catch (e) {
+          mods[pi].sprites = {};
+          mods[pi].spriteNames = [];
+          mods[pi].boxes = {};
+          warnings.push({ name: mods[pi].name, message: '贴图解码失败（会回退矢量图标）：' + (e.message || e) });
+        }
+      }
+    } else {
+      mods.forEach(function (m) { m.sprites = {}; m.spriteNames = []; m.boxes = {}; });
+    }
+
+    // ---- 存记录 + 应用 ----
+    var nextRecords = keepRecords.concat(mods);
+    mods.forEach(function (m) {
+      added.push({ packageId: m.packageId, name: m.name, count: m.buildings.length, sprites: (m.spriteNames || []).length });
+    });
+    await setRecords(nextRecords);
+    state.base = base;
+    state.gameVersion = gameVersion;
+    var manifest = applyRecords(nextRecords, base);
+    var buildings = 0;
+    mods.forEach(function (m) { buildings += m.buildings.length; });
+    tick('完成：' + buildings + ' 个模组建筑 · ' + sprites + ' 张贴图', 1);
+    return finalize(nextRecords, base, errors, added, warnings, sprites, buildings, manifest);
+  }
+
+  function finalize(records, base, errors, added, warnings, sprites, buildings, manifest) {
+    if (manifest === undefined) manifest = applyRecords(records, state.base || base);
+    return {
+      manifest: manifest,
+      mods: list(),
+      added: added,
+      errors: errors,
+      warnings: warnings,
+      sprites: sprites,
+      buildings: buildings,
+      hasCore: !!(state.base && state.base.buildings)
+    };
+  }
+
+  /** 启动时从 IndexedDB 恢复已导入的模组（在 RWGame.loadCache() 之后调用） */
+  async function restore() {
+    var records;
+    try { records = (await global.RWGame.getMeta(MODS_KEY)) || []; }
+    catch (e) { records = []; }
+    state.records = records;
+    var base = await loadBase();
+    state.base = base;
+    // 即使没有导入过模组，也把游戏版本记下来：导出蓝图时 meta.gameVersion 要用
+    state.gameVersion = base.gameVersion || '';
+    if (!records.length) return null;
+    var manifest = applyRecords(records, base);
+    return { manifest: manifest, mods: list() };
+  }
+
+  /** 游戏目录重新导入之后：用新的核心数据重新解析已存模组（贴图沿用之前解出的文件） */
+  async function refresh() {
+    var records = await loadRecords();
+    if (!records.length) return null;
+    var base = await loadBase();
+    var core = await global.RWGame.getCoreDefDocs();
+    var parsed;
+    try { parsed = parseTogether([], records, core); }
+    catch (e) { return { manifest: applyRecords(records, base), mods: list() }; }
+    var next = [];
+    records.forEach(function (r) {
+      var m = {
+        packageId: r.packageId, name: r.name, author: r.author, version: r.version,
+        supported: r.supported, steamId: r.steamId, at: r.at, gameVersion: base.gameVersion || r.gameVersion,
+        folders: r.folders, defDocs: r.defDocs, lang: r.lang, declared: r.declared,
+        sprites: r.sprites || {}, spriteNames: r.spriteNames || [], boxes: r.boxes || {}
+      };
+      try {
+        var data = extractForMod(parsed, m);
+        m.buildings = data.buildings;
+        m.stuffs = data.stuffs;
+        m.stuffCats = data.stuffCats;
+        m.researches = data.researches;
+        m.items = data.items;
+      } catch (e) {
+        m.buildings = r.buildings || [];
+        m.stuffs = r.stuffs || [];
+        m.stuffCats = r.stuffCats || [];
+        m.researches = r.researches || [];
+        m.items = r.items || {};
+      }
+      // 贴图按 defName 复用；新出现的 def 暂时用矢量图标
+      next.push(m);
+    });
+    await setRecords(next);
+    state.base = base;
+    state.gameVersion = base.gameVersion || '';
+    var manifest = applyRecords(next, base);
+    return { manifest: manifest, mods: list() };
+  }
+
+  /** 删除一个模组：清掉它的贴图、记录，然后把数据回滚到「核心 + 剩余模组」 */
+  async function remove(packageId) {
+    var records = await loadRecords();
+    var keep = [], del = [];
+    records.forEach(function (r) {
+      if (r.packageId === packageId) del.push(r); else keep.push(r);
+    });
+    if (!del.length) return { manifest: applyRecords(keep, state.base || await loadBase()), mods: list() };
+    var names = [];
+    del.forEach(function (r) { names = names.concat(r.spriteNames || []); });
+    try { await global.RWGame.delTextures(names); } catch (e) { /* 清贴图失败不影响数据回滚 */ }
+    await setRecords(keep);
+    var base = state.base || await loadBase();
+    state.base = base;
+    var manifest = applyRecords(keep, base);
+    return { manifest: manifest, mods: list() };
+  }
+
+  /** 清空所有模组 */
+  async function removeAll() {
+    var records = await loadRecords();
+    var names = [];
+    records.forEach(function (r) { names = names.concat(r.spriteNames || []); });
+    try { await global.RWGame.delTextures(names); } catch (e) { /* 同上 */ }
+    await setRecords([]);
+    var base = await loadBase();
+    state.base = base;
+    var manifest = applyRecords([], base);
+    return { manifest: manifest, mods: [] };
+  }
+
+  /** 清空内存状态（「清除游戏缓存」之后调用；IndexedDB 已经被 RWGame.clearCache 清掉） */
+  function reset() {
+    state.records = null;
+    state.base = null;
+    state.gameVersion = '';
+  }
+
+  /**
+   * 给导出蓝图用的模组元信息（meta.modIds / modSteamIds / modNames）。
+   *
+   * 传了 entries（toBlueprintsXML 里的 BuildableThings）时，只把「真正提供了
+   * 蓝图里某个 def 的模组」写进去：Blueprints 只拿 meta 做 mod 差异提示，
+   * 多写无关模组会让玩家看到假的「缺少 mod」。
+   * 不传时退回「所有已扫描模组」，给预览/调试用。
+   */
+  function exportMeta(entries) {
+    var ids = ['brrainz.harmony', 'ludeon.rimworld', 'nova.blueprints.waylith17'];
+    var steam = ['0', '0', '0'];
+    var names = ['Harmony', 'Core', 'Blueprints - 1.7 Waylith (Unofficial)'];
+    var records = state.records || [];
+    var want = null;
+    if (entries && entries.length) {
+      var usedDefs = {};
+      entries.forEach(function (e) {
+        if (!e) return;
+        if (e.defName) usedDefs[e.defName] = 1;
+        if (e.terrain) usedDefs[e.terrain] = 1;
+        if (e.stuff) usedDefs[e.stuff] = 1;   // 核心建筑用了模组材质时，这个模组也得写进 meta
+      });
+      want = {};
+      records.forEach(function (r) {
+        (r.buildings || []).forEach(function (b) { if (b && b.def && usedDefs[b.def]) want[r.packageId] = r; });
+        (r.stuffs || []).forEach(function (s) { if (s && s.def && usedDefs[s.def]) want[r.packageId] = r; });
+      });
+    } else {
+      want = {};
+      records.forEach(function (r) { if (r && r.packageId) want[r.packageId] = r; });
+    }
+    records.forEach(function (r) {
+      if (!r || !r.packageId || !want[r.packageId]) return;
+      var id = String(r.packageId).toLowerCase();
+      if (ids.indexOf(id) >= 0) {
+        var at = ids.indexOf(id);
+        if (r.steamId && steam[at] === '0') steam[at] = String(r.steamId);
+        if (r.name && !names[at]) names[at] = r.name;
+        return;
+      }
+      ids.push(id);
+      steam.push(String(r.steamId || '0'));
+      names.push(r.name || r.packageId);
+    });
+    return { modIds: ids, modSteamIds: steam, modNames: names, gameVersion: state.gameVersion || '' };
+  }
+
+  function list() {
+    return (state.records || []).map(function (r) {
+      return {
+        packageId: r.packageId,
+        name: r.name || r.packageId,
+        count: (r.buildings || []).length,
+        sprites: (r.spriteNames || []).length,
+        version: r.version || '',
+        steamId: r.steamId || '',
+        at: r.at || 0
+      };
+    });
+  }
+
+  global.RWMods = {
+    importFiles: importFiles,
+    restore: restore,
+    refresh: refresh,
+    remove: remove,
+    removeAll: removeAll,
+    reset: reset,
+    list: list,
+    exportMeta: exportMeta,
+    // 给命令行工具 / 单测用
+    _groupMods: groupMods,
+    _pickLoadFolders: pickLoadFolders,
+    _classifyFiles: classifyFiles,
+    _applyRecords: applyRecords,
+    _state: function () { return state; }
   };
 })(typeof window !== 'undefined' ? window : globalThis);
 
@@ -4353,17 +5832,21 @@ kbd {
 
   /** 该建筑在某个朝向 + 某个材质下要用的图片（+ 需要的 drawSize 朝向） */
   function computePlan(e, rot, app) {
+    if (!e) return null;
     // 按材质换图的（Graphic_Appearances：墙 / 栅栏）：挑对应「外观」的那张图集
     if (e.sheets) {
       var f = (app && e.sheets[app]) || e.sheets['Smooth'] || e.sheets['default'] ||
               e.sheets[Object.keys(e.sheets)[0]];
       if (!f) return null;
       if (e.kind === 'linked') return { file: f, ds: e.ds, link: true };
-      return { file: f, ds: e.ds.slice() };
+      return { file: f, ds: (e.ds || [1, 1]).slice() };
     }
+    // 贴图没解出来（浏览器不支持 BC7 / 导入时漏了部分贴图）时，条目可能没有 imgs：
+    // 返回 null 让上层退化成矢量图标，千万别在这里抛异常把整帧渲染炸掉
+    if (!e.imgs) return null;
     var slot = e.kind === 'multi' ? slotOf(rot) : 'n';
     var file = e.imgs[slot];
-    var ds = e.ds.slice();
+    var ds = (e.ds || [1, 1]).slice();
     if (!file && slot === 'w') file = e.imgs.e;            // 西向缺失时用东向镜像
     if (!file && slot === 's') file = e.imgs.n;
     if (!file) file = e.imgs[Object.keys(e.imgs)[0]];
@@ -8738,11 +10221,32 @@ kbd {
       maxX = Math.max(maxX, e.x); maxZ = Math.max(maxZ, e.z);
     });
 
-    // meta：优先复用导入存档里的 mod 列表，这样游戏不会报「缺少 mod」
+    // meta：优先复用导入存档里的 mod 列表，这样游戏不会报「缺少 mod」；
+    // 再把「扫描进来的模组」（js/modimport.js）自动并进去，蓝图里用到模组建筑时游戏才不会误报缺失。
     var meta = opts.meta || {};
-    var modIds = meta.modIds && meta.modIds.length ? meta.modIds : ['brrainz.harmony', 'ludeon.rimworld', 'nova.blueprints.waylith17'];
-    var modSteam = meta.modSteamIds && meta.modSteamIds.length ? meta.modSteamIds : modIds.map(function () { return '0'; });
-    var modNames = meta.modNames && meta.modNames.length ? meta.modNames : ['Harmony', 'Core', 'Blueprints - 1.7 Waylith (Unofficial)'];
+    var auto = (global.RWMods && global.RWMods.exportMeta) ? global.RWMods.exportMeta(entries) : null;
+    var modIds, modSteam, modNames;
+    if (meta.modIds && meta.modIds.length) {
+      modIds = meta.modIds.slice();
+      modSteam = (meta.modSteamIds || []).slice();
+      modNames = (meta.modNames || []).slice();
+    } else if (auto && auto.modIds && auto.modIds.length) {
+      modIds = auto.modIds.slice();
+      modSteam = auto.modSteamIds.slice();
+      modNames = auto.modNames.slice();
+    } else {
+      modIds = ['brrainz.harmony', 'ludeon.rimworld', 'nova.blueprints.waylith17'];
+      modSteam = modIds.map(function () { return '0'; });
+      modNames = ['Harmony', 'Core', 'Blueprints - 1.7 Waylith (Unofficial)'];
+    }
+    if (auto && auto.modIds) {
+      auto.modIds.forEach(function (id, i) {
+        if (modIds.indexOf(id) >= 0) return;
+        modIds.push(id);
+        modSteam.push(auto.modSteamIds[i] || '0');
+        modNames.push(auto.modNames[i] || '');
+      });
+    }
     while (modSteam.length < modIds.length) modSteam.push('0');
     while (modNames.length < modIds.length) modNames.push('');
 
@@ -8751,7 +10255,7 @@ kbd {
     L.push('<?xml version="1.0" encoding="utf-8"?>');
     L.push('<Blueprint>');
     L.push(T + '<meta>');
-    L.push(T + T + '<gameVersion>' + escapeXml(opts.gameVersion || meta.gameVersion || '') + '</gameVersion>');
+    L.push(T + T + '<gameVersion>' + escapeXml(opts.gameVersion || meta.gameVersion || (auto && auto.gameVersion) || '') + '</gameVersion>');
     L.push(T + T + '<modIds>');
     modIds.forEach(function (x) { L.push(T + T + T + '<li>' + escapeXml(x) + '</li>'); });
     L.push(T + T + '</modIds>');
@@ -10794,6 +12298,17 @@ kbd {
       b.onclick = function () { activeCat = pair[0]; buildTabs(); buildPalette(); };
       box.appendChild(b);
     });
+    // 导入过模组建筑才出现「🧩 模组」页签（数据来自 js/modimport.js）
+    var modApi = global.RWMods;
+    if (modApi && modApi.list && modApi.list().length && hasModBuildings()) {
+      var mb = document.createElement('button');
+      mb.id = 'mod';
+      mb.className = 'tab' + (activeCat === 'mod' ? ' on' : '');
+      mb.textContent = '🧩 模组';
+      mb.title = modBuildings().length + ' 项';
+      mb.onclick = function () { activeCat = 'mod'; buildTabs(); buildPalette(); };
+      box.appendChild(mb);
+    }
     Data.CATEGORIES.forEach(function (c) {
       var n = Data.BUILDINGS.filter(function (b) { return b.cat === c.id; }).length;
       var b = document.createElement('button');
@@ -10864,6 +12379,14 @@ kbd {
       list = (state.recent || []).map(function (id) {
         var d = Data.byId[id]; return d ? { def: d } : null;
       }).filter(Boolean);
+    } else if (activeCat === 'mod') {
+      // 只列模组扫描进来的建筑（照常应用搜索过滤）
+      list = Data.BUILDINGS.filter(function (b) {
+        if (!b.mod) return false;
+        if (!q) return true;
+        return (b.name + ' ' + (b.en || '') + ' ' + b.id + ' ' +
+          (b.modName || '') + ' ' + b.mod).toLowerCase().indexOf(q) >= 0;
+      }).map(function (b) { return { def: b }; });
     } else {
       list = Data.BUILDINGS.filter(function (b) {
         if (b.cat !== activeCat) return false;
@@ -10871,7 +12394,7 @@ kbd {
         return (b.name + ' ' + (b.en || '') + ' ' + b.id).toLowerCase().indexOf(q) >= 0;
       }).map(function (b) { return { def: b }; });
     }
-    if (q && activeCat !== 'floor' && activeCat !== 'fav' && activeCat !== 'recent') {
+    if (q && activeCat !== 'floor' && activeCat !== 'fav' && activeCat !== 'recent' && activeCat !== 'mod') {
       // 搜索时跨类别
       list = Data.BUILDINGS.filter(function (b) {
         return (b.name + ' ' + (b.en || '') + ' ' + b.id).toLowerCase().indexOf(q) >= 0;
@@ -10880,7 +12403,9 @@ kbd {
     if (!list.length) {
       box.innerHTML = '<div class="empty">' +
         (activeCat === 'fav' ? '还没收藏东西 —— 点物品上的 ☆ 可以收藏' :
-         activeCat === 'recent' ? '还没有用过的东西' : '没有匹配项') + '</div>';
+         activeCat === 'recent' ? '还没有用过的东西' :
+         activeCat === 'mod' ? '还没有导入模组建筑 —— 右侧「导入模组建筑」把 Mods 文件夹拖进来' :
+         '没有匹配项') + '</div>';
       return;
     }
 
@@ -10900,6 +12425,7 @@ kbd {
         var dn = def.def || def.id;
         var en = def.en || '';
         el.title = def.name +
+          (def.mod ? '（模组：' + (def.modName || def.mod) + '）' : '') +
           (en && en !== def.name && en.toLowerCase() !== String(dn).toLowerCase() ? '（' + en + '）' : '') +
           (def.dlc ? '　[' + def.dlc + ']' : '') +
           (def.menu === 0 ? '\n○ 不在建筑师菜单里（工作台制作 / 任务奖励）' : '') +
@@ -12022,6 +13548,135 @@ kbd {
     toastTimer = setTimeout(function () { el.className = 'toast'; }, 4200);
   }
 
+  // ------------------------------------------------------------------ 模组建筑
+  // 玩家把 Mods 文件夹拖进来 → js/modimport.js 扫描模组里新增的可建造建筑和贴图。
+  // modimport.js 可能不存在（单文件版 / 旧版本），所有入口都先判空。
+  function modsApi() { return global.RWMods; }
+
+  function hasModBuildings() { return modBuildings().length > 0; }
+
+  function modBuildings() {
+    return ((Data && Data.BUILDINGS) || []).filter(function (b) { return !!(b && b.mod); });
+  }
+
+  /** 把贴图清单应用到画布 / 物品栏（「导入游戏资源」和「导入模组建筑」共用） */
+  function useManifest(manifest, note, setStatus) {
+    if (!manifest) return false;
+    Art.setSprites(manifest, global.RWGame ? global.RWGame.getImageURL : null);
+    // 单文件版启动时没有 sprites.js，原版贴图开关默认是关闭/禁用的；
+    // 导入（或从缓存恢复）贴图后要主动把它打开，否则画布仍然走矢量图。
+    if (Art.setSpriteEnabled) Art.setSpriteEnabled(true);
+    var spEl = $('useSprites');
+    if (spEl) { spEl.disabled = false; spEl.checked = true; }
+    var spRow = $('spriteRow');
+    if (spRow) { spRow.classList.remove('muted'); spRow.removeAttribute('title'); }
+    buildPalette();
+    RW.render();
+    var n = Object.keys(manifest.items || {}).length;
+    var f = Object.keys(manifest.floors || {}).length;
+    var html = '✅ ' + (note || '') + '已启用原版贴图：<b>' + n + '</b> 个建筑 · <b>' + f + '</b> 种地板';
+    if (typeof setStatus === 'function') setStatus(html);
+    else { var st = $('gameStatus'); if (st) st.innerHTML = html; }
+    return true;
+  }
+
+  /** 模组操作返回的 manifest 生效：非 null 换贴图；null = 连基础清单都没了 → 退回矢量图 */
+  function applyModManifest(res) {
+    var manifest = res && res.manifest;
+    if (manifest) { useManifest(manifest, ''); return true; }
+    if (Art.clearCache) Art.clearCache();
+    if (Art.setSpriteEnabled) Art.setSpriteEnabled(false);
+    var sp = $('useSprites');
+    if (sp) { sp.checked = false; sp.disabled = true; }
+    var row = $('spriteRow');
+    if (row) row.classList.add('muted');
+    buildPalette();
+    RW.render();
+    return false;
+  }
+
+  /** 渲染模组列表，并同步「🧩 模组」页签 / 物品栏 */
+  function updateModList() {
+    var box = $('modList');
+    var api = modsApi();
+    var mods = (api && api.list) ? (api.list() || []) : [];
+    if (box) {
+      box.innerHTML = '';
+      if (!mods.length) {
+        var empty = document.createElement('div');
+        empty.className = 'muted modempty';
+        empty.textContent = '还没有导入模组（创意工坊的 mod 在 steamapps/workshop/content/294100/）';
+        box.appendChild(empty);
+      }
+      mods.forEach(function (m) {
+        var row = document.createElement('div');
+        row.className = 'modrow';
+        var name = document.createElement('span');
+        name.className = 'modname';
+        name.textContent = m.name || m.packageId || '（未命名模组）';
+        name.title = (m.packageId || '') +
+          '\n' + (m.count || 0) + ' 个建筑 · ' + (m.sprites || 0) + ' 张贴图' +
+          (m.version ? '\n游戏版本 ' + m.version : '') +
+          (m.steamId ? '\n工坊 ID ' + m.steamId : '');
+        row.appendChild(name);
+        var meta = document.createElement('span');
+        meta.className = 'modmeta';
+        meta.textContent = (m.count || 0) + ' 个建筑 · ' + (m.sprites || 0) + ' 张贴图';
+        row.appendChild(meta);
+        var del = document.createElement('button');
+        del.className = 'ghost danger moddel';
+        del.textContent = '✕';
+        del.title = '移除「' + (m.name || m.packageId) + '」导入的建筑与贴图';
+        del.onclick = function () { removeMod(m.packageId); };
+        row.appendChild(del);
+        box.appendChild(row);
+      });
+    }
+    // 模组建筑清空后，别把玩家留在空的「模组」页签上
+    if (activeCat === 'mod' && (!mods.length || !hasModBuildings())) activeCat = 'fav';
+    buildTabs();
+    buildPalette();
+  }
+
+  function removeMod(packageId) {
+    var api = modsApi();
+    if (!api || !api.remove) return;
+    api.remove(packageId).then(function (res) {
+      applyModManifest(res);
+      updateModList();
+    }, function (e) {
+      toast('移除模组失败：' + ((e && e.message) || e), true);
+    });
+  }
+
+  /** 启动时从 IndexedDB 恢复模组数据（核心缓存恢复与否都要调） */
+  function restoreMods() {
+    var api = modsApi();
+    if (!api || !api.restore) { updateModList(); return; }
+    api.restore().then(function (res) {
+      if (res && res.manifest) {
+        // 别把「已用缓存数据（替换 N 条…）」的详情冲掉，追加一行即可
+        useManifest(res.manifest, '已恢复模组，', function (html) {
+          var st = $('gameStatus');
+          if (!st) return;
+          st.innerHTML = st.innerHTML ? st.innerHTML + '<br>' + html : html;
+        });
+      }
+      updateModList();
+    }, function () { updateModList(); });
+  }
+
+  /** 游戏目录重新导入后：用新的核心数据重解析已存模组 */
+  function refreshMods() {
+    var api = modsApi();
+    if (!api || !api.refresh) { updateModList(); return; }
+    api.refresh().then(function (res) {
+      // 不覆盖「导入完成」的详细状态，所以给 useManifest 传个空的状态回调
+      if (res && res.manifest) useManifest(res.manifest, '', function () {});
+      updateModList();
+    }, function () { updateModList(); });
+  }
+
   // ------------------------------------------------------------------ 导入游戏资源
   // 玩家把 RimWorld 安装目录拖进来 → 浏览器里现场解析数据 + 解出原版贴图 → 存 IndexedDB
   function initGameImport() {
@@ -12055,25 +13710,21 @@ kbd {
 
     function setStatus(html) { if (status) status.innerHTML = html; }
     function humanSize(b) { return b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.round(b / 1024) + ' KB'; }
-
-    function useManifest(manifest, note) {
-      Art.setSprites(manifest, global.RWGame.getImageURL);
-      // 单文件版启动时没有 sprites.js，原版贴图开关默认是关闭/禁用的；
-      // 导入（或从缓存恢复）贴图后要主动把它打开，否则画布仍然走矢量图。
-      if (Art.setSpriteEnabled) Art.setSpriteEnabled(true);
-      var spEl = $('useSprites');
-      if (spEl) { spEl.disabled = false; spEl.checked = true; }
-      var spRow = $('spriteRow');
-      if (spRow) { spRow.classList.remove('muted'); spRow.removeAttribute('title'); }
-      buildPalette();
-      RW.render();
-      var n = Object.keys(manifest.items).length;
-      var f = Object.keys(manifest.floors).length;
-      setStatus('✅ ' + (note || '') + '已启用原版贴图：<b>' + n + '</b> 个建筑 · <b>' + f + '</b> 种地板');
+    /** 双击打开本地 html（file://）时，浏览器不允许网页读拖入的文件夹，只能走「选择目录」 */
+    function localFilePage() {
+      try { return !!(global.location && global.location.protocol === 'file:'); } catch (e) { return false; }
+    }
+    function localPickHint(subject, tip) {
+      return '这个页面是双击打开的本机文件：浏览器不允许网页读取拖入的文件夹（macOS 的 Chrome / Edge / 豆包都这样），' +
+        '请点「' + subject + '」把文件夹选进来。' +
+        '<br><span class="muted">' + tip + '</span>';
     }
 
     function runImport(files) {
-      if (!files || !files.length) { setStatus('没拿到文件，换个方式再试一次'); return; }
+      if (!files || !files.length) {
+        setStatus('没拿到文件：请点「选择模组文件夹」按钮（macOS 双击打开 html 时，浏览器不允许网页读拖进来的文件夹）');
+        return;
+      }
       drop.classList.add('busy');
       var imp = new global.RWGame.Importer();
       imp.onProgress = function (text, frac) {
@@ -12088,14 +13739,27 @@ kbd {
         setStatus('✅ 导入完成：已替换 <b>' + (mg.replaced || 0) + '</b> 条 / 新增 <b>' + (mg.added || 0) +
           '</b> 条建筑 · <b>' + res.info.sprites + '</b> 张贴图<br><span class="muted">中文名来源：' + (res.langSource || '内置对照表') +
           ' · 换游戏版本后重新拖一次目录即可更新</span>' +
+          (res.info.skipped ? '<br><span class="muted">⚠️ 有 ' + res.info.skipped +
+            ' 张贴图没解出来：这个浏览器不支持 BC7 压缩纹理（常见于关闭硬件加速或远程桌面）。这些建筑会改用矢量图，不影响布局。</span>' : '') +
           (res.info.mem ? '<br><span class="muted">⚠️ 这个浏览器不允许本地数据库，数据只在本次打开有效，刷新后需要重新拖一次</span>' : ''));
         rememberNoAsk();
         hidePrompt();
         toast('已导入 ' + res.info.sprites + ' 张贴图 · 建筑数据替换 ' + (mg.replaced || 0) + ' 条（下次打开直接可用）');
+        // 核心数据换了，已存的模组要按新数据重解析一遍（ParentName 继承 / 贴图覆盖）
+        refreshMods();
       }, function (e) {
         drop.classList.remove('busy');
         setStatus('❌ ' + ((e && e.message) || e));
       });
+    }
+
+    /** 拖拽拿不到文件时的引导：多半是「双击打开 html」（file://）时浏览器不让读目录 */
+    function pickInstead() {
+      setStatus('⚠️ ' + (localFilePage()
+        ? '这个页面是双击打开的本机文件，浏览器不允许网页读取拖入的文件夹，已经帮你改走「选择目录」。'
+        : '没读到拖入的文件夹，换用「选择目录」试试。') +
+        '<br><span class="muted">选 <b>RimWorld 安装目录</b> 整层就好，工具会自动进 RimWorld.app 找 Core 贴图；也可以点上面的「选择游戏目录」。</span>');
+      try { input.click(); } catch (e) { /* 没有手势就点不动，按钮还在 */ }
     }
 
     // 拖入
@@ -12107,8 +13771,12 @@ kbd {
     });
     drop.addEventListener('drop', function (e) {
       var dt = e.dataTransfer;
-      if (!dt) return;
-      global.RWGame.collectFromDrop(dt).then(runImport, function (err) {
+      if (!dt || !global.RWGame.dropHasFiles(dt)) return;
+      global.RWGame.collectFromDrop(dt).then(function (files) {
+        // 拖进来的不是游戏目录（比如 file:// 页面只掉出一两个假文件）就直接给选择目录的引导
+        if (files && files.length && global.RWGame.looksLikeGameDir(files)) return runImport(files);
+        pickInstead();
+      }, function (err) {
         setStatus('❌ ' + ((err && err.message) || err));
       });
     });
@@ -12116,9 +13784,17 @@ kbd {
     global.addEventListener('dragover', function (e) { e.preventDefault(); });
     global.addEventListener('drop', function (e) {
       if (drop.contains(e.target)) return;
+      // 「导入模组建筑」有自己的拖拽区，别被这里当成游戏目录
+      var modDrop = $('modDrop');
+      if (modDrop && modDrop.contains(e.target)) return;
       e.preventDefault();
       var dt = e.dataTransfer;
-      if (dt && dt.items && dt.items.length) global.RWGame.collectFromDrop(dt).then(runImport);
+      if (!dt || !global.RWGame.dropHasFiles(dt)) return;
+      global.RWGame.collectFromDrop(dt).then(function (files) {
+        // 拖进来的不是游戏目录（比如 file:// 页面只掉出一两个假文件）就直接给选择目录的引导
+        if (files && files.length && global.RWGame.looksLikeGameDir(files)) return runImport(files);
+        pickInstead();
+      });
     });
 
     // 点按钮选目录
@@ -12135,6 +13811,16 @@ kbd {
         if (Art.setSpriteEnabled) Art.setSpriteEnabled(false);
         var sp = $('useSprites');
         if (sp) { sp.checked = false; sp.disabled = true; }
+        // 模组数据依赖核心数据，核心缓存清了就把模组的内存状态也清掉
+        if (global.RWMods && global.RWMods.reset) global.RWMods.reset();
+        updateModList();
+        // 顺手把已经合进 RWData 的模组建筑摘掉（否则搜索里还留着点不出来的建筑）
+        if (global.RWMods && global.RWMods.removeAll) {
+          global.RWMods.removeAll().then(function () {
+            updateModList();
+            buildPalette(); RW.render();
+          }, function () { /* 数据库已经清空，失败也无所谓 */ });
+        }
         buildPalette(); RW.render();
         setStatus('已清除浏览器里缓存的游戏数据');
         toast('已清除，刷新页面后回到内置数据 + 矢量图');
@@ -12144,21 +13830,205 @@ kbd {
     // 启动时先看缓存
     global.RWGame.cacheInfo().then(function (info) {
       if (!info) {
-        setStatus('还没导入。拖入游戏目录后，数据与贴图都会自动生成。');
+        setStatus(localFilePage()
+          ? localPickHint('选择游戏目录', '选 RimWorld 安装目录整层就好（Steam → 右键游戏 → 管理 → 浏览本地文件），工具会自动进 RimWorld.app 找原版贴图')
+          : '还没导入。拖入游戏目录后，数据与贴图都会自动生成。');
         showPrompt();
+        // 可能只存过模组数据、没有核心数据 —— 也恢复一下，列表里看得到
+        restoreMods();
         return;
       }
       hidePrompt();
       global.RWGame.loadCache().then(function (cache) {
-        if (!cache) { setStatus('缓存读取失败，请重新导入一次'); showPrompt(); return; }
+        if (!cache) { setStatus('缓存读取失败，请重新导入一次'); showPrompt(); restoreMods(); return; }
         applyStuff();
         useManifest(cache.manifest, '');
         var cm = cache.merged || {};
+        var cacheTip = '<br><span class="muted">中文名来源：' + (info.langSource || '内置对照表') +
+          ' · 换游戏版本后重新拖一次目录即可更新</span>';
+        if (info.skipped) {
+          cacheTip += '<br><span class="muted">⚠️ 有 ' + info.skipped +
+            ' 张贴图没解出来：这个浏览器不支持 BC7 压缩纹理（常见于关闭硬件加速或远程桌面）。这些建筑会改用矢量图，不影响布局。</span>';
+        }
         setStatus('✅ 已用浏览器里缓存的数据（建筑替换 ' + (cm.replaced || 0) + ' 条 · ' + info.sprites +
-          ' 张贴图 · ' + humanSize(info.bytes || 0) + '）<br><span class="muted">中文名来源：' +
-          (info.langSource || '内置对照表') + ' · 换游戏版本后重新拖一次目录即可更新</span>');
+          ' 张贴图 · ' + humanSize(info.bytes || 0) + '）' + cacheTip);
+        restoreMods();
       });
     });
+  }
+
+  // ------------------------------------------------------------------ 导入模组建筑
+  // 把 Mods 文件夹（或单个模组文件夹）拖进来 → js/modimport.js 扫描模组新增的可建造建筑。
+  // 数据要叠在游戏目录之上，所以没导入过游戏目录时先提示、不硬拦（模组可能自带全套贴图）。
+  function initModImport() {
+    var drop = $('modDrop');
+    var pick = $('btnPickMod');
+    var input = $('fileModDir');
+    var status = $('modStatus');
+    var clearBtn = $('btnModClear');
+    if (!drop) return;
+    var busy = false;
+
+    function setStatus(html) { if (status) status.innerHTML = html; }
+    function errText(e) { return (e && e.message) || e; }
+    function setBusy(on) {
+      busy = !!on;
+      if (on) drop.classList.add('busy'); else drop.classList.remove('busy');
+      if (pick) pick.disabled = !!on;
+      if (clearBtn) clearBtn.disabled = !!on;
+    }
+
+    function reportResult(res) {
+      applyStuff();
+      // manifest 为 null 时说明这次没产出基础贴图清单，保留当前画布贴图不动
+      if (res.manifest) useManifest(res.manifest, '');
+      updateModList();
+      var added = res.added || [];
+      var warnings = res.warnings || [];
+      var errors = res.errors || [];
+      var html = (res.buildings || 0) > 0
+        ? '✅ 新增 <b>' + res.buildings + '</b> 个建筑 · <b>' + (res.sprites || 0) + '</b> 张模组贴图'
+        : '⚠️ 没有新增建筑 · <b>' + (res.sprites || 0) + '</b> 张模组贴图';
+      if (added.length) {
+        html += '<br><span class="muted">' + added.map(function (a) {
+          return esc(a.name || a.packageId) + '（' + (a.count || 0) + '）';
+        }).join(' · ') + '</span>';
+      }
+      // 没读到核心 Defs 时 ParentName 继承不完整，模组建筑可能缺字段（尺寸/材料/工作量）。
+      // modimport 自己也会给出更具体的提示，别重复。
+      if (res.hasCore === false && !warnings.some(function (w) { return /ParentName|游戏目录/.test(w.message || ''); })) {
+        html += '<br><span class="muted">⚠️ 没读到游戏核心数据，ParentName 继承可能不完整 —— 建议先导入游戏目录</span>';
+      }
+      if (warnings.length) {
+        // 一次拖入整个 294100 时「这个模组没有建筑」之类的提示可能几十条，只展开前几条
+        var shown = warnings.slice(0, 5);
+        html += '<br><span class="muted">⚠️ ' + shown.map(function (w) {
+          return (w.name ? esc(w.name) + '：' : '') + esc(w.message || '');
+        }).join('<br>');
+        if (warnings.length > shown.length) html += '<br>…还有 ' + (warnings.length - shown.length) + ' 条同类提示（多数是模组里没有可建造建筑）';
+        html += '</span>';
+      }
+      if (errors.length) {
+        html += '<br><span class="muted">❌ ' + errors.length + ' 个模组没能导入：' +
+          errors.map(function (er) { return esc(er.name || '（未知）') + '：' + esc(er.message || ''); }).join('；') +
+          '</span>';
+      }
+      setStatus(html);
+      if (res.buildings > 0) toast('已导入模组：新增 ' + res.buildings + ' 个建筑 · ' + (res.sprites || 0) + ' 张模组贴图');
+      else toast('没有从这些文件夹里找到可建造建筑', true);
+      if (errors.length) toast('有 ' + errors.length + ' 个模组没能导入，详情见右侧状态', true);
+    }
+
+    function runModImport(files) {
+      var api = modsApi();
+      if (!api || !api.importFiles) {
+        setStatus('这个页面没有加载模组导入模块（js/modimport.js）');
+        return;
+      }
+      if (!global.RWGame) {
+        setStatus('请先在「导入游戏资源」里导入游戏目录，再导入模组');
+        return;
+      }
+      if (!files || !files.length) {
+        setStatus('没拿到文件：请点「选择模组文件夹」按钮（macOS 双击打开 html 时，浏览器不允许网页读拖进来的文件夹）');
+        return;
+      }
+      if (busy) return;
+      setBusy(true);
+      setStatus('正在解析模组…');
+      api.importFiles(files, function (text, frac) {
+        setStatus(text + ' <span class="muted">' + Math.round((frac || 0) * 100) + '%</span>');
+      }).then(function (res) {
+        setBusy(false);
+        try { reportResult(res); } catch (e) { setStatus('❌ ' + errText(e)); }
+      }, function (e) {
+        setBusy(false);
+        setStatus('❌ ' + errText(e));
+        toast('模组导入失败：' + errText(e), true);
+      });
+    }
+
+    function localFilePage() {
+      try { return !!(global.location && global.location.protocol === 'file:'); } catch (e) { return false; }
+    }
+
+    /** 拖拽拿不到文件时的引导（本地 file:// 打开时浏览器不让读目录） */
+    function modPickInstead() {
+      setStatus('⚠️ ' + (localFilePage()
+        ? '这个页面是双击打开的本机文件，浏览器不允许网页读取拖入的文件夹，已经帮你改走「选择目录」。'
+        : '没读到拖入的文件夹，换用「选择目录」试试。') +
+        '<br><span class="muted">选 <b>Mods 文件夹</b> 整层（macOS：~/Library/Application Support/RimWorld/Mods），也可以点上面的「选择模组文件夹」。</span>');
+      if (input) { try { input.click(); } catch (e) { /* 点不动就等用户点按钮 */ } }
+    }
+
+    // 拖入：这里必须 stopPropagation，否则外层 window 的兜底会把同一份文件当游戏目录再导一遍
+    ['dragenter', 'dragover'].forEach(function (ev) {
+      drop.addEventListener(ev, function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        drop.classList.add('over');
+      });
+    });
+    ['dragleave', 'drop'].forEach(function (ev) {
+      drop.addEventListener(ev, function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        drop.classList.remove('over');
+      });
+    });
+    drop.addEventListener('drop', function (e) {
+      var dt = e.dataTransfer;
+      if (!dt || busy) return;
+      if (!global.RWGame) {
+        setStatus('请先在「导入游戏资源」里导入游戏目录，再导入模组');
+        return;
+      }
+      if (!global.RWGame.dropHasFiles(dt)) return;
+      global.RWGame.collectFromDrop(dt).then(function (files) {
+        if (files && files.length && global.RWGame.looksLikeModDir(files)) return runModImport(files);
+        modPickInstead();
+      }, function (err) {
+        setStatus('❌ ' + errText(err));
+      });
+    });
+
+    // 点按钮选目录
+    if (pick && input) {
+      pick.onclick = function () { if (!busy) input.click(); };
+      input.onchange = function () {
+        var list = global.RWGame ? global.RWGame.collectFromInput(this.files) : [];
+        this.value = '';
+        runModImport(list);
+      };
+    }
+
+    // 清除全部
+    if (clearBtn) clearBtn.onclick = function () {
+      var api = modsApi();
+      if (!api || !api.removeAll || busy) return;
+      var mods = (api.list ? api.list() : []) || [];
+      if (!mods.length) { setStatus('还没有导入任何模组'); return; }
+      if (!confirm('清除全部 ' + mods.length + ' 个模组导入的建筑与贴图？')) return;
+      setBusy(true);
+      setStatus('正在清除…');
+      api.removeAll().then(function (res) {
+        setBusy(false);
+        applyModManifest(res);
+        updateModList();
+        setStatus('已清除全部模组');
+        toast('已清除全部模组建筑');
+      }, function (e) {
+        setBusy(false);
+        setStatus('❌ ' + errText(e));
+        toast('清除模组失败：' + errText(e), true);
+      });
+    };
+
+    if (localFilePage() && status && !status.innerText.trim()) {
+      setStatus('双击打开的本机页面里，浏览器不允许网页读取拖入的文件夹 —— 请点「选择模组文件夹」。' +
+        '<br><span class="muted">macOS 的 Mods 在 ~/Library/Application Support/RimWorld/Mods；也可以先用「导入游戏资源」导入游戏目录。</span>');
+    }
+    updateModList();
   }
 
   // ------------------------------------------------------------------ 自定义提示框
@@ -12214,6 +14084,7 @@ kbd {
     buildTabs();
     buildPalette();
     initGameImport();
+    initModImport();
     initTooltips();
 
     // 尺寸

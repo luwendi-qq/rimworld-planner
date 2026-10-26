@@ -65,6 +65,17 @@
       b.onclick = function () { activeCat = pair[0]; buildTabs(); buildPalette(); };
       box.appendChild(b);
     });
+    // 导入过模组建筑才出现「🧩 模组」页签（数据来自 js/modimport.js）
+    var modApi = global.RWMods;
+    if (modApi && modApi.list && modApi.list().length && hasModBuildings()) {
+      var mb = document.createElement('button');
+      mb.id = 'mod';
+      mb.className = 'tab' + (activeCat === 'mod' ? ' on' : '');
+      mb.textContent = '🧩 模组';
+      mb.title = modBuildings().length + ' 项';
+      mb.onclick = function () { activeCat = 'mod'; buildTabs(); buildPalette(); };
+      box.appendChild(mb);
+    }
     Data.CATEGORIES.forEach(function (c) {
       var n = Data.BUILDINGS.filter(function (b) { return b.cat === c.id; }).length;
       var b = document.createElement('button');
@@ -135,6 +146,14 @@
       list = (state.recent || []).map(function (id) {
         var d = Data.byId[id]; return d ? { def: d } : null;
       }).filter(Boolean);
+    } else if (activeCat === 'mod') {
+      // 只列模组扫描进来的建筑（照常应用搜索过滤）
+      list = Data.BUILDINGS.filter(function (b) {
+        if (!b.mod) return false;
+        if (!q) return true;
+        return (b.name + ' ' + (b.en || '') + ' ' + b.id + ' ' +
+          (b.modName || '') + ' ' + b.mod).toLowerCase().indexOf(q) >= 0;
+      }).map(function (b) { return { def: b }; });
     } else {
       list = Data.BUILDINGS.filter(function (b) {
         if (b.cat !== activeCat) return false;
@@ -142,7 +161,7 @@
         return (b.name + ' ' + (b.en || '') + ' ' + b.id).toLowerCase().indexOf(q) >= 0;
       }).map(function (b) { return { def: b }; });
     }
-    if (q && activeCat !== 'floor' && activeCat !== 'fav' && activeCat !== 'recent') {
+    if (q && activeCat !== 'floor' && activeCat !== 'fav' && activeCat !== 'recent' && activeCat !== 'mod') {
       // 搜索时跨类别
       list = Data.BUILDINGS.filter(function (b) {
         return (b.name + ' ' + (b.en || '') + ' ' + b.id).toLowerCase().indexOf(q) >= 0;
@@ -151,7 +170,9 @@
     if (!list.length) {
       box.innerHTML = '<div class="empty">' +
         (activeCat === 'fav' ? '还没收藏东西 —— 点物品上的 ☆ 可以收藏' :
-         activeCat === 'recent' ? '还没有用过的东西' : '没有匹配项') + '</div>';
+         activeCat === 'recent' ? '还没有用过的东西' :
+         activeCat === 'mod' ? '还没有导入模组建筑 —— 右侧「导入模组建筑」把 Mods 文件夹拖进来' :
+         '没有匹配项') + '</div>';
       return;
     }
 
@@ -171,6 +192,7 @@
         var dn = def.def || def.id;
         var en = def.en || '';
         el.title = def.name +
+          (def.mod ? '（模组：' + (def.modName || def.mod) + '）' : '') +
           (en && en !== def.name && en.toLowerCase() !== String(dn).toLowerCase() ? '（' + en + '）' : '') +
           (def.dlc ? '　[' + def.dlc + ']' : '') +
           (def.menu === 0 ? '\n○ 不在建筑师菜单里（工作台制作 / 任务奖励）' : '') +
@@ -1293,6 +1315,135 @@
     toastTimer = setTimeout(function () { el.className = 'toast'; }, 4200);
   }
 
+  // ------------------------------------------------------------------ 模组建筑
+  // 玩家把 Mods 文件夹拖进来 → js/modimport.js 扫描模组里新增的可建造建筑和贴图。
+  // modimport.js 可能不存在（单文件版 / 旧版本），所有入口都先判空。
+  function modsApi() { return global.RWMods; }
+
+  function hasModBuildings() { return modBuildings().length > 0; }
+
+  function modBuildings() {
+    return ((Data && Data.BUILDINGS) || []).filter(function (b) { return !!(b && b.mod); });
+  }
+
+  /** 把贴图清单应用到画布 / 物品栏（「导入游戏资源」和「导入模组建筑」共用） */
+  function useManifest(manifest, note, setStatus) {
+    if (!manifest) return false;
+    Art.setSprites(manifest, global.RWGame ? global.RWGame.getImageURL : null);
+    // 单文件版启动时没有 sprites.js，原版贴图开关默认是关闭/禁用的；
+    // 导入（或从缓存恢复）贴图后要主动把它打开，否则画布仍然走矢量图。
+    if (Art.setSpriteEnabled) Art.setSpriteEnabled(true);
+    var spEl = $('useSprites');
+    if (spEl) { spEl.disabled = false; spEl.checked = true; }
+    var spRow = $('spriteRow');
+    if (spRow) { spRow.classList.remove('muted'); spRow.removeAttribute('title'); }
+    buildPalette();
+    RW.render();
+    var n = Object.keys(manifest.items || {}).length;
+    var f = Object.keys(manifest.floors || {}).length;
+    var html = '✅ ' + (note || '') + '已启用原版贴图：<b>' + n + '</b> 个建筑 · <b>' + f + '</b> 种地板';
+    if (typeof setStatus === 'function') setStatus(html);
+    else { var st = $('gameStatus'); if (st) st.innerHTML = html; }
+    return true;
+  }
+
+  /** 模组操作返回的 manifest 生效：非 null 换贴图；null = 连基础清单都没了 → 退回矢量图 */
+  function applyModManifest(res) {
+    var manifest = res && res.manifest;
+    if (manifest) { useManifest(manifest, ''); return true; }
+    if (Art.clearCache) Art.clearCache();
+    if (Art.setSpriteEnabled) Art.setSpriteEnabled(false);
+    var sp = $('useSprites');
+    if (sp) { sp.checked = false; sp.disabled = true; }
+    var row = $('spriteRow');
+    if (row) row.classList.add('muted');
+    buildPalette();
+    RW.render();
+    return false;
+  }
+
+  /** 渲染模组列表，并同步「🧩 模组」页签 / 物品栏 */
+  function updateModList() {
+    var box = $('modList');
+    var api = modsApi();
+    var mods = (api && api.list) ? (api.list() || []) : [];
+    if (box) {
+      box.innerHTML = '';
+      if (!mods.length) {
+        var empty = document.createElement('div');
+        empty.className = 'muted modempty';
+        empty.textContent = '还没有导入模组（创意工坊的 mod 在 steamapps/workshop/content/294100/）';
+        box.appendChild(empty);
+      }
+      mods.forEach(function (m) {
+        var row = document.createElement('div');
+        row.className = 'modrow';
+        var name = document.createElement('span');
+        name.className = 'modname';
+        name.textContent = m.name || m.packageId || '（未命名模组）';
+        name.title = (m.packageId || '') +
+          '\n' + (m.count || 0) + ' 个建筑 · ' + (m.sprites || 0) + ' 张贴图' +
+          (m.version ? '\n游戏版本 ' + m.version : '') +
+          (m.steamId ? '\n工坊 ID ' + m.steamId : '');
+        row.appendChild(name);
+        var meta = document.createElement('span');
+        meta.className = 'modmeta';
+        meta.textContent = (m.count || 0) + ' 个建筑 · ' + (m.sprites || 0) + ' 张贴图';
+        row.appendChild(meta);
+        var del = document.createElement('button');
+        del.className = 'ghost danger moddel';
+        del.textContent = '✕';
+        del.title = '移除「' + (m.name || m.packageId) + '」导入的建筑与贴图';
+        del.onclick = function () { removeMod(m.packageId); };
+        row.appendChild(del);
+        box.appendChild(row);
+      });
+    }
+    // 模组建筑清空后，别把玩家留在空的「模组」页签上
+    if (activeCat === 'mod' && (!mods.length || !hasModBuildings())) activeCat = 'fav';
+    buildTabs();
+    buildPalette();
+  }
+
+  function removeMod(packageId) {
+    var api = modsApi();
+    if (!api || !api.remove) return;
+    api.remove(packageId).then(function (res) {
+      applyModManifest(res);
+      updateModList();
+    }, function (e) {
+      toast('移除模组失败：' + ((e && e.message) || e), true);
+    });
+  }
+
+  /** 启动时从 IndexedDB 恢复模组数据（核心缓存恢复与否都要调） */
+  function restoreMods() {
+    var api = modsApi();
+    if (!api || !api.restore) { updateModList(); return; }
+    api.restore().then(function (res) {
+      if (res && res.manifest) {
+        // 别把「已用缓存数据（替换 N 条…）」的详情冲掉，追加一行即可
+        useManifest(res.manifest, '已恢复模组，', function (html) {
+          var st = $('gameStatus');
+          if (!st) return;
+          st.innerHTML = st.innerHTML ? st.innerHTML + '<br>' + html : html;
+        });
+      }
+      updateModList();
+    }, function () { updateModList(); });
+  }
+
+  /** 游戏目录重新导入后：用新的核心数据重解析已存模组 */
+  function refreshMods() {
+    var api = modsApi();
+    if (!api || !api.refresh) { updateModList(); return; }
+    api.refresh().then(function (res) {
+      // 不覆盖「导入完成」的详细状态，所以给 useManifest 传个空的状态回调
+      if (res && res.manifest) useManifest(res.manifest, '', function () {});
+      updateModList();
+    }, function () { updateModList(); });
+  }
+
   // ------------------------------------------------------------------ 导入游戏资源
   // 玩家把 RimWorld 安装目录拖进来 → 浏览器里现场解析数据 + 解出原版贴图 → 存 IndexedDB
   function initGameImport() {
@@ -1326,25 +1477,21 @@
 
     function setStatus(html) { if (status) status.innerHTML = html; }
     function humanSize(b) { return b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.round(b / 1024) + ' KB'; }
-
-    function useManifest(manifest, note) {
-      Art.setSprites(manifest, global.RWGame.getImageURL);
-      // 单文件版启动时没有 sprites.js，原版贴图开关默认是关闭/禁用的；
-      // 导入（或从缓存恢复）贴图后要主动把它打开，否则画布仍然走矢量图。
-      if (Art.setSpriteEnabled) Art.setSpriteEnabled(true);
-      var spEl = $('useSprites');
-      if (spEl) { spEl.disabled = false; spEl.checked = true; }
-      var spRow = $('spriteRow');
-      if (spRow) { spRow.classList.remove('muted'); spRow.removeAttribute('title'); }
-      buildPalette();
-      RW.render();
-      var n = Object.keys(manifest.items).length;
-      var f = Object.keys(manifest.floors).length;
-      setStatus('✅ ' + (note || '') + '已启用原版贴图：<b>' + n + '</b> 个建筑 · <b>' + f + '</b> 种地板');
+    /** 双击打开本地 html（file://）时，浏览器不允许网页读拖入的文件夹，只能走「选择目录」 */
+    function localFilePage() {
+      try { return !!(global.location && global.location.protocol === 'file:'); } catch (e) { return false; }
+    }
+    function localPickHint(subject, tip) {
+      return '这个页面是双击打开的本机文件：浏览器不允许网页读取拖入的文件夹（macOS 的 Chrome / Edge / 豆包都这样），' +
+        '请点「' + subject + '」把文件夹选进来。' +
+        '<br><span class="muted">' + tip + '</span>';
     }
 
     function runImport(files) {
-      if (!files || !files.length) { setStatus('没拿到文件，换个方式再试一次'); return; }
+      if (!files || !files.length) {
+        setStatus('没拿到文件：请点「选择模组文件夹」按钮（macOS 双击打开 html 时，浏览器不允许网页读拖进来的文件夹）');
+        return;
+      }
       drop.classList.add('busy');
       var imp = new global.RWGame.Importer();
       imp.onProgress = function (text, frac) {
@@ -1359,14 +1506,27 @@
         setStatus('✅ 导入完成：已替换 <b>' + (mg.replaced || 0) + '</b> 条 / 新增 <b>' + (mg.added || 0) +
           '</b> 条建筑 · <b>' + res.info.sprites + '</b> 张贴图<br><span class="muted">中文名来源：' + (res.langSource || '内置对照表') +
           ' · 换游戏版本后重新拖一次目录即可更新</span>' +
+          (res.info.skipped ? '<br><span class="muted">⚠️ 有 ' + res.info.skipped +
+            ' 张贴图没解出来：这个浏览器不支持 BC7 压缩纹理（常见于关闭硬件加速或远程桌面）。这些建筑会改用矢量图，不影响布局。</span>' : '') +
           (res.info.mem ? '<br><span class="muted">⚠️ 这个浏览器不允许本地数据库，数据只在本次打开有效，刷新后需要重新拖一次</span>' : ''));
         rememberNoAsk();
         hidePrompt();
         toast('已导入 ' + res.info.sprites + ' 张贴图 · 建筑数据替换 ' + (mg.replaced || 0) + ' 条（下次打开直接可用）');
+        // 核心数据换了，已存的模组要按新数据重解析一遍（ParentName 继承 / 贴图覆盖）
+        refreshMods();
       }, function (e) {
         drop.classList.remove('busy');
         setStatus('❌ ' + ((e && e.message) || e));
       });
+    }
+
+    /** 拖拽拿不到文件时的引导：多半是「双击打开 html」（file://）时浏览器不让读目录 */
+    function pickInstead() {
+      setStatus('⚠️ ' + (localFilePage()
+        ? '这个页面是双击打开的本机文件，浏览器不允许网页读取拖入的文件夹，已经帮你改走「选择目录」。'
+        : '没读到拖入的文件夹，换用「选择目录」试试。') +
+        '<br><span class="muted">选 <b>RimWorld 安装目录</b> 整层就好，工具会自动进 RimWorld.app 找 Core 贴图；也可以点上面的「选择游戏目录」。</span>');
+      try { input.click(); } catch (e) { /* 没有手势就点不动，按钮还在 */ }
     }
 
     // 拖入
@@ -1378,8 +1538,12 @@
     });
     drop.addEventListener('drop', function (e) {
       var dt = e.dataTransfer;
-      if (!dt) return;
-      global.RWGame.collectFromDrop(dt).then(runImport, function (err) {
+      if (!dt || !global.RWGame.dropHasFiles(dt)) return;
+      global.RWGame.collectFromDrop(dt).then(function (files) {
+        // 拖进来的不是游戏目录（比如 file:// 页面只掉出一两个假文件）就直接给选择目录的引导
+        if (files && files.length && global.RWGame.looksLikeGameDir(files)) return runImport(files);
+        pickInstead();
+      }, function (err) {
         setStatus('❌ ' + ((err && err.message) || err));
       });
     });
@@ -1387,9 +1551,17 @@
     global.addEventListener('dragover', function (e) { e.preventDefault(); });
     global.addEventListener('drop', function (e) {
       if (drop.contains(e.target)) return;
+      // 「导入模组建筑」有自己的拖拽区，别被这里当成游戏目录
+      var modDrop = $('modDrop');
+      if (modDrop && modDrop.contains(e.target)) return;
       e.preventDefault();
       var dt = e.dataTransfer;
-      if (dt && dt.items && dt.items.length) global.RWGame.collectFromDrop(dt).then(runImport);
+      if (!dt || !global.RWGame.dropHasFiles(dt)) return;
+      global.RWGame.collectFromDrop(dt).then(function (files) {
+        // 拖进来的不是游戏目录（比如 file:// 页面只掉出一两个假文件）就直接给选择目录的引导
+        if (files && files.length && global.RWGame.looksLikeGameDir(files)) return runImport(files);
+        pickInstead();
+      });
     });
 
     // 点按钮选目录
@@ -1406,6 +1578,16 @@
         if (Art.setSpriteEnabled) Art.setSpriteEnabled(false);
         var sp = $('useSprites');
         if (sp) { sp.checked = false; sp.disabled = true; }
+        // 模组数据依赖核心数据，核心缓存清了就把模组的内存状态也清掉
+        if (global.RWMods && global.RWMods.reset) global.RWMods.reset();
+        updateModList();
+        // 顺手把已经合进 RWData 的模组建筑摘掉（否则搜索里还留着点不出来的建筑）
+        if (global.RWMods && global.RWMods.removeAll) {
+          global.RWMods.removeAll().then(function () {
+            updateModList();
+            buildPalette(); RW.render();
+          }, function () { /* 数据库已经清空，失败也无所谓 */ });
+        }
         buildPalette(); RW.render();
         setStatus('已清除浏览器里缓存的游戏数据');
         toast('已清除，刷新页面后回到内置数据 + 矢量图');
@@ -1415,21 +1597,205 @@
     // 启动时先看缓存
     global.RWGame.cacheInfo().then(function (info) {
       if (!info) {
-        setStatus('还没导入。拖入游戏目录后，数据与贴图都会自动生成。');
+        setStatus(localFilePage()
+          ? localPickHint('选择游戏目录', '选 RimWorld 安装目录整层就好（Steam → 右键游戏 → 管理 → 浏览本地文件），工具会自动进 RimWorld.app 找原版贴图')
+          : '还没导入。拖入游戏目录后，数据与贴图都会自动生成。');
         showPrompt();
+        // 可能只存过模组数据、没有核心数据 —— 也恢复一下，列表里看得到
+        restoreMods();
         return;
       }
       hidePrompt();
       global.RWGame.loadCache().then(function (cache) {
-        if (!cache) { setStatus('缓存读取失败，请重新导入一次'); showPrompt(); return; }
+        if (!cache) { setStatus('缓存读取失败，请重新导入一次'); showPrompt(); restoreMods(); return; }
         applyStuff();
         useManifest(cache.manifest, '');
         var cm = cache.merged || {};
+        var cacheTip = '<br><span class="muted">中文名来源：' + (info.langSource || '内置对照表') +
+          ' · 换游戏版本后重新拖一次目录即可更新</span>';
+        if (info.skipped) {
+          cacheTip += '<br><span class="muted">⚠️ 有 ' + info.skipped +
+            ' 张贴图没解出来：这个浏览器不支持 BC7 压缩纹理（常见于关闭硬件加速或远程桌面）。这些建筑会改用矢量图，不影响布局。</span>';
+        }
         setStatus('✅ 已用浏览器里缓存的数据（建筑替换 ' + (cm.replaced || 0) + ' 条 · ' + info.sprites +
-          ' 张贴图 · ' + humanSize(info.bytes || 0) + '）<br><span class="muted">中文名来源：' +
-          (info.langSource || '内置对照表') + ' · 换游戏版本后重新拖一次目录即可更新</span>');
+          ' 张贴图 · ' + humanSize(info.bytes || 0) + '）' + cacheTip);
+        restoreMods();
       });
     });
+  }
+
+  // ------------------------------------------------------------------ 导入模组建筑
+  // 把 Mods 文件夹（或单个模组文件夹）拖进来 → js/modimport.js 扫描模组新增的可建造建筑。
+  // 数据要叠在游戏目录之上，所以没导入过游戏目录时先提示、不硬拦（模组可能自带全套贴图）。
+  function initModImport() {
+    var drop = $('modDrop');
+    var pick = $('btnPickMod');
+    var input = $('fileModDir');
+    var status = $('modStatus');
+    var clearBtn = $('btnModClear');
+    if (!drop) return;
+    var busy = false;
+
+    function setStatus(html) { if (status) status.innerHTML = html; }
+    function errText(e) { return (e && e.message) || e; }
+    function setBusy(on) {
+      busy = !!on;
+      if (on) drop.classList.add('busy'); else drop.classList.remove('busy');
+      if (pick) pick.disabled = !!on;
+      if (clearBtn) clearBtn.disabled = !!on;
+    }
+
+    function reportResult(res) {
+      applyStuff();
+      // manifest 为 null 时说明这次没产出基础贴图清单，保留当前画布贴图不动
+      if (res.manifest) useManifest(res.manifest, '');
+      updateModList();
+      var added = res.added || [];
+      var warnings = res.warnings || [];
+      var errors = res.errors || [];
+      var html = (res.buildings || 0) > 0
+        ? '✅ 新增 <b>' + res.buildings + '</b> 个建筑 · <b>' + (res.sprites || 0) + '</b> 张模组贴图'
+        : '⚠️ 没有新增建筑 · <b>' + (res.sprites || 0) + '</b> 张模组贴图';
+      if (added.length) {
+        html += '<br><span class="muted">' + added.map(function (a) {
+          return esc(a.name || a.packageId) + '（' + (a.count || 0) + '）';
+        }).join(' · ') + '</span>';
+      }
+      // 没读到核心 Defs 时 ParentName 继承不完整，模组建筑可能缺字段（尺寸/材料/工作量）。
+      // modimport 自己也会给出更具体的提示，别重复。
+      if (res.hasCore === false && !warnings.some(function (w) { return /ParentName|游戏目录/.test(w.message || ''); })) {
+        html += '<br><span class="muted">⚠️ 没读到游戏核心数据，ParentName 继承可能不完整 —— 建议先导入游戏目录</span>';
+      }
+      if (warnings.length) {
+        // 一次拖入整个 294100 时「这个模组没有建筑」之类的提示可能几十条，只展开前几条
+        var shown = warnings.slice(0, 5);
+        html += '<br><span class="muted">⚠️ ' + shown.map(function (w) {
+          return (w.name ? esc(w.name) + '：' : '') + esc(w.message || '');
+        }).join('<br>');
+        if (warnings.length > shown.length) html += '<br>…还有 ' + (warnings.length - shown.length) + ' 条同类提示（多数是模组里没有可建造建筑）';
+        html += '</span>';
+      }
+      if (errors.length) {
+        html += '<br><span class="muted">❌ ' + errors.length + ' 个模组没能导入：' +
+          errors.map(function (er) { return esc(er.name || '（未知）') + '：' + esc(er.message || ''); }).join('；') +
+          '</span>';
+      }
+      setStatus(html);
+      if (res.buildings > 0) toast('已导入模组：新增 ' + res.buildings + ' 个建筑 · ' + (res.sprites || 0) + ' 张模组贴图');
+      else toast('没有从这些文件夹里找到可建造建筑', true);
+      if (errors.length) toast('有 ' + errors.length + ' 个模组没能导入，详情见右侧状态', true);
+    }
+
+    function runModImport(files) {
+      var api = modsApi();
+      if (!api || !api.importFiles) {
+        setStatus('这个页面没有加载模组导入模块（js/modimport.js）');
+        return;
+      }
+      if (!global.RWGame) {
+        setStatus('请先在「导入游戏资源」里导入游戏目录，再导入模组');
+        return;
+      }
+      if (!files || !files.length) {
+        setStatus('没拿到文件：请点「选择模组文件夹」按钮（macOS 双击打开 html 时，浏览器不允许网页读拖进来的文件夹）');
+        return;
+      }
+      if (busy) return;
+      setBusy(true);
+      setStatus('正在解析模组…');
+      api.importFiles(files, function (text, frac) {
+        setStatus(text + ' <span class="muted">' + Math.round((frac || 0) * 100) + '%</span>');
+      }).then(function (res) {
+        setBusy(false);
+        try { reportResult(res); } catch (e) { setStatus('❌ ' + errText(e)); }
+      }, function (e) {
+        setBusy(false);
+        setStatus('❌ ' + errText(e));
+        toast('模组导入失败：' + errText(e), true);
+      });
+    }
+
+    function localFilePage() {
+      try { return !!(global.location && global.location.protocol === 'file:'); } catch (e) { return false; }
+    }
+
+    /** 拖拽拿不到文件时的引导（本地 file:// 打开时浏览器不让读目录） */
+    function modPickInstead() {
+      setStatus('⚠️ ' + (localFilePage()
+        ? '这个页面是双击打开的本机文件，浏览器不允许网页读取拖入的文件夹，已经帮你改走「选择目录」。'
+        : '没读到拖入的文件夹，换用「选择目录」试试。') +
+        '<br><span class="muted">选 <b>Mods 文件夹</b> 整层（macOS：~/Library/Application Support/RimWorld/Mods），也可以点上面的「选择模组文件夹」。</span>');
+      if (input) { try { input.click(); } catch (e) { /* 点不动就等用户点按钮 */ } }
+    }
+
+    // 拖入：这里必须 stopPropagation，否则外层 window 的兜底会把同一份文件当游戏目录再导一遍
+    ['dragenter', 'dragover'].forEach(function (ev) {
+      drop.addEventListener(ev, function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        drop.classList.add('over');
+      });
+    });
+    ['dragleave', 'drop'].forEach(function (ev) {
+      drop.addEventListener(ev, function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        drop.classList.remove('over');
+      });
+    });
+    drop.addEventListener('drop', function (e) {
+      var dt = e.dataTransfer;
+      if (!dt || busy) return;
+      if (!global.RWGame) {
+        setStatus('请先在「导入游戏资源」里导入游戏目录，再导入模组');
+        return;
+      }
+      if (!global.RWGame.dropHasFiles(dt)) return;
+      global.RWGame.collectFromDrop(dt).then(function (files) {
+        if (files && files.length && global.RWGame.looksLikeModDir(files)) return runModImport(files);
+        modPickInstead();
+      }, function (err) {
+        setStatus('❌ ' + errText(err));
+      });
+    });
+
+    // 点按钮选目录
+    if (pick && input) {
+      pick.onclick = function () { if (!busy) input.click(); };
+      input.onchange = function () {
+        var list = global.RWGame ? global.RWGame.collectFromInput(this.files) : [];
+        this.value = '';
+        runModImport(list);
+      };
+    }
+
+    // 清除全部
+    if (clearBtn) clearBtn.onclick = function () {
+      var api = modsApi();
+      if (!api || !api.removeAll || busy) return;
+      var mods = (api.list ? api.list() : []) || [];
+      if (!mods.length) { setStatus('还没有导入任何模组'); return; }
+      if (!confirm('清除全部 ' + mods.length + ' 个模组导入的建筑与贴图？')) return;
+      setBusy(true);
+      setStatus('正在清除…');
+      api.removeAll().then(function (res) {
+        setBusy(false);
+        applyModManifest(res);
+        updateModList();
+        setStatus('已清除全部模组');
+        toast('已清除全部模组建筑');
+      }, function (e) {
+        setBusy(false);
+        setStatus('❌ ' + errText(e));
+        toast('清除模组失败：' + errText(e), true);
+      });
+    };
+
+    if (localFilePage() && status && !status.innerText.trim()) {
+      setStatus('双击打开的本机页面里，浏览器不允许网页读取拖入的文件夹 —— 请点「选择模组文件夹」。' +
+        '<br><span class="muted">macOS 的 Mods 在 ~/Library/Application Support/RimWorld/Mods；也可以先用「导入游戏资源」导入游戏目录。</span>');
+    }
+    updateModList();
   }
 
   // ------------------------------------------------------------------ 自定义提示框
@@ -1485,6 +1851,7 @@
     buildTabs();
     buildPalette();
     initGameImport();
+    initModImport();
     initTooltips();
 
     // 尺寸

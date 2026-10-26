@@ -32,6 +32,7 @@ SCRIPT_ORDER = [
     'js/gamezip.js',               # zip + DDS 解码
     'js/gamedefs.js',              # 解析游戏 Defs
     'js/gameimport.js',            # 导入编排 + IndexedDB 缓存
+    'js/modimport.js',             # 扫描 Mods/ 里的模组新增建筑（浏览器端）
     'js/icons.js',
     'js/engine.js',
     'js/site.js',                  # 存档地形 / 山体 / 可建造性

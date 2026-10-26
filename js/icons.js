@@ -836,17 +836,21 @@
 
   /** 该建筑在某个朝向 + 某个材质下要用的图片（+ 需要的 drawSize 朝向） */
   function computePlan(e, rot, app) {
+    if (!e) return null;
     // 按材质换图的（Graphic_Appearances：墙 / 栅栏）：挑对应「外观」的那张图集
     if (e.sheets) {
       var f = (app && e.sheets[app]) || e.sheets['Smooth'] || e.sheets['default'] ||
               e.sheets[Object.keys(e.sheets)[0]];
       if (!f) return null;
       if (e.kind === 'linked') return { file: f, ds: e.ds, link: true };
-      return { file: f, ds: e.ds.slice() };
+      return { file: f, ds: (e.ds || [1, 1]).slice() };
     }
+    // 贴图没解出来（浏览器不支持 BC7 / 导入时漏了部分贴图）时，条目可能没有 imgs：
+    // 返回 null 让上层退化成矢量图标，千万别在这里抛异常把整帧渲染炸掉
+    if (!e.imgs) return null;
     var slot = e.kind === 'multi' ? slotOf(rot) : 'n';
     var file = e.imgs[slot];
-    var ds = e.ds.slice();
+    var ds = (e.ds || [1, 1]).slice();
     if (!file && slot === 'w') file = e.imgs.e;            // 西向缺失时用东向镜像
     if (!file && slot === 's') file = e.imgs.n;
     if (!file) file = e.imgs[Object.keys(e.imgs)[0]];

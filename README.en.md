@@ -116,9 +116,16 @@ Click **导出蓝图 (Export blueprint)** in the top bar to get a `.xml`, then d
 
 Load it in-game with the blueprint button; workers will consume materials and build it. Requires the **Blueprints** mod (for 1.7: `Blueprints - 1.7 Waylith (Unofficial)`, workshop ID `3819556044`).
 
+> **Modded buildings work too.** The blueprint stores `defName` strings that the game resolves through `DefDatabase`, so any building/terrain/stuff from an active mod maps exactly like Core — there is no Core whitelist. The exporter fills `<meta>` with the mods actually used by the blueprint, and the only real requirement is that those mods are enabled when placing it. Evidence (upstream source + local 1.7 DLL) → [docs/blueprints-mod-support.md](docs/blueprints-mod-support.md) (Chinese).
+
 > Handy: click **存入 Blueprints (Save into Blueprints)**, pick the folder once, and future exports write straight into it.
 
 Details and save importing → [docs/import-export.md](docs/import-export.md) (Chinese)
+
+> **Using mods?** Drag your `Mods` folder (or a single mod folder) into the "导入模组建筑" box on the right: the browser reads each mod's `About.xml`, only the Defs effective for your game version (supports `LoadFolders.xml` / `1.x/` folders), adds its buildable buildings to the palette (a "🧩 模组" tab appears) and decodes textures from the mod's own `Textures/`. Import your game folder first so `ParentName` inheritance resolves; mod data is cached in IndexedDB and restored automatically.
+> Steam Workshop mods are **not** in `RimWorld/Mods` — they live in `steamapps/workshop/content/294100/`. Drag that whole `294100` folder in to import every subscribed mod at once (each subfolder name is the workshop ID); the panel has per-platform paths.
+>
+> On macOS the mods live in `~/Library/Application Support/RimWorld/Mods` (Steam Workshop items: `…/steamapps/workshop/content/294100/`), and — same as above — use the **选择模组文件夹** button instead of dragging when the page was opened from disk.
 
 ## Data accuracy (important)
 
@@ -126,7 +133,7 @@ The built-in database is **hand-curated reference data**: footprints are mostly 
 
 **Want exact numbers** (size / power usage / generation / storage straight from the game's `Defs`)?
 
-- Easiest: drag your **RimWorld install folder** into the "导入游戏资源" box on the right — the browser reads everything itself.
+- Easiest: drag your **RimWorld install folder** into the "导入游戏资源" box on the right — the browser reads everything itself. On macOS use the **选择游戏目录** button instead: browsers refuse to enumerate a dropped folder on `file://` pages. The folder is `~/Library/Application Support/Steam/steamapps/common/RimWorld`, and Core textures live inside `RimWorld.app/Contents/MacOS/Assets.zip` (the tool finds them automatically).
 - Or run `python tools/extract_defs.py "<game folder>"` to generate `js/buildings.generated.js`.
 
 Both routes **only read numbers from your own machine** — the output is a table of sizes and power values, and contains no game art.

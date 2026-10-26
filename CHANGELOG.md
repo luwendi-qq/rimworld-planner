@@ -2,6 +2,74 @@
 
 记一下每次改了什么，方便回溯。
 
+## 2026-10-26 · 修复 macOS 上导入游戏资源 / 模组
+
+汇报：「html 导入需要对 mac 支持，现在 mac 上导入不了游戏资源和 mod」。定位下来不是 macOS 文件读不出来，而是
+**双击打开 html（`file://`）时 Chromium 不允许网页遍历拖入的文件夹**（`webkitGetAsEntry().createReader().readEntries()`
+直接抛 `EncodingError`，FSA 的 `getAsFileSystemHandle()` 返回的 Promise 在 `file://` 下永远不落地），
+拖进来的目录只剩 0~1 个假文件，于是报「没拿到文件」/「没找到 Data/**/Defs/**/*.xml」。
+另外 Mac 的核心贴图不在 `Data/Core/`，而在 `RimWorld.app/Contents/MacOS/Assets.zip`，单独选 `Data` 目录时核心贴图会全缺。
+
+### 修复
+
+| 问题 | 处理 |
+| --- | --- |
+| `file://` 下拖入文件夹读不到 | 收集逻辑改成 **entry-first**：同步取 `webkitGetAsEntry` / `getAsFile`，FSA 只在没有 entry 时兜底且带超时（3s / 20s / 30s）；`file://` 直接跳过 FSA，避免永远挂着 |
+| 拖进来的不是游戏目录还硬跑一遍解析 | 新增 `RWGame.looksLikeGameDir()` / `looksLikeModDir()` 嗅探，不像就立刻提示并引导「选择游戏目录 / 选择模组文件夹」 |
+| 用户不知道双击打开的页面上拖拽是禁用的 | `file://` 下初始状态、拖拽失败、选择按钮都给明确文案，并顺手自动打开文件选择框；`file://` 下第一次进来就有引导 |
+| Mac 核心贴图在 `.app` 里 | 导入时放宽识别：安装目录里任意 `Assets.zip`（含 `RimWorld.app/Contents/MacOS/Assets.zip`）都收，`Data/Core` 与 `.app` 两种布局都能过；缺核心 zip 时错误提示直接告诉你 Mac 路径 |
+| 浏览器没有 BC7 纹理扩展时整页渲染链崩 | `js/icons.js` 的 `computePlan` 对「没有 imgs / imgs 为空」的条目返回 `null` 走矢量图；`gameimport.js` 解码失败的建筑不再登记半成品条目；导入完成/读缓存时明确提示「N 张贴图没解出来（缺硬件加速），已用矢量图代替」 |
+
+### 测试
+
+- 新增 `tests/gameimport-drop.test.js`（13 个用例）：entry-first、FSA 超时兜底、`file://` 跳过 FSA、`dt.files` 兜底、
+  macOS 的 `EncodingError`、目录嗅探；`node --test` 全绿（167 个）
+- 用无头 Edge + 真实 Mac 安装目录做了端到端：`file://` 拖入立刻出引导（秒级，不再卡）；`file://` 点「选择游戏目录」
+  成功导入 3206 个文件 / 6 个 `Assets.zip` / 1572 个 Defs / 260 条建筑（核心 zip 来自 `RimWorld.app`）；
+  `http://` 拖拽 3206 个文件照常导入；模组（含 `ParentName` 继承原版）选择与拖入都能导入
+- 渲染回归：260 条建筑缩略图/`fetch` 计划零异常（贴图解不出的走矢量图）
+
+文档：`docs/import-export.md` / `docs/textures.md` / `docs/faq.md` / `README` 补了 macOS 安装目录、Mods 路径、
+`file://` 下改用「选择目录」、BC7 提示的说明。
+
+## 2026-10-26 · 支持扫描模组新增建筑 + 核实 Blueprints 跨 mod 能力
+
+内置建筑表只有原版 + DLC；装了模组的玩家在物品栏里找不到模组建筑。这次让用户在网页里**指定模组文件夹**，把模组新增的可建造建筑连同贴图扫进来；同时把「蓝图为啥能放其它 mod 的东西」查清楚写成文档。
+
+### 新功能：导入模组建筑
+
+| 能力 | 说明 |
+| --- | --- |
+| 指定模组路径 | 右侧新增「导入模组建筑」面板：拖入 `Mods/` 整个文件夹、单个模组文件夹，或点「选择模组文件夹」 |
+| 认模组 | 按 `About/About.xml` 认 packageId / 名字 / modVersion / supportedVersions / 工坊 id（`PublishedFileId.txt` 或 About 里的链接） |
+| 版本目录 | 有 `LoadFolders.xml` 按它挑当前版本文件夹（跳过 `IfModActive` 条件项）；没有就回退到「不高于当前版本的 `1.x/`」+ 根目录 |
+| 正确解析继承 | 把模组 Defs 和缓存的**核心 Defs XML** 拼在一起喂给 `RWDefs.parse`，`ParentName` 能跨原版/跨模组继承；没导过游戏目录会提示且只解析能解的部分 |
+| 只收自己的 def | 预扫描模组文档里声明的 ThingDef / stuff 分类 / 科技，解析后只挑该模组自己声明的建筑，打 `mod` / `modName` 标记 |
+| 创意工坊路径引导 | Steam 订阅的 mod 不在 `RimWorld/Mods`，在 `steamapps/workshop/content/294100/`。面板里折叠了「创意工坊的 mod 在哪？」（Win/macOS/Linux 路径 + Steam 库位置怎么找），可以直接把整个 `294100` 拖进来一次导入全部订阅 mod；拖错目录时的报错也会指路。工坊 mod 文件夹名是纯数字时自动当作工坊 ID（老 mod 缺 `PublishedFileId.txt` 也能写对蓝图 meta） |
+| 贴图 | 从 `<模组>/Textures/**.png|.dds` 找图（含 `_north/_east` 变体、`Graphic_Multi`、门镜像、炮塔顶图），PNG 走 `createImageBitmap`，DDS 复用 `gamezip.decodeDds`；AssetBundles 里的解不出就回退矢量图 |
+| 物品栏 | 多出「🧩 模组」页签；搜索跨模组名；tooltip 标注「（模组：名字）」 |
+| 管理 | 每个模组单独一行（建筑数 / 贴图数 / `✕` 移除），可「清除全部」；数据存 IndexedDB，刷新自动恢复 |
+| 与核心数据联动 | 重新导入游戏目录后自动用新核心重解析已存模组；「清除游戏缓存」会连模组数据一起清 |
+
+实现：新增 `js/modimport.js`（`RWMods`）；`js/gameimport.js` 增加核心 Defs XML 缓存（`defdocs`）与 `saveTexture/deleteTextures/getMeta/setMeta` 等接口；`js/data.js` 增加 `restoreBaseBuildings()/reindexBuildings()` 与 `byId` 就地重建；`js/main.js` + `index.html` + `css/app.css` 接 UI；`tools/lib/dom.js` 的假 DOM 补 `childNodes` 让 `gamedefs.js` 能在 Node 测试里跑。
+
+### 核实：Blueprints 是否支持其它 mod 物品
+
+**支持，且不存在 Core 白名单。** 蓝图 XML 存的是 `defName`（`Scribe_Defs.Look`），读时走 `DefDatabase.GetNamed`；唯一硬门槛是 `designationCategory != null`（在建筑师菜单里），与来源 mod 无关。缺 mod 时逐条报 `Def named ... not found.`，1.7 维护版弹 `Dialog_MissingMods` 让玩家选「删除缺失项」或「放置时跳过」。
+
+据此调整导出：`<meta>` 的 `modIds/modSteamIds/modNames` 只写**蓝图里实际用到**的模组（小写 packageId + 工坊 id + About 名字），不再把所有扫描到的模组一股脑塞进去。
+
+证据与对导出实现的 7 条要求 → [docs/blueprints-mod-support.md](docs/blueprints-mod-support.md)（含上游源码链接、本机 1.7 DLL 反汇编、真实存档 meta 样本）。
+
+### 测试
+
+- 新增 `tests/modimport.test.js`（15 个用例）：模组识别 / ParentName 跨继承 / 无核心数据降级 / 重复导入 / 删除回滚 / IndexedDB 恢复 / 导出 meta 只带用到的模组 / LoadFolders 版本选择 / 非模组目录报错 / 多模组分组 / 文件分类。
+- `npm test`：154 个用例全过。
+
+### 单文件版
+
+`rimworld-planner.single.html` 重新生成，内联了 `js/modimport.js`；`tools/build_single.py` 的 `SCRIPT_ORDER` 已加在 `gameimport.js` 之后。
+
 ## 2026-10-21 · 按「全自主玩 20 天」的复盘修问题
 
 另一个 AI 用 RimMolt + 本规划器自动玩了 20 天，写了一份方法论（`.trae/skills/rimworld-autoplay/SKILL.md`）。

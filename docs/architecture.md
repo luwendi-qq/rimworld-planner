@@ -18,7 +18,8 @@ rimworld-planner/
 │   ├── vendor/fzstd.js         纯 JS 的 zstd 解压（浏览器内导入游戏贴图用，MIT）
 │   ├── gamezip.js              读 Assets.zip + 解 DDS（BC7 走 WebGL2 / BC4 纯 JS）
 │   ├── gamedefs.js             在浏览器里解析游戏 Defs（= extract_defs.py 的 JS 版）
-│   ├── gameimport.js           导入编排 + IndexedDB 缓存
+│   ├── gameimport.js           导入编排 + IndexedDB 缓存（含核心 Defs XML / 游戏版本，供模组导入用）
+├── modimport.js            扫描 Mods/ 里的模组新增建筑 + 贴图（About.xml / LoadFolders / ParentName 合并解析）
 │   ├── icons.js                贴图渲染（原版贴图优先，缺失时用原创矢量图兜底）
 │   ├── engine.js               网格 / 相机 / 编辑 / 撤销 / 渲染
 │   ├── site.js                 存档地形 / 山体 / 可建造性（affordance 校验、离屏地形画布）

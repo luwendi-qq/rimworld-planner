@@ -11,6 +11,10 @@
 
 把 **RimWorld 安装目录**拖到右侧「导入游戏资源」那个框里（或点「选择游戏目录」）。浏览器会自己完成：
 
+> 🍎 **macOS**：安装目录在 `~/Library/Application Support/Steam/steamapps/common/RimWorld`；
+> 核心贴图不在 `Data/Core/`，而在 `RimWorld.app/Contents/MacOS/Assets.zip` —— 选安装目录整层就好，工具会自己进去找。
+> 另外，**双击打开 html（`file://`）时浏览器不允许网页读拖进来的文件夹**，请点「选择游戏目录」（或「选择模组文件夹」）。
+
 1. 读 `Data` 下所有 Defs，现场算出**精确数据**（尺寸 / 电力 / 材质表 / 通行性 / 门…）；
 2. 顺便读官方简中语言包（`Languages/ChineseSimplified*.tar`，解包成文件夹的形式也认），
    建筑名 / 材质名直接用游戏里的官方中文名；万一没找到，就退回内置对照表（导入状态里会写清楚用的是哪种）；

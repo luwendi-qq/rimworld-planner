@@ -120,6 +120,26 @@ git pull
 - 导入后能得到精确尺寸 / 造价 / 工时 / 科技前置、地形与山体识别、原版贴图
 - 不导入也能用，只是部分数值是参考值、画布使用矢量图
 - 可以勾「不再提醒」；右侧「导入游戏资源」面板始终保留，随时能再导
+- **macOS**：安装目录在 `~/Library/Application Support/Steam/steamapps/common/RimWorld`；核心贴图藏在 `RimWorld.app` 里（工具会自动进去找）。双击打开的 `file://` 页面里**浏览器不允许网页读取拖入的文件夹**，请点「选择游戏目录」
+
+### 装了模组？把 Mods 文件夹拖进来
+
+内置建筑表只覆盖原版 + DLC。装了模组后，点右侧「**导入模组建筑**」，把 `Mods` 文件夹（或单个模组文件夹）拖进来：
+浏览器会按 `About/About.xml` 认出每个模组，只读**当前游戏版本生效**的 Defs（支持 `LoadFolders.xml` 和 `1.x/` 版本目录），
+把模组新增的**可建造建筑**并进物品栏（会多出一个「🧩 模组」页签），贴图也从模组自己的 `Textures/` 里解出来。
+
+- **创意工坊订阅的 mod 不在 `RimWorld/Mods`**，在 Steam 库的 `steamapps/workshop/content/294100/`。
+  把整个 `294100` 文件夹拖进来 = 一次导入全部订阅 mod（子文件夹名就是工坊 ID）：
+  - Windows `C:\Program Files (x86)\Steam\steamapps\workshop\content\294100`
+  - macOS `~/Library/Application Support/Steam/steamapps/workshop/content/294100`
+  - Linux `~/.local/share/Steam/steamapps/workshop/content/294100`
+  - 换过 Steam 库位置：Steam 设置 → 存储 看库路径；或右键 RimWorld → 管理 → 浏览本地文件再退回 `steamapps/workshop`
+- **建议先「导入游戏资源」再导模组**：模组的 `ParentName` 常继承原版抽象 def，没有核心 Defs 会解析不全（面板会提示）
+- 可以一次拖入整个 `Mods/`，也可点「选择模组文件夹」；每个模组单独一行，点 `✕` 只移除它，「清除全部」一次清空
+- **macOS**：`Mods` 在 `~/Library/Application Support/RimWorld/Mods`，Steam 创意工坊模组在 `…/steamapps/workshop/content/294100/`；双击打开时拖拽同样不行，用「选择模组文件夹」
+- 数据存在浏览器 IndexedDB 里，下次打开自动恢复；重新导入游戏目录后会用新核心数据自动重解析
+- 贴图打包在 Unity `AssetBundles`（`.assets`）里的模组解不出来，会退回矢量图标，建筑尺寸/造价等功能不受影响
+- 只读 `Defs/` 里**直接声明**的建筑：靠 `Patches/` 的 XML Patch 或 C# 代码动态生成的建筑不会出现（前者常见于改数值，后者常见于大型框架 mod）
 
 ### 原版贴图 vs 矢量图
 
@@ -141,6 +161,10 @@ git pull
 | macOS | `~/Library/Application Support/RimWorld/Blueprints/` |
 
 游戏里用蓝图按钮载入即可，工人会消耗材料开建。需要 **Blueprints** 模组（1.7 用 `Blueprints - 1.7 Waylith (Unofficial)`，工坊 ID `3819556044`）。
+
+> **模组建筑也能导**：蓝图里存的是 `defName` 字符串，游戏读蓝图时走 `DefDatabase` 查，所以**任何已加载 mod 的建筑/材质都能映射**，不存在 Core 白名单。
+> 导出时 meta 会自动带上「蓝图里实际用到」的模组 packageId / 工坊 id / 名字；但**放置时必须启用对应模组**，否则那几条会被游戏当成缺失条目（提示后跳过）。
+> 完整证据链（上游源码 + 本机 1.7 DLL 反汇编 + 缺 mod 行为）→ [docs/blueprints-mod-support.md](docs/blueprints-mod-support.md)。
 
 > **更省事**：顶栏点「**存入 Blueprints**」，选一次那个文件夹，之后一键直接写进去，不用自己翻路径。
 > 设定过文件夹后再点「导出蓝图」也会直接写进同一个文件夹，不会额外下载一份。
@@ -217,6 +241,7 @@ node --test        # 或 npm test
 | [docs/usage.md](docs/usage.md) | 绘制规则、物品栏、房间角色推导、模板、界面说明、快捷键 |
 | [docs/checks.md](docs/checks.md) | 校验模型：电力 / 房间 / 温控到底怎么算的 |
 | [docs/import-export.md](docs/import-export.md) | 蓝图导出、存档导入、Blueprints 路径 |
+| [docs/blueprints-mod-support.md](docs/blueprints-mod-support.md) | Blueprints 为什么支持其它 mod 的物品、缺 mod 会怎样 |
 | [docs/data.md](docs/data.md) | 数据准确性、从游戏提取 defs 的三种方案 |
 | [docs/textures.md](docs/textures.md) | 原版贴图的两种获取方式与还原程度 |
 | [docs/architecture.md](docs/architecture.md) | 代码结构、各文件职责、撤销栈设计、测试 |

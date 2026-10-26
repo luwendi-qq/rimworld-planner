@@ -80,29 +80,140 @@
       tx.onerror = function () { rej(tx.error); };
     });
   }
+  function idbDel(db, store, key) {
+    if (db && db.mem) { delete MEM[store][key]; return Promise.resolve(); }
+    return new Promise(function (res, rej) {
+      var tx = db.transaction(store, 'readwrite');
+      tx.objectStore(store).delete(key);
+      tx.oncomplete = function () { res(); };
+      tx.onerror = function () { rej(tx.error); };
+    });
+  }
 
   // ---------------------------------------------------------------- 目录遍历
+  //
+  // 拖文件夹进浏览器，能用的接口就两个，各自的脾气（2026-10 在 macOS 上实测）：
+  //
+  //   webkitGetAsEntry（老接口，Safari / Chrome / Edge 都认）
+  //     · http(s) 页面：能拿目录对象，readEntries 正常，递归读全部文件 —— 主路径。
+  //     · file:// 页面（双击打开 html）：在 macOS 的 Chromium 上 readEntries 直接抛
+  //       EncodingError（Windows 上同样的代码能读，所以「只有 Mac 导入不了」），
+  //       拿到的目录对象是空的，只能靠 main.js 引导用户去点「选择目录」。
+  //     · DataTransferItem 在 drop 事件的同步阶段之外会被「neutered」，所以必须在
+  //       事件里先把 entry 拿到手，之后再慢慢读 —— 这是下面先取 entry 再不等 FSA 的原因。
+  //
+  //   getAsFileSystemHandle（新接口）
+  //     · 在 file:// 页面上返回的 Promise 永远不 resolve（不给本地来源弹权限框），
+  //       所以绝不能把它放在主路径上等，只能当兜底，而且必须带超时。
+  //
+  //  `<input webkitdirectory>`（选择目录）在两个协议下都好使，是 file:// 的唯一活路。
+
+  /** promise 超时兜底：到点当作失败 */
+  function withTimeout(p, ms) {
+    return new Promise(function (res, rej) {
+      var t = setTimeout(function () { rej(new Error('timeout')); }, ms);
+      p.then(function (v) { clearTimeout(t); res(v); }, function (e) { clearTimeout(t); rej(e); });
+    });
+  }
+
+  function isLocalFilePage() {
+    try { return !!(global.location && global.location.protocol === 'file:'); } catch (e) { return false; }
+  }
+
+  /** 拖入的东西里有没有文件/文件夹（纯文字/链接的拖拽不算） */
+  function dropHasFiles(dt) {
+    if (!dt) return false;
+    if (dt.files && dt.files.length) return true;
+    var items = dt.items || [];
+    for (var i = 0; i < items.length; i++) {
+      if (items[i] && items[i].kind === 'file') return true;
+    }
+    return false;
+  }
 
   /** 从拖入的 DataTransfer 里收集文件；目录会递归展开 */
   function collectFromDrop(dt) {
     var out = [];
-    var items = dt.items;
+    var items = (dt && dt.items) || [];
+    // DataTransfer 在 drop 事件结束会被清空，能同步拿的先拿下来
+    var plainFiles = [];
+    try {
+      if (dt && dt.files) plainFiles = Array.prototype.slice.call(dt.files);
+    } catch (e) { plainFiles = []; }
     var jobs = [];
     for (var i = 0; i < items.length; i++) {
-      var entry = items[i].webkitGetAsEntry && items[i].webkitGetAsEntry();
-      if (entry) jobs.push(walkEntry(entry, '', out));
-      else if (items[i].getAsFile) {
-        var f = items[i].getAsFile();
-        if (f) out.push({ path: f.name, file: f });
-      }
+      var item = items[i];
+      if (!item || item.kind === 'string') continue;
+      jobs.push(walkItem(item, out));
     }
-    return Promise.all(jobs).then(function () { return out; });
+    return Promise.all(jobs).then(function () {
+      // items 为空或被浏览器清掉时，还能从 files 里拿到平铺的文件
+      if (!out.length) {
+        for (var j = 0; j < plainFiles.length; j++) {
+          var f = plainFiles[j];
+          if (f) out.push({ path: f.webkitRelativePath || f.name, file: f });
+        }
+      }
+      return out;
+    });
+  }
+
+  /** 单个 DataTransferItem：entry（主路径）→ FileSystemHandle（兜底）→ 单个文件 */
+  function walkItem(item, out) {
+    var entry = null, single = null;
+    try { entry = item.webkitGetAsEntry && item.webkitGetAsEntry(); } catch (e) { entry = null; }
+    try { single = item.getAsFile && item.getAsFile(); } catch (e) { single = null; }
+    if (entry) {
+      var before = out.length;
+      return walkEntry(entry, '', out).then(function () {
+        if (out.length > before) return;           // 老接口读到了，收工
+        return walkByHandle(item, single, out);    // 老接口读不动（macOS file:// 常见）
+      });
+    }
+    return walkByHandle(item, single, out);
+  }
+
+  /** 兜底：File System Access；file:// 下它永不 resolve，直接跳过 */
+  function walkByHandle(item, single, out) {
+    var job = null;
+    if (!isLocalFilePage() && typeof item.getAsFileSystemHandle === 'function') {
+      try { job = withTimeout(Promise.resolve(item.getAsFileSystemHandle()), 3000); } catch (e) { job = null; }
+    }
+    return (job ? job.catch(function () { return null; }) : Promise.resolve(null)).then(function (handle) {
+      if (handle) return walkHandle(handle, '', out);
+      if (single) out.push({ path: single.name, file: single });
+    });
+  }
+
+  /** FileSystemHandle 递归（每次 await 都带超时，防浏览器抽风把导入卡死） */
+  function walkHandle(handle, prefix, out) {
+    if (!handle) return Promise.resolve();
+    if (handle.kind === 'file') {
+      return withTimeout(Promise.resolve().then(function () { return handle.getFile(); }), 20000).then(function (f) {
+        if (f) out.push({ path: prefix + handle.name, file: f });
+      }, function () { /* 读不了就跳过 */ });
+    }
+    if (handle.kind !== 'directory') return Promise.resolve();
+    var dir = prefix + handle.name + '/';
+    var it = handle.values();
+    var all = [];
+    function more() {
+      return withTimeout(Promise.resolve(it.next()), 30000).then(function (r) {
+        if (!r || r.done) return all;
+        all.push(r.value);
+        return more();
+      }, function () { return all; });
+    }
+    return more().then(function (list) {
+      return Promise.all(list.map(function (h) { return walkHandle(h, dir, out); }));
+    });
   }
 
   function walkEntry(entry, prefix, out) {
     if (entry.isFile) {
       return new Promise(function (res) {
-        entry.file(function (f) { out.push({ path: prefix + entry.name, file: f }); res(); }, function () { res(); });
+        entry.file(function (f) { out.push({ path: prefix + entry.name, file: f }); res(); },
+                   function () { res(); });   // 读不了就跳过（macOS file:// 会走到这）
       });
     }
     if (!entry.isDirectory) return Promise.resolve();
@@ -118,7 +229,7 @@
           }
           all = all.concat(Array.prototype.slice.call(batch));
           more();
-        }, function () { res(); });
+        }, function () { res(); });             // macOS file://：EncodingError 会落到这里
       }
       more();
     });
@@ -132,6 +243,36 @@
       out.push({ path: (f.webkitRelativePath || f.name), file: f });
     }
     return out;
+  }
+
+  function pathOfGameFile(f) {
+    return (f && (f.path || f.webkitRelativePath || f.name)) || '';
+  }
+
+  /**
+   * 收集到的一堆文件里，是否像「RimWorld 安装目录 / Data 目录」？
+   * 拖拽在 macOS 的 file:// 页面上读不到目录内容，只会掉出一两个假文件；
+   * 用它来判断「该提示换选择目录」还是「真能开始导入」，别让用户白等一次解析。
+   */
+  function looksLikeGameDir(files) {
+    for (var i = 0; files && i < files.length; i++) {
+      var p = pathOfGameFile(files[i]);
+      if (/\.zip$/i.test(p)) return true;
+      if (/(^|\/)Data\/[^/]+\/Defs\/.+\.xml$/i.test(p)) return true;
+      if (/(^|\/)Core\/Defs\/.+\.xml$/i.test(p)) return true;
+      if (/(^|\/)About\/About\.xml$/i.test(p) && /(^|\/)Core\//i.test(p)) return true;
+    }
+    return false;
+  }
+
+  /** 是否像「Mods 目录 / 单个模组目录」：有 About.xml 或任意 Defs/*.xml */
+  function looksLikeModDir(files) {
+    for (var i = 0; files && i < files.length; i++) {
+      var p = pathOfGameFile(files[i]);
+      if (/(^|\/)About\/About\.xml$/i.test(p)) return true;
+      if (/(^|\/)Defs\/.+\.xml$/i.test(p)) return true;
+    }
+    return false;
   }
 
   // ---------------------------------------------------------------- 贴图清单
@@ -228,20 +369,44 @@
     if (this.onProgress) this.onProgress(text, frac);
   };
 
+  /** 从拖入的文件里认出游戏版本（Version.txt 优先，其次 Core 的 About.xml supportedVersions） */
+  async function detectGameVersion(verFiles, coreAbout) {
+    for (var i = 0; i < verFiles.length; i++) {
+      try {
+        var txt = await verFiles[i].text();
+        var m = /(\d+\.\d+)(?:\.\d+)?/.exec(txt);
+        if (m) return m[1];
+      } catch (e) { /* 换下一个 */ }
+    }
+    if (coreAbout) {
+      try {
+        var ax = await coreAbout.text();
+        var sm = /<supportedVersions>([\s\S]*?)<\/supportedVersions>/.exec(ax);
+        if (sm) {
+          var vs = sm[1].match(/\d+\.\d+/g);
+          if (vs && vs.length) return vs[vs.length - 1];
+        }
+      } catch (e) { /* 忽略 */ }
+    }
+    return '';
+  }
+
   /**
    * 导入。files = [{path, file}]
    * 返回 { buildings, stuffs, stuffCats, floors, spriteCount, skipped }
    */
   Importer.prototype.run = async function (files) {
     var self = this;
-    var docs = [], zips = [], langJobs = [];
+    var docs = [], zips = [], langJobs = [], verFiles = [], coreAbout = null;
 
     this.tick('正在读取游戏目录…', 0.02);
     files.forEach(function (f) {
       var p = f.path.replace(/\\/g, '/');
       var lower = p.toLowerCase();
       var base = lower.split('/').pop();
-      if (base === 'assets.zip') { zips.push(f.file); return; }
+      if (base === 'version.txt') { verFiles.push(f.file); return; }
+      if (base === 'about.xml' && /(^|\/)data\/core\/about\//i.test(lower)) { coreAbout = f.file; return; }
+      if (base === 'assets.zip') { zips.push({ file: f.file, path: lower }); return; }
       // 语言包：官方简中（tar 打包 或 解包后的 DefInjected XML 都认）
       if (lower.indexOf('chinesesimplified') >= 0) {
         if (/\.tar$/.test(base)) langJobs.push({ file: f.file, kind: 'tar' });
@@ -251,8 +416,17 @@
       if (/\/defs\/.+\.xml$/i.test(lower)) docs.push(f);
     });
 
-    if (!docs.length) throw new Error('没找到 Data/**/Defs/**/*.xml —— 请拖入整个 RimWorld 安装目录（或它的 Data 目录）');
-    if (!zips.length) throw new Error('没找到 Assets.zip —— 请拖入整个 RimWorld 安装目录（新版贴图打包在 Assets.zip 里）');
+    if (!docs.length) throw new Error('没找到 Data/**/Defs/**/*.xml —— 请选择整个 RimWorld 安装目录（或它的 Data 目录）');
+    if (!zips.length) throw new Error('没找到 Assets.zip —— 请选择整个 RimWorld 安装目录（新版贴图打包在 Assets.zip 里；macOS 在 RimWorld.app/Contents/MacOS/Assets.zip）');
+    // macOS 特例：原版的 Assets.zip 在 RimWorld.app 里面，只选 Data 目录就只剩 5 个 DLC 贴图包，
+    // 建筑会全部没有贴图。这里直接说清楚，别让人对着「导入了但没贴图」发懵。
+    var hasCoreZip = zips.some(function (z) {
+      return /(^|\/)data\/core\/assets\.zip$/.test(z.path) || /\.app\/contents\/macos\/assets\.zip$/.test(z.path);
+    });
+    if (!hasCoreZip) {
+      throw new Error('只找到 DLC 的 Assets.zip，没找到原版（Core）贴图包。macOS 上它在 RimWorld.app/Contents/MacOS/Assets.zip 里，' +
+        '请选择整个 RimWorld 安装目录（Steam 里右键游戏 → 管理 → 浏览本地文件），别只选 Data 目录。');
+    }
 
     this.tick('正在读取定义文件（' + docs.length + ' 个）…', 0.08);
     var xmlDocs = [];
@@ -278,6 +452,8 @@
         }
       } catch (e) { /* 换下一个来源 */ }
     }
+    this.tick('正在识别游戏版本…', 0.21);
+    var gameVersion = await detectGameVersion(verFiles, coreAbout);
     this.tick('正在解析建筑数据…', 0.22);
     var parsed = global.RWDefs.parse(xmlDocs, lang);
     if (!parsed.buildings.length) throw new Error('解析出来的建筑是 0 条，游戏版本可能不兼容');
@@ -286,7 +462,7 @@
     this.tick('正在打开贴图包（' + zips.length + ' 个）…', 0.26);
     var zipReaders = [];
     for (var z = 0; z < zips.length; z++) {
-      zipReaders.push(await global.RWZip.openZip(zips[z]));
+      zipReaders.push(await global.RWZip.openZip(zips[z].file));
       if (this.cancel) throw new Error('已取消');
     }
     var tex = buildTexIndex(zipReaders);
@@ -447,7 +623,11 @@
           }
         }
       } catch (e) {
+        // 这张贴图解不出来（最常见：浏览器没开硬件加速 / 没有 BC7(BC6) 纹理扩展）。
+        // 别登记半成品条目（imgs 会是空的，渲染层会拿到一份解不出的计划），
+        // 直接留空，画布上这个建筑就走矢量图，不影响布局。
         skipped++;
+        continue;
       }
       manifest.items[dn] = entry;
       manifest.byName[norm(dn)] = dn;
@@ -497,11 +677,15 @@
     await idbPut(db, META, 'rocks', parsed.rocks || []);
     await idbPut(db, META, 'researches', parsed.researches || []);
     await idbPut(db, META, 'items', parsed.items || {});
+    // 原始 Defs XML + 游戏版本：之后扫描模组时，要用它们来解析 ParentName 跨模组/跨原版继承
+    await idbPut(db, META, 'defdocs', xmlDocs);
+    if (gameVersion) await idbPut(db, META, 'gameVersion', gameVersion);
     meta.sprites = done;
     meta.skipped = skipped;
     meta.bytes = bytes;
     meta.buildingsTotal = merged.total;
     meta.langSource = langSource;
+    meta.gameVersion = gameVersion || '';
     await idbPut(db, META, 'info', meta);
     db.close();
 
@@ -643,14 +827,66 @@
     } catch (e) { return null; }
   }
 
+  // ---------------------------------------------------------------- 给模组导入用的底层 API
+  // js/modimport.js 复用同一套 IndexedDB：核心游戏数据是「底」，模组只是在上面加一层。
+
+  async function getMeta(key) {
+    try {
+      var db = await idbOpen();
+      var v = await idbGet(db, META, key);
+      db.close();
+      return v;
+    } catch (e) { return null; }
+  }
+  async function setMeta(key, val) {
+    var db = await idbOpen();
+    await idbPut(db, META, key, val);
+    db.close();
+  }
+  async function delMeta(key) {
+    var db = await idbOpen();
+    await idbDel(db, META, key);
+    db.close();
+  }
+  async function putTexture(name, blob) {
+    var db = await idbOpen();
+    await idbPut(db, STORE, name, blob);
+    db.close();
+  }
+  async function delTextures(names) {
+    if (!names || !names.length) return;
+    var db = await idbOpen();
+    for (var i = 0; i < names.length; i++) await idbDel(db, STORE, names[i]);
+    db.close();
+  }
+  /** 核心 Defs 原始 XML（游戏目录导入时存下的）+ 游戏版本；没导入过游戏目录时返回 null */
+  async function getCoreDefDocs() {
+    try {
+      var docs = await getMeta('defdocs');
+      if (!docs || !docs.length) return null;
+      var version = await getMeta('gameVersion');
+      return { docs: docs, version: version || '' };
+    } catch (e) { return null; }
+  }
+
   global.RWGame = {
     Importer: Importer,
     collectFromDrop: collectFromDrop,
     collectFromInput: collectFromInput,
+    dropHasFiles: dropHasFiles,
+    looksLikeGameDir: looksLikeGameDir,
+    looksLikeModDir: looksLikeModDir,
     loadCache: loadCache,
     getImageURL: getImageURL,
     clearCache: clearCache,
     cacheInfo: cacheInfo,
+    // —— 模组导入（js/modimport.js）用的底层接口 ——
+    getMeta: getMeta,
+    setMeta: setMeta,
+    delMeta: delMeta,
+    putTexture: putTexture,
+    delTextures: delTextures,
+    getCoreDefDocs: getCoreDefDocs,
     _findGraphic: findGraphic
   };
 })(typeof window !== 'undefined' ? window : globalThis);

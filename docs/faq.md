@@ -12,6 +12,17 @@
 
 详见 [textures.md](textures.md)。
 
+### macOS 上把文件夹拖进网页没反应，或提示「没拿到文件，换个方式再试一次」？
+
+双击打开 html（`file://` 页面）时，浏览器不允许网页读取**拖进来**的文件夹内容，只会掉出一两个假文件，
+这是 Chromium 浏览器（Chrome / Edge / 豆包等）在 `file://` 页面上共有的安全限制，不是工具的问题。点面板上的「**选择游戏目录**」/
+「**选择模组文件夹**」把文件夹选进来就行（选一次，结果存在浏览器里，下次打开不用再选）。
+
+- macOS 安装目录：`~/Library/Application Support/Steam/steamapps/common/RimWorld`
+- 核心贴图不在 `Data/Core/`，在 `RimWorld.app/Contents/MacOS/Assets.zip` —— 选安装目录**整层**，工具会自己进去找
+- macOS 的 Mods：`~/Library/Application Support/RimWorld/Mods`；Steam 创意工坊模组在 `…/steamapps/workshop/content/294100/`
+- 想长期用、又不想每次点按钮：在仓库目录跑 `python3 -m http.server`，用 `http://localhost:8000` 打开，拖拽就正常了
+
 ### 需要联网吗？会上传我的数据吗？
 
 不需要，也不会。全部逻辑跑在本地浏览器里，没有任何网络请求。
@@ -75,8 +86,14 @@
 
 ### 能规划 mod 的建筑吗？
 
-可以。如果你的 mod 建筑在游戏 `Defs` 里，导入游戏目录时会被扫描进来作为新条目追加。
-（纯贴图 mod 里没有 def 的建筑自然不会被识别。）
+可以。右侧「导入模组建筑」把模组文件夹拖进来，就会把 mod 新增的可建造建筑和贴图扫进物品栏（多出「🧩 模组」页签）。
+
+- 本地 mod 在 `<游戏目录>/Mods/`；**Steam 创意工坊订阅的在 `steamapps/workshop/content/294100/`**，不是 `Mods/`
+- 把整个 `294100` 文件夹拖进来 = 一次导入全部订阅 mod
+- 先「导入游戏资源」再导模组：模组的 `ParentName` 常继承原版抽象 def，没核心数据会解析不全
+- 只读 `Defs/` 里直接声明的建筑：靠 `Patches/` XML Patch 或 C# 动态加的建筑扫不到；贴图打包在 AssetBundles 里的会退回矢量图标
+
+详见 [import-export.md 的「导入模组建筑」](import-export.md#导入模组建筑)。
 
 ### 支持手机吗？
 

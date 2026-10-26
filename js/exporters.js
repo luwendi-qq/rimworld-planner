@@ -147,11 +147,32 @@
       maxX = Math.max(maxX, e.x); maxZ = Math.max(maxZ, e.z);
     });
 
-    // meta：优先复用导入存档里的 mod 列表，这样游戏不会报「缺少 mod」
+    // meta：优先复用导入存档里的 mod 列表，这样游戏不会报「缺少 mod」；
+    // 再把「扫描进来的模组」（js/modimport.js）自动并进去，蓝图里用到模组建筑时游戏才不会误报缺失。
     var meta = opts.meta || {};
-    var modIds = meta.modIds && meta.modIds.length ? meta.modIds : ['brrainz.harmony', 'ludeon.rimworld', 'nova.blueprints.waylith17'];
-    var modSteam = meta.modSteamIds && meta.modSteamIds.length ? meta.modSteamIds : modIds.map(function () { return '0'; });
-    var modNames = meta.modNames && meta.modNames.length ? meta.modNames : ['Harmony', 'Core', 'Blueprints - 1.7 Waylith (Unofficial)'];
+    var auto = (global.RWMods && global.RWMods.exportMeta) ? global.RWMods.exportMeta(entries) : null;
+    var modIds, modSteam, modNames;
+    if (meta.modIds && meta.modIds.length) {
+      modIds = meta.modIds.slice();
+      modSteam = (meta.modSteamIds || []).slice();
+      modNames = (meta.modNames || []).slice();
+    } else if (auto && auto.modIds && auto.modIds.length) {
+      modIds = auto.modIds.slice();
+      modSteam = auto.modSteamIds.slice();
+      modNames = auto.modNames.slice();
+    } else {
+      modIds = ['brrainz.harmony', 'ludeon.rimworld', 'nova.blueprints.waylith17'];
+      modSteam = modIds.map(function () { return '0'; });
+      modNames = ['Harmony', 'Core', 'Blueprints - 1.7 Waylith (Unofficial)'];
+    }
+    if (auto && auto.modIds) {
+      auto.modIds.forEach(function (id, i) {
+        if (modIds.indexOf(id) >= 0) return;
+        modIds.push(id);
+        modSteam.push(auto.modSteamIds[i] || '0');
+        modNames.push(auto.modNames[i] || '');
+      });
+    }
     while (modSteam.length < modIds.length) modSteam.push('0');
     while (modNames.length < modIds.length) modNames.push('');
 
@@ -160,7 +181,7 @@
     L.push('<?xml version="1.0" encoding="utf-8"?>');
     L.push('<Blueprint>');
     L.push(T + '<meta>');
-    L.push(T + T + '<gameVersion>' + escapeXml(opts.gameVersion || meta.gameVersion || '') + '</gameVersion>');
+    L.push(T + T + '<gameVersion>' + escapeXml(opts.gameVersion || meta.gameVersion || (auto && auto.gameVersion) || '') + '</gameVersion>');
     L.push(T + T + '<modIds>');
     modIds.forEach(function (x) { L.push(T + T + T + '<li>' + escapeXml(x) + '</li>'); });
     L.push(T + T + '</modIds>');

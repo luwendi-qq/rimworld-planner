@@ -51,6 +51,14 @@ class XmlNode {
     return out;
   }
 
+  /**
+   * 和浏览器 DOM 一样提供 childNodes（gamedefs.js 用它遍历子元素）。
+   * 这里只保留元素节点（文本都在 _text 里），所以 childNodes === children。
+   */
+  get childNodes() {
+    return this.children;
+  }
+
   set textContent(v) {
     this._text = v == null ? '' : String(v);
     this.children.length = 0;

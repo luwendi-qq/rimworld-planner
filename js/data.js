@@ -503,6 +503,58 @@
     return { replaced: replaced, added: added, keptArt: keptArt, total: BUILDINGS.length };
   }
 
+  /**
+   * 把「带 .mod 标记的模组建筑」还原成核心游戏数据（删除模组 / 重新解析前用）。
+   * base 是核心游戏数据快照（浏览器里存的是 IndexedDB 的 buildings 列表）：
+   *   - base 里有的：说明模组覆盖了原版同名建筑，把核心字段写回去并去掉 mod 标记；
+   *   - base 里没有的：模组新增的，从库里删掉。
+   */
+  function restoreBaseBuildings(base) {
+    var baseByKey = {};
+    (base || []).forEach(function (b) {
+      if (!b) return;
+      var k = normDef(b.def || b.en || b.id);
+      if (k) baseByKey[k] = b;
+    });
+    var removed = 0, restored = 0;
+    for (var i = BUILDINGS.length - 1; i >= 0; i--) {
+      var b = BUILDINGS[i];
+      if (!b || !b.mod) continue;
+      var src = baseByKey[normDef(b.def || b.en || b.id)] || null;
+      if (!src) {
+        BUILDINGS.splice(i, 1);
+        if (b.id && byId[b.id] === b) delete byId[b.id];
+        removed++;
+        continue;
+      }
+      var copy = {};
+      for (var k in src) if (Object.prototype.hasOwnProperty.call(src, k)) copy[k] = src[k];
+      copy.id = b.id;
+      copy.exact = true;
+      BUILDINGS[i] = copy;
+      byId[copy.id] = copy;
+      restored++;
+    }
+    reindexBuildings();
+    return { removed: removed, restored: restored };
+  }
+
+  /** 直接改过 BUILDINGS/byId 之后，重建规范化字段与「defName → id」索引 */
+  function reindexBuildings() {
+    // byId 是给外部直接读的对象，就地把已经不在 BUILDINGS 里的条目删掉
+    var live = {};
+    for (var i = 0; i < BUILDINGS.length; i++) live[BUILDINGS[i].id] = BUILDINGS[i];
+    for (var k in byId) {
+      if (Object.prototype.hasOwnProperty.call(byId, k) && !live[k]) delete byId[k];
+    }
+    for (var k2 in live) {
+      if (Object.prototype.hasOwnProperty.call(live, k2)) byId[k2] = live[k2];
+    }
+    nameIndex = null;
+    normalizeDefs();
+    buildNameIndex();
+  }
+
   // ------------------------------------------------------------------
   // 地形 / 山体 / 科技树 索引
   // ------------------------------------------------------------------
@@ -665,6 +717,8 @@
     normDef: normDef,
     matchDefName: matchDefName,
     mergeBuildings: mergeBuildings,
+    restoreBaseBuildings: restoreBaseBuildings,
+    reindexBuildings: reindexBuildings,
     // ---- 地形 / 山体 / 科技树 ----
     terrainHash: terrainHash,
     terrains: function () { return terrains; },
