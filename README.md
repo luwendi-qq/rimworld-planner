@@ -92,6 +92,20 @@ git pull
 
 完整操作说明 → [docs/usage.md](docs/usage.md)
 
+## 更新日志
+
+按时间倒序，只列主要改动；完整记录（含问题定位与测试数据）见 [CHANGELOG.md](CHANGELOG.md)。
+最新构建自动发布在 [Releases · latest](https://github.com/luwendi-qq/rimworld-planner/releases/latest)。
+
+| 日期 | 改动 |
+| --- | --- |
+| 2026-10-26 | **模组建筑导入**：拖入 `Mods/`、创意工坊 `294100/` 或单个模组文件夹，自动扫描模组新增的**可建造建筑与贴图**，物品栏出现「🧩 模组」页签；导出蓝图时 `<meta>` 只写真正用到的模组。同时核实了 Blueprints 对任意 mod 建筑的映射 → [说明](docs/blueprints-mod-support.md) |
+| 2026-10-26 | **macOS 修复**：双击打开的单文件版在 `file://` 下拖拽文件夹读不到文件（Chromium 限制），改为 entry-first 收集 + 目录嗅探并给出引导；Mac 核心贴图自动从 `RimWorld.app/Contents/MacOS/Assets.zip` 取；贴图解不出时退回矢量图、不再崩掉渲染 |
+| 2026-10-21 | 按「AI 全自主玩 20 天」的复盘修问题：冷冻库目标温度、旧建筑挡校验、材质自动挑选、问题来源标记、新规划与存档原有建筑区分显示等 |
+| 2026-10-20 | 新增命令行入口 `node tools/plan.js`：读存档 → 规划 → 校验 → 直接生成游戏侧 `build()` 调用，给 AI / 脚本用 → [docs/for-llm.md](docs/for-llm.md) |
+| 2026-10-20 | 规划器大更新：房间角色、温控、电力、粘贴模板、AI 简报 / 导入 AI 规划等主体功能落地 |
+| 更早 | 初始版本与早期迭代，详见 [CHANGELOG.md](CHANGELOG.md) |
+
 ## 截图
 
 ### 布局校验：电力 / 房间 / 建筑清单

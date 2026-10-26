@@ -86,6 +86,20 @@ Or click **Code → Download ZIP** on the repo page and overwrite your old folde
 
 Full manual → [docs/usage.md](docs/usage.md) (Chinese)
 
+## Changelog
+
+Newest first, highlights only; the full log (with debugging details and test data) is in [CHANGELOG.md](CHANGELOG.md) (Chinese).
+Every update is auto-built and published to [Releases · latest](https://github.com/luwendi-qq/rimworld-planner/releases/latest).
+
+| Date | Change |
+| --- | --- |
+| 2026-10-26 | **Mod building import**: drop `Mods/`, Steam Workshop `294100/`, or a single mod folder — buildable buildings and textures from each mod are scanned in, a "🧩 模组" tab appears in the palette, and the exported blueprint's `<meta>` lists only the mods actually used. Also verified that Blueprints maps buildings from any mod → [notes](docs/blueprints-mod-support.md) |
+| 2026-10-26 | **macOS fixes**: in the double-clicked single-file build, dragging folders under `file://` read no files (Chromium restriction) — now uses entry-first collection with directory sniffing and clear guidance; Core textures are picked up from `RimWorld.app/Contents/MacOS/Assets.zip`; undecodable textures fall back to vector icons instead of breaking rendering |
+| 2026-10-21 | Fixes from a "20 days of fully autonomous AI play" retrospective: freezer target temperature, existing buildings blocking checks, automatic material picking, issue source labels, planned-vs-existing rendering |
+| 2026-10-20 | CLI entry point `node tools/plan.js`: save → plan → checks → game-side `build()` calls, for AI / scripts → [docs/for-llm.md](docs/for-llm.md) (Chinese) |
+| 2026-10-20 | Major planner update: room roles, temperature, power, paste templates, AI briefing / AI plan import |
+| Earlier | Initial version and early iterations — see [CHANGELOG.md](CHANGELOG.md) |
+
 ## Screenshots
 
 ### Layout check: power network
